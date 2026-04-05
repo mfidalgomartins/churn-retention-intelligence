@@ -1,0 +1,48 @@
+category,check_name,status,severity,gate_level,is_blocker,evidence
+Data Quality,Row/column count sanity,PASS,info,technical_validity,False,"Observed shapes: {'customers': (3500, 6), 'subscriptions': (3500, 8), 'product_usage': (367054, 7), 'payments': (56445, 5)}; checked against structural counts and plausible row-count ranges."
+Data Quality,Duplicate handling,PASS,info,technical_validity,True,"Primary-key duplicate counts: {'customers.customer_id': 0, 'subscriptions.subscription_id': 0, 'product_usage.usage_id': 0, 'payments.payment_id': 0}."
+Data Quality,Null handling,PASS,info,technical_validity,False,subscription_end_date nulls=2547 (expected for open accounts); unexpected subscription nulls={}.
+Data Quality,Status consistency,PASS,info,technical_validity,True,"Subscription statuses=['active', 'at_risk', 'churned']; payment statuses=['failed', 'paid']; invalid subscription=[]; invalid payment=[]."
+Data Quality,Impossible date logic,PASS,info,technical_validity,True,subscription_end_before_start=0; signup_after_subscription_start=0.
+Data Quality,Impossible revenue values,PASS,info,technical_validity,False,subscriptions.monthly_revenue <= 0 rows: 0.
+Data Quality,Overlapping subscriptions where not expected,PASS,info,technical_validity,True,Customers with overlapping subscription intervals: 0.
+Data Quality,Usage dates outside subscription periods,PASS,info,technical_validity,False,Usage rows outside active subscription window: 0.
+Data Quality,Payment consistency,PASS,info,technical_validity,False,payment.amount<=0 rows=0; payment_before_subscription_start=0; payment_after_subscription_end=0.
+Metric Correctness,churn_flag logic,PASS,info,analytical_validity,True,churn_flag mismatches=0; rows with churn_flag=1 and at_risk_flag=1=0.
+Metric Correctness,at_risk_flag logic,PASS,info,analytical_validity,True,at_risk_flag mismatches=0.
+Metric Correctness,Customer churn rate calculation,PASS,info,analytical_validity,True,features churn_rate=0.272286; segment_summary implied=0.272286; diff=0.00000000.
+Metric Correctness,Revenue churn rate calculation,PASS,info,analytical_validity,True,features churned_monthly_value=191102.08; churn_by_segment churned_revenue sum=191102.08; revenue_churn_rate=0.137684.
+Metric Correctness,Revenue at risk calculation,PASS,info,analytical_validity,False,Max segment-level absolute diff vs recompute: 0.0000.
+Metric Correctness,Retention rate correctness,PASS,info,analytical_validity,False,cohort retention mismatches=0; bounds violations=0.
+Metric Correctness,Monthly trend metric correctness,PASS,info,analytical_validity,True,overall_retention_trend_monthly inconsistencies=0.
+Metric Correctness,Cohort logic correctness,PASS,info,analytical_validity,False,observation_before_cohort=0; active_denominator_inconsistencies=0; monotonicity_violations=0.
+Analytical Integrity,Join inflation risk,PASS,info,analytical_validity,True,"Unique rows -> customers 3500/3500, subscriptions 3500/3500, features 3500/3500, risk_scores 2547/2547."
+Analytical Integrity,Incomplete period comparison risk,WARN,major,analytical_validity,False,"Months with active_customers_start < 100: 2 (2022-01-01, 2022-02-01)."
+Analytical Integrity,Denominator correctness,PASS,info,analytical_validity,True,Dimension-level denominator/rate inconsistencies=0.
+Analytical Integrity,Survivorship bias risk,PASS,info,analytical_validity,False,risk_scores rows=2547; non-churned feature rows=2547; scoring layer excludes churned accounts by design.
+Analytical Integrity,Overclaiming risk,PASS,info,analytical_validity,False,Behavior signals with churn lift <= 1.0: none.
+Analytical Integrity,Conclusions supported by evidence,PASS,info,analytical_validity,False,"Section 3 finding includes top drivers check -> True. Top values: segment=Startup, region=LATAM, channel=Affiliate, plan=Basic, relationship=low_nps_flag."
+Visualization Review,Chart file completeness/readability,PASS,info,communication_quality,False,missing=[]; tiny_files=[]; small_dimensions=[].
+Visualization Review,Chart index consistency,PASS,info,communication_quality,False,chart_index rows=12; missing in index=[].
+Visualization Review,Title quality,PASS,info,communication_quality,False,Detected 9 chart titles in script; short/non-insight titles=[].
+Visualization Review,Axis correctness,PASS,info,communication_quality,False,Percent-format axes references=5; currency-format axes references=1.
+Visualization Review,Misleading chart risk,PASS,info,communication_quality,False,No inverted/truncated y-axis directives found for churn and retention bar/line charts; heatmap bounded at 0-1.
+Dashboard Review,Official dashboard output uniqueness,PASS,info,decision_product_quality,False,Dashboard HTML files detected: ['churn_retention_command_center.html'].
+Dashboard Review,Governed data-source usage,PASS,info,decision_product_quality,True,Builder uses governed processed/output artifacts and does not query raw source files directly.
+Dashboard Review,Required diagnostics coverage (region),PASS,info,decision_product_quality,False,Region-level churn diagnostic chart is present in the dashboard.
+Dashboard Review,Dashboard payload integrity,PASS,info,decision_product_quality,True,Embedded payload contains governed cubes and rendering tables.
+Dashboard Review,Filtered vs aggregated output consistency,PASS,info,decision_product_quality,False,"Date/categorical/risk filters are implemented and connected to trend, risk, and diagnostic retrieval functions."
+Dashboard Review,Consistency between KPI cards and trend charts,PASS,info,decision_product_quality,True,"Compared 50 overlapping months in all-scope cube vs official trend table; max customer churn diff=0.00000050, max revenue churn diff=0.00000048."
+Dashboard Review,Risk chart/table logic consistency,PASS,info,decision_product_quality,False,scored_customers required columns=True; risk_kpi_cube contains all-scope row=True.
+Dashboard Review,Priority table schema consistency,PASS,info,decision_product_quality,False,Priority-table columns are governed by the risk scoring output schema.
+Dashboard Review,Chart density and readability scope,PASS,info,decision_product_quality,False,Unique chart canvases detected: 10.
+Dashboard Review,Responsive/layout safety,PASS,info,decision_product_quality,False,Layout uses grid-based responsive rules with constrained overflow and without fragile absolute positioning.
+Dashboard Review,Offline/self-contained packaging,PASS,info,decision_product_quality,False,Dashboard HTML is packaged without external network script/style dependencies.
+Dashboard Review,Payload size/performance sanity,PASS,info,decision_product_quality,False,Dashboard HTML payload size=2385583 bytes.
+Dashboard Review,Version stamping and traceability,PASS,info,decision_product_quality,True,Dashboard embeds version metadata in governed payload and exposes period traceability controls in the UI.
+Governance & Release,Risk tier summary cross-output consistency,PASS,info,general,False,Tier count absolute diff between risk_scores and risk_tier_summary: 0.
+Governance & Release,Priority ranking monotonicity,PASS,info,general,False,Rows violating non-increasing priority order: 0.
+Governance & Release,Risk tier score monotonicity,PASS,info,general,False,"Tier average priority monotonicity violations=0; averages={'high': 63.98487179487179, 'medium': 46.258989113530326, 'low': 28.148166219839144}."
+Governance & Release,Recommended-action rule consistency,PASS,info,general,False,Action rows violating scoring policy rules: 0.
+Governance & Release,Financial tie-out consistency,PASS,info,general,False,Max absolute diff between segment financial outputs and feature recomputation: 0.0000.
+Governance & Release,Score stability baseline drift,PASS,info,general,False,max_tier_share_drift=0.0000; avg_priority_drift=0.0000; baseline_version=2026-04-02-v1.

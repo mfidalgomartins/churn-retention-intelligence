@@ -1,0 +1,13 @@
+{
+  "baseline_version": "2026-04-02-v1",
+  "generated_at_utc": "2026-04-02 12:31:55 UTC",
+  "population": 2547,
+  "tier_share": {
+    "critical": 0.0,
+    "high": 0.015312131919905771,
+    "medium": 0.2524538672948567,
+    "low": 0.7322340007852375
+  },
+  "avg_priority_score": 33.26905,
+  "notes": "Synthetic-seed baseline for drift guardrails in final validation."
+}

@@ -1,0 +1,7 @@
+state,active,criterion,evidence
+technically valid,True,No blocker failures in technical and product-quality gates.,"blocker_fails=0, technical_failures=0"
+analytically acceptable,True,Technically valid and no analytical failures with controlled major caveats.,"analytical_failures=0, major_warns=1"
+decision-support only,True,Analytically acceptable but still caveated (simulation/proxy/correlation limits).,"synthetic_data=True, total_warns=1"
+screening-grade only,False,Technically stable but analytically below decision-support threshold.,"technically_valid=True, analytically_acceptable=True"
+not committee-grade,True,Any unresolved caveat or synthetic-data limitation prevents committee-grade claims.,"synthetic_data=True, warns=1"
+publish-blocked,False,Any FAIL or blocker fail blocks publication-ready claim.,"fail_count=0, blocker_fails=0"

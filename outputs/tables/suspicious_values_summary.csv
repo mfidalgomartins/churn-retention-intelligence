@@ -1,0 +1,4 @@
+table_name,issue,affected_rows,threshold_or_rule,note
+subscriptions,extreme_high_monthly_revenue,0,monthly_revenue > 7247.52,Likely rare tail accounts; validate if enterprise pricing assumptions are intentional.
+product_usage,zero_session_events,669,sessions == 0,Not impossible; can represent dormant weeks and is analytically useful for risk signals.
+payments,failed_payment_events,2017,payment_status == 'failed',Expected risk signal; monitor concentration by segment/channel before modeling.

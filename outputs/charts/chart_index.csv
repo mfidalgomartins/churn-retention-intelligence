@@ -1,0 +1,13 @@
+chart_number,file_name,chart_title,business_narrative_support
+1,customer_churn_trend_over_time.png,Customer Churn Trend Over Time,Tracks whether customer churn is improving or worsening over time and anchors overall retention health.
+2,revenue_churn_trend_over_time.png,Revenue Churn Trend Over Time,Shows how much recurring revenue is being lost over time and whether value loss is concentrated.
+3,cohort_retention_curves.png,Cohort Retention Curves,Compares customer survival patterns by signup cohort to assess onboarding and lifecycle quality.
+4,revenue_retention_by_cohort.png,Revenue Retention by Cohort,Evaluates which cohorts preserve the most revenue and where monetization erosion begins.
+5,churn_rate_by_segment.png,Churn Rate by Segment,Identifies which customer segments contribute disproportionately to churn volume.
+6,churn_rate_by_acquisition_channel.png,Churn Rate by Acquisition Channel,Highlights acquisition sources with weaker retention quality and potential CAC inefficiency.
+7,churn_rate_by_plan_type.png,Churn Rate by Plan Type,Shows whether specific plans systematically underperform on retention.
+8,usage_trend_churned_vs_retained.png,Usage Trend for Churned vs Retained Customers,Demonstrates relationship between pre-churn behavior decay and realized churn.
+9,support_tickets_churned_vs_retained.png,Support Tickets for Churned vs Retained Customers,Supports the service-friction hypothesis by comparing support burden between churned and retained groups.
+10,revenue_at_risk_by_segment.png,Revenue at Risk by Segment,Quantifies where intervention should be concentrated to protect the largest revenue pools.
+11,top_risk_drivers_distribution.png,Top Risk Drivers Distribution,"Shows which operational issues are most prevalent, informing playbook staffing and ownership."
+12,priority_customers_ranking_chart.png,Priority Customers Ranking Chart,Provides action-ready target list for Customer Success and retention operations.

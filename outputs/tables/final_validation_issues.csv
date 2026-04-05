@@ -1,0 +1,2 @@
+category,check_name,severity,gate_level,is_blocker,status,evidence,fix_applied
+Analytical Integrity,Incomplete period comparison risk,major,analytical_validity,False,WARN,"Months with active_customers_start < 100: 2 (2022-01-01, 2022-02-01).",No (validation-only scope)

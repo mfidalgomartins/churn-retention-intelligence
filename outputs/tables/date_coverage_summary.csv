@@ -1,0 +1,6 @@
+table_name,date_field,min_date,max_date,coverage_days
+customers,signup_date,2022-01-01,2026-02-28,1519
+subscriptions,subscription_start_date,2022-01-02,2026-03-01,1519
+subscriptions,subscription_end_date,2024-08-18,2026-02-28,559
+product_usage,usage_date,2022-01-02,2026-03-01,1519
+payments,payment_date,2022-01-02,2026-03-01,1519

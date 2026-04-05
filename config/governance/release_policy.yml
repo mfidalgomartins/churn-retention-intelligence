@@ -1,0 +1,32 @@
+version: 1
+policy_owner: analytics-qa
+
+readiness_states:
+  - technically valid
+  - analytically acceptable
+  - decision-support only
+  - screening-grade only
+  - not committee-grade
+  - publish-blocked
+
+blocker_fail_policy:
+  description: Any blocker FAIL triggers publish-blocked state.
+  action: stop_release
+
+warn_policy:
+  major_warn_threshold_for_analytical_acceptance: 1
+  major_warn_threshold_for_decision_support: 3
+
+synthetic_data_policy:
+  committee_grade_allowed: false
+  note: Synthetic data outputs are never committee-grade regardless of technical quality.
+
+release_gate_outputs:
+  - outputs/tables/data_contract_checks.csv
+  - outputs/tables/data_contract_issues.csv
+  - outputs/tables/final_validation_checks.csv
+  - outputs/tables/final_validation_issues.csv
+  - outputs/tables/release_readiness_matrix.csv
+  - docs/governance/data_contract_validation_report.md
+  - docs/reports/final_validation_report.md
+  - docs/governance/release_readiness_summary.md

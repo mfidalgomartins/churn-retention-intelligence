@@ -1,0 +1,5 @@
+segment,customers,at_risk_customers,churned_customers,at_risk_mrr,churned_revenue,future_revenue_risk,total_revenue_loss_proxy
+SMB,1416,228,481,50899.83,86323.61,50899.83,137223.44
+Mid-Market,974,103,177,37538.64,45725.01,37538.64,83263.65
+Enterprise,536,42,38,36630.090000000004,24183.36,36630.090000000004,60813.450000000004
+Startup,574,105,257,17124.92,34870.1,17124.92,51995.02

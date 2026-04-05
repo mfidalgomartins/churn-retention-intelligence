@@ -1,0 +1,15 @@
+table_name,check_name,failed_rows,denominator,failure_rate,severity,status,details
+subscriptions,overlapping_subscriptions,0,3500,0.0,high,PASS,Subscription start date should occur after previous subscription end date for the same customer.
+subscriptions,impossible_revenue_values,0,3500,0.0,high,PASS,Monthly revenue must be positive and finite.
+subscriptions,invalid_subscription_status,0,3500,0.0,high,PASS,"Status must be one of: active, at_risk, churned."
+product_usage,usage_outside_subscription_period,0,367054,0.0,high,PASS,Usage date must fall within the customer subscription active interval.
+payments,payment_inconsistencies,0,56445,0.0,high,PASS,Payment status/amount/date must be valid and aligned with a known subscription lifecycle.
+subscriptions,invalid_contract_type,0,3500,0.0,medium,PASS,Contract type should be either Annual or Monthly.
+subscriptions,invalid_billing_cycle,0,3500,0.0,medium,PASS,"Billing cycle should be Monthly, Quarterly, or Annual."
+subscriptions,subscription_end_before_start,0,3500,0.0,high,PASS,Subscription end date cannot be before start date.
+product_usage,negative_sessions,0,367054,0.0,high,PASS,Sessions must be non-negative.
+product_usage,feature_adoption_out_of_range,0,367054,0.0,high,PASS,"Feature adoption score must be in [0, 100]."
+product_usage,negative_support_tickets,0,367054,0.0,high,PASS,Support tickets must be non-negative.
+product_usage,nps_out_of_range,0,367054,0.0,high,PASS,"NPS must be in [-100, 100]."
+customers,signup_date_in_future,0,3500,0.0,medium,PASS,Signup date should not be after dataset snapshot date.
+payments,duplicate_payment_id,0,56445,0.0,high,PASS,payment_id should be unique.

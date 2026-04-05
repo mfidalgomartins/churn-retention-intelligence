@@ -1,0 +1,4 @@
+risk_tier,customers,share_of_scored_base,total_current_mrr,avg_churn_risk_score,avg_revenue_risk_score,avg_retention_priority_score
+high,39,0.015312,58603.33,51.87,86.47,63.98
+medium,643,0.252454,553198.25,33.66,69.66,46.26
+low,1865,0.732234,585612.86,20.43,42.49,28.15

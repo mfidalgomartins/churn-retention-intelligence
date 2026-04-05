@@ -1,0 +1,5 @@
+segment,active_customers,churned_customers,churn_rate,revenue_at_risk,avg_tenure,avg_nps,avg_usage_trend
+Enterprise,498,38,0.070896,60813.45,745.4,34.38,1.6215
+Mid-Market,797,177,0.181725,83263.65,743.68,23.97,0.7723
+SMB,935,481,0.339689,137223.44,727.1,13.38,0.1351
+Startup,317,257,0.447735,51995.02,700.28,7.31,-0.03

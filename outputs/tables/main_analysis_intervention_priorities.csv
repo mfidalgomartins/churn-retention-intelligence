@@ -1,0 +1,5 @@
+opportunity,recoverable_customers,recoverable_mrr,benchmark_churn_rate,priority_score,segment_focus,recommended_action
+Renewal Save Desk,897,290553.05,0.41983,121982.97,"Mid-Market ($109,890), SMB ($87,268)",Pre-renewal save playbook with tailored offers and success plans
+Service Recovery,248,71091.5,0.686347,48793.43,"SMB ($40,055), Mid-Market ($24,425)",Escalated support workflow and proactive success outreach
+Payment Rescue,111,47549.11,0.726601,34549.23,"Mid-Market ($17,377), SMB ($13,316)",Collections + payment method refresh + retry sequencing
+Adoption Reactivation,242,16120.12,0.612179,9868.41,"SMB ($7,649), Startup ($5,849)","Usage coaching, onboarding refresh, and feature activation campaign"

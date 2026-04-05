@@ -1,0 +1,6 @@
+relationship,customers_in_group,share_of_base,churn_rate_in_group,churn_rate_out_group,churn_rate_lift,churn_rate_delta_pp
+low_nps_flag,877,0.250571,0.996579,0.030118,33.088954,96.646
+low_feature_adoption_flag,875,0.25,0.917714,0.057143,16.06,86.057
+failed_payment_flag,406,0.116,0.726601,0.21267,3.416571,51.393
+high_support_ticket_flag,905,0.258571,0.533702,0.181118,2.946714,35.258
+usage_decline_flag,1493,0.426571,0.288011,0.260588,1.105234,2.742
