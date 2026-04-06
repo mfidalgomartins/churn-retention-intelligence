@@ -862,9 +862,9 @@ def main() -> int:
     # 5) DASHBOARD REVIEW
     # ----------------------------
     dashboard_builder = (project_root / "src" / "dashboard_builder" / "build_executive_dashboard.py").read_text(encoding="utf-8")
-    dashboard_path = project_root / "dashboard" / "churn_retention_command_center.html"
+    dashboard_path = project_root / "outputs" / "dashboard" / "churn_retention_command_center.html"
     dashboard_html = dashboard_path.read_text(encoding="utf-8")
-    dashboard_htmls = sorted((project_root / "dashboard").glob("*.html"))
+    dashboard_htmls = sorted((project_root / "outputs" / "dashboard").glob("*.html"))
 
     checks.append(
         Check(

@@ -1,6 +1,6 @@
 # Release Readiness Summary
 
-Generated at: `2026-04-05 21:46:18`
+Generated at: `2026-04-06 00:08:51`
 
 - Recommended release state: **decision-support only**
 - Confidence label: **Share with caveats**

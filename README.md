@@ -38,12 +38,13 @@ churn-retention-intelligence-system/
 ├── tests/                           # Smoke/integrity checks
 ├── outputs/
 │   ├── tables/                      # Analysis outputs, summaries, validation logs
-│   └── charts/                      # Publication-quality chart pack
+│   ├── charts/                      # Publication-quality chart pack
+│   └── dashboard/                   # Final executive HTML dashboard artifact
+├── assets/
+│   └── vendor/                      # Vendored runtime dependencies for offline dashboard packaging
 ├── config/
 │   ├── contracts/                   # Data contracts and required schema/keys
 │   └── governance/                  # Release policy + score stability baseline
-├── dashboard/
-│   └── churn_retention_command_center.html
 ├── docs/                            # Methodology notes, analysis report, QA report
 │   ├── architecture/                # Dashboard product/design docs
 │   ├── methodology/                 # Feature/risk/scoring references
@@ -51,7 +52,6 @@ churn-retention-intelligence-system/
 │   └── governance/                  # QA framework and release readiness outputs
 ├── requirements.txt
 ├── Makefile
-└── LICENSE
 ```
 
 ## 5) Methodology
@@ -126,7 +126,7 @@ From the current analytical run:
 
 ## 11) Dashboard Overview
 The executive dashboard is available at:
-- `dashboard/churn_retention_command_center.html`
+- `outputs/dashboard/churn_retention_command_center.html`
 
 It includes:
 - KPI strip (active base, churn, revenue at risk, high/critical counts)
@@ -157,7 +157,7 @@ python -m venv .venv
 ```
 
 Then open:
-- `dashboard/churn_retention_command_center.html`
+- `outputs/dashboard/churn_retention_command_center.html`
 
 Shortcut:
 

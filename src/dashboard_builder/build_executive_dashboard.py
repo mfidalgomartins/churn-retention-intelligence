@@ -1941,12 +1941,13 @@ def _enforce_single_official_html(dashboard_dir: Path, official_filename: str) -
 
 def main() -> None:
     project_root = Path(__file__).resolve().parents[2]
-    dashboard_dir = project_root / "dashboard"
+    dashboard_dir = project_root / "outputs" / "dashboard"
+    dashboard_dir.mkdir(parents=True, exist_ok=True)
 
     data = load_data(project_root)
     data_json = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
 
-    vendor_chart = dashboard_dir / "vendor" / "chart.umd.min.js"
+    vendor_chart = project_root / "assets" / "vendor" / "chart.umd.min.js"
     chart_js = vendor_chart.read_text(encoding="utf-8")
 
     _enforce_single_official_html(dashboard_dir, OFFICIAL_DASHBOARD_FILENAME)
