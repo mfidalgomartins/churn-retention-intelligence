@@ -195,7 +195,7 @@ class TestProjectIntegrity(unittest.TestCase):
         self.assertEqual(
             rel,
             [
-                "docs/index.html",
+                "index.html",
                 "outputs/dashboard/executive-retention-command-center.html",
             ],
         )

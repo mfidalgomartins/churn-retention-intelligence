@@ -2033,8 +2033,7 @@ def main() -> None:
     project_root = Path(__file__).resolve().parents[2]
     dashboard_dir = project_root / "outputs" / "dashboard"
     dashboard_dir.mkdir(parents=True, exist_ok=True)
-    pages_dir = project_root / "docs"
-    pages_dir.mkdir(parents=True, exist_ok=True)
+    pages_dir = project_root
 
     data = load_data(project_root)
     data_json = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
