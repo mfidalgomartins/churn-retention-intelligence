@@ -1,7 +1,7 @@
 # Dashboard Executivo
 
 Dashboard interativo (recomendado):  
-`https://mfidalgomartins.github.io/churn-retention-intelligence/dashboard/`
+`https://mfidalgomartins.github.io/churn-retention-intelligence/`
 
 Se abrir o HTML dentro do GitHub, verá código, não a experiência interativa.
 

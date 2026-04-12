@@ -2033,7 +2033,7 @@ def main() -> None:
     project_root = Path(__file__).resolve().parents[2]
     dashboard_dir = project_root / "outputs" / "dashboard"
     dashboard_dir.mkdir(parents=True, exist_ok=True)
-    pages_dir = project_root / "docs" / "dashboard"
+    pages_dir = project_root / "docs"
     pages_dir.mkdir(parents=True, exist_ok=True)
 
     data = load_data(project_root)

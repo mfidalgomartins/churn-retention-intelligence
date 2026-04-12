@@ -8,7 +8,7 @@ Esta pasta contém os artefactos gerados do projeto.
 - `profiling/` — artefactos de QA e profiling.
 
 Dashboard ao vivo (recomendado):  
-`https://mfidalgomartins.github.io/churn-retention-intelligence/dashboard/`
+`https://mfidalgomartins.github.io/churn-retention-intelligence/`
 
 Pasta do dashboard:  
 `outputs/dashboard/`
