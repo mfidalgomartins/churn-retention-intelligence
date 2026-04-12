@@ -2049,25 +2049,12 @@ def main() -> None:
     output_file.write_text(html, encoding="utf-8")
     pages_file = pages_dir / "index.html"
     pages_file.write_text(html, encoding="utf-8")
-    redirect_html = """<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="refresh" content="0; url=../index.html" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard Redirect</title>
-  </head>
-  <body>
-    <p>Redirecting to the executive dashboard...</p>
-  </body>
-</html>
-"""
     docs_pages_file = docs_pages_dir / "index.html"
-    docs_pages_file.write_text(redirect_html, encoding="utf-8")
+    docs_pages_file.write_text(html, encoding="utf-8")
 
     print("Executive dashboard generated:", output_file)
     print("GitHub Pages dashboard:", pages_file)
-    print("GitHub Pages redirect:", docs_pages_file)
+    print("GitHub Pages dashboard (docs):", docs_pages_file)
     print("Dashboard version:", data["meta"]["dashboard_version"])
     print("Builder version:", data["meta"]["builder_version"])
     print("Payload bytes:", len(html.encode("utf-8")))
