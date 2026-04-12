@@ -162,8 +162,6 @@ def main() -> int:
     lines = [
         "# Data Contract Validation Report",
         "",
-        f"Generated at: `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`",
-        "",
         f"- Total checks: **{len(checks)}**",
         f"- PASS: **{pass_count}**",
         f"- FAIL: **{fail_count}**",

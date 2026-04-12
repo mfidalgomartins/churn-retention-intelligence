@@ -1,7 +1,5 @@
 # Risk Scoring Methodology Note
 
-Generated at: `2026-04-02 13:56:08`
-
 ## Scope
 - This scoring layer targets **recoverable customers only** (`churn_flag = 0`).
 - Goal: prioritize intervention effort by combining behavioral churn risk and economic importance.

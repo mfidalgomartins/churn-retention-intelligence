@@ -37,5 +37,4 @@ This project now tracks readiness using explicit states:
 - `outputs/tables/final_validation_issues.csv`
 - `outputs/tables/release_readiness_matrix.csv`
 - `docs/governance/data_contract_validation_report.md`
-- `docs/reports/final_validation_report.md`
-- `docs/governance/release_readiness_summary.md`
+- `docs/governance/qa_release_summary.md`

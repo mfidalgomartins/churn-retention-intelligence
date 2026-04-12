@@ -354,11 +354,7 @@ def build_segment_retention_summary(features: pd.DataFrame) -> pd.DataFrame:
 def write_feature_dictionary(docs_dir: Path) -> None:
     methodology_dir = docs_dir / "methodology"
     methodology_dir.mkdir(parents=True, exist_ok=True)
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    text = f"""# Feature Dictionary
-
-Generated at: `{created_at}`
+    text = """# Feature Dictionary
 
 ## Transparent Flag Definitions
 - `churn_flag`: 1 when `subscriptions.status == 'churned'`, else 0.

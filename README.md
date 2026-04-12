@@ -24,7 +24,6 @@ churn-retention-intelligence-system/
 ├── data/
 │   ├── raw/                         # Synthetic source tables
 │   └── processed/                   # Engineered feature tables + risk outputs
-├── notebooks/                       # Notebook workspace (kept lightweight for portfolio hygiene)
 ├── src/
 │   ├── data_generation/
 │   ├── data_profiling/
@@ -39,16 +38,18 @@ churn-retention-intelligence-system/
 ├── outputs/
 │   ├── tables/                      # Analysis outputs, summaries, validation logs
 │   ├── charts/                      # Publication-quality chart pack
+│   ├── profiling/                   # Detailed profiling artifacts (kept separate from decision outputs)
 │   └── dashboard/                   # Final executive HTML dashboard artifact
+├── sql/                             # Illustrative SQL models (staging + marts)
 ├── assets/
 │   └── vendor/                      # Vendored runtime dependencies for offline dashboard packaging
 ├── config/
 │   ├── contracts/                   # Data contracts and required schema/keys
 │   └── governance/                  # Release policy + score stability baseline
-├── docs/                            # Methodology notes, analysis report, QA report
+├── docs/                            # Methodology notes, decision memo, QA artifacts
 │   ├── architecture/                # Dashboard product/design docs
 │   ├── methodology/                 # Feature/risk/scoring references
-│   ├── reports/                     # Generated analytical and QA reports
+│   ├── reports/                     # Decision memo + data quality profile
 │   └── governance/                  # QA framework and release readiness outputs
 ├── requirements.txt
 ├── Makefile
@@ -64,6 +65,7 @@ The project follows a production-style analytics lifecycle:
 6. Visualization pack for narrative support
 7. Executive dashboard build
 8. End-to-end QA validation before stakeholder delivery
+9. SQL equivalents for core models (staging + marts) to support warehouse translation
 
 ## 6) Data Generation or Data Source
 This project uses **synthetic data** designed to mimic subscription business dynamics:
@@ -117,6 +119,9 @@ From the current analytical run:
   - Plan: **Basic (44.7%)**
 - Largest revenue loss concentration: **SMB**
 
+Decision memo:
+- `docs/reports/executive_decision_memo.md`
+
 ## 10) Business Recommendations
 1. Stand up a **Renewal Save Desk** for renewal-near high-risk accounts (CS + Sales).
 2. Run **Service Recovery** motion for high-support / low-NPS accounts (Support + CS Ops).
@@ -134,7 +139,7 @@ It includes:
 - Diagnostic breakdowns (segment/region/channel/plan + behavioral indicators)
 - Customer prioritization table with recommended actions
 - Action-oriented intervention grouping
-- Version stamping (`dashboard_version`, `builder_version`) and offline packaging for traceable executive exports
+- Offline packaging for clean executive exports
 
 ## 12) How to Run
 From project root:
@@ -176,8 +181,7 @@ make test
   - `outputs/tables/data_contract_checks.csv`
   - `docs/governance/data_contract_validation_report.md`
   - `outputs/tables/release_readiness_matrix.csv`
-  - `docs/reports/final_validation_report.md`
-  - `docs/governance/release_readiness_summary.md`
+  - `docs/governance/qa_release_summary.md`
 
 ## 14) Future Improvements
 - Add causal testing layer (A/B intervention lift measurement).

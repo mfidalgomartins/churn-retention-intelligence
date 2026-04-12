@@ -189,11 +189,7 @@ def risk_tier_summary(scored: pd.DataFrame) -> pd.DataFrame:
 def write_methodology_note(docs_dir: Path) -> None:
     methodology_dir = docs_dir / "methodology"
     methodology_dir.mkdir(parents=True, exist_ok=True)
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    text = f"""# Risk Scoring Methodology Note
-
-Generated at: `{created_at}`
+    text = """# Risk Scoring Methodology Note
 
 ## Scope
 - This scoring layer targets **recoverable customers only** (`churn_flag = 0`).

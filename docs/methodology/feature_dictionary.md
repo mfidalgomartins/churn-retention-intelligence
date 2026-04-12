@@ -1,7 +1,5 @@
 # Feature Dictionary
 
-Generated at: `2026-04-02 13:56:07`
-
 ## Transparent Flag Definitions
 - `churn_flag`: 1 when `subscriptions.status == 'churned'`, else 0.
 - `at_risk_flag`: 1 when `subscriptions.status == 'at_risk'`, else 0.

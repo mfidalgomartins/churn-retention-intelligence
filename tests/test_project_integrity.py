@@ -14,11 +14,14 @@ class TestProjectIntegrity(unittest.TestCase):
         required_dirs = [
             "data/raw",
             "data/processed",
-            "notebooks",
             "src",
             "src/retention_analysis",
+            "sql",
+            "sql/staging",
+            "sql/marts",
             "outputs/charts",
             "outputs/tables",
+            "outputs/profiling",
             "outputs/dashboard",
             "assets",
             "assets/vendor",
@@ -74,6 +77,21 @@ class TestProjectIntegrity(unittest.TestCase):
             0,
             f"Validation has FAIL rows: {[r.get('check_name') for r in fail_rows]}",
         )
+
+    def test_risk_scores_are_bounded(self) -> None:
+        path = ROOT / "data/processed/customer_risk_scores.csv"
+        with path.open("r", encoding="utf-8", newline="") as f:
+            rows = list(csv.DictReader(f))
+
+        allowed_tiers = {"low", "medium", "high", "critical"}
+        for r in rows:
+            churn_score = float(r["churn_risk_score"])
+            revenue_score = float(r["revenue_risk_score"])
+            priority_score = float(r["retention_priority_score"])
+            self.assertTrue(0 <= churn_score <= 100)
+            self.assertTrue(0 <= revenue_score <= 100)
+            self.assertTrue(0 <= priority_score <= 100)
+            self.assertIn(r["risk_tier"], allowed_tiers)
 
     def test_validation_schema_and_blockers(self) -> None:
         checks_path = ROOT / "outputs/tables/final_validation_checks.csv"

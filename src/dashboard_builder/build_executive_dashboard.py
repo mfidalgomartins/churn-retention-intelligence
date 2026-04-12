@@ -325,23 +325,23 @@ def build_html(data_json: str, chart_js: str) -> str:
   <title>Churn & Retention Command Center</title>
   <style>
     :root {
-      --bg: #edf2f7;
+      --bg: #f2f5f9;
       --surface: #ffffff;
-      --surface-soft: #f7fafc;
+      --surface-soft: #f8fafc;
       --surface-elev: #ffffff;
       --ink: #0b1320;
       --ink-soft: #425466;
-      --brand: #113f67;
-      --brand-2: #22577f;
+      --brand: #0f3b66;
+      --brand-2: #1c5a8f;
       --danger: #b42318;
       --success: #0f766e;
       --warning: #a16207;
-      --border: #d5e0ea;
-      --shadow: 0 10px 26px rgba(11, 19, 32, 0.08);
-      --radius: 16px;
-      --space: 14px;
-      --font: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
-      --font-strong: "IBM Plex Sans", "Avenir Next", "Trebuchet MS", sans-serif;
+      --border: #d4dee9;
+      --shadow: 0 12px 28px rgba(11, 19, 32, 0.08);
+      --radius: 18px;
+      --space: 16px;
+      --font: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+      --font-strong: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
       --input-bg: #f5fbff;
       --input-border: #8aaec4;
       --input-ink: #173a51;
@@ -401,14 +401,14 @@ def build_html(data_json: str, chart_js: str) -> str:
       font-family: var(--font);
       color: var(--ink);
       background:
-        radial-gradient(1400px 500px at 100% 0%, rgba(23,79,119,0.16), transparent 60%),
-        linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, #ffffff 16%) 0%, var(--bg) 36%);
+        radial-gradient(1200px 480px at 100% 0%, rgba(20, 72, 120, 0.14), transparent 60%),
+        linear-gradient(180deg, color-mix(in srgb, var(--bg) 88%, #ffffff 12%) 0%, var(--bg) 38%);
       line-height: 1.4;
     }
 
     .container {
-      width: min(1720px, 100% - 34px);
-      margin: 16px auto 26px;
+      width: min(1720px, 100% - 38px);
+      margin: 20px auto 32px;
       display: grid;
       gap: var(--space);
     }
@@ -425,9 +425,9 @@ def build_html(data_json: str, chart_js: str) -> str:
     .header {
       background: linear-gradient(132deg, var(--header-grad-1) 0%, var(--header-grad-2) 42%, var(--header-grad-3) 100%);
       color: var(--header-ink);
-      padding: 18px;
+      padding: 22px;
       display: grid;
-      gap: 13px;
+      gap: 16px;
     }
 
     .header-top {
@@ -467,8 +467,8 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .filters {
       display: grid;
-      grid-template-columns: repeat(8, minmax(0, 1fr));
-      gap: 9px;
+      grid-template-columns: repeat(9, minmax(0, 1fr));
+      gap: 10px;
       min-width: 0;
     }
 
@@ -505,7 +505,14 @@ def build_html(data_json: str, chart_js: str) -> str:
       justify-content: flex-end;
     }
 
-    .theme-toggle {
+    .header-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      width: 100%;
+    }
+
+    .action-btn {
       min-height: 36px;
       border-radius: 10px;
       border: 1px solid var(--toggle-border);
@@ -518,7 +525,7 @@ def build_html(data_json: str, chart_js: str) -> str:
       cursor: pointer;
     }
 
-    .theme-toggle:hover { filter: brightness(1.07); }
+    .action-btn:hover { filter: brightness(1.07); }
 
     .scope-note {
       font-size: 12px;
@@ -529,18 +536,23 @@ def build_html(data_json: str, chart_js: str) -> str:
     .summary-strip {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
+      gap: 12px;
     }
 
     .summary-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-left: 4px solid var(--brand-2);
-      border-radius: 11px;
-      padding: 10px 11px;
-      min-height: 94px;
+      border-radius: 12px;
+      padding: 12px 13px;
+      min-height: 98px;
       overflow: hidden;
     }
+
+    .summary-card.summary-card-1 { border-left-color: #1d4e89; }
+    .summary-card.summary-card-2 { border-left-color: #9f1239; }
+    .summary-card.summary-card-3 { border-left-color: #0f766e; }
+    .summary-card.summary-card-4 { border-left-color: #b45309; }
 
     .summary-title {
       margin: 0;
@@ -561,14 +573,14 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .section-header {
       background: var(--surface-soft);
-      padding: 12px 14px;
+      padding: 14px 16px;
       border-bottom: 1px solid var(--border);
       border-left: 4px solid #c7d8e8;
     }
 
     .section-title {
       margin: 0;
-      font-size: 17px;
+      font-size: 18px;
       line-height: 1.2;
       font-family: var(--font-strong);
     }
@@ -581,20 +593,25 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     .kpi-grid {
-      padding: 12px;
+      padding: 14px;
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 10px;
+      gap: 12px;
     }
 
     .kpi-card {
       border: 1px solid var(--border);
-      border-radius: 11px;
-      padding: 10px;
-      min-height: 116px;
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 122px;
       overflow: hidden;
       background: linear-gradient(180deg, var(--surface-elev) 0%, var(--surface) 100%);
     }
+
+    .kpi-card.kpi-primary { border-top: 3px solid #0f3b66; }
+    .kpi-card.kpi-danger { border-top: 3px solid #b42318; }
+    .kpi-card.kpi-warning { border-top: 3px solid #b45309; }
+    .kpi-card.kpi-success { border-top: 3px solid #0f766e; }
 
     .kpi-label {
       font-size: 10px;
@@ -607,7 +624,7 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .kpi-value {
       margin-top: 5px;
-      font-size: clamp(20px, 2.1vw, 26px);
+      font-size: clamp(22px, 2.2vw, 28px);
       line-height: 1.05;
       color: var(--brand);
       font-weight: 750;
@@ -635,9 +652,9 @@ def build_html(data_json: str, chart_js: str) -> str:
     .chart-grid-2,
     .chart-grid-4,
     .chart-grid-risk {
-      padding: 12px;
+      padding: 14px;
       display: grid;
-      gap: 10px;
+      gap: 12px;
       min-width: 0;
     }
 
@@ -647,16 +664,16 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .chart-card {
       border: 1px solid var(--border);
-      border-radius: 11px;
-      padding: 10px;
+      border-radius: 12px;
+      padding: 12px;
       background: var(--surface-elev);
       min-width: 0;
       overflow: hidden;
     }
 
     .chart-title {
-      margin: 0 0 8px;
-      font-size: 12px;
+      margin: 0 0 10px;
+      font-size: 13px;
       line-height: 1.25;
       color: var(--ink);
       font-weight: 700;
@@ -667,29 +684,30 @@ def build_html(data_json: str, chart_js: str) -> str:
     .canvas-wrap {
       position: relative;
       width: 100%;
-      height: 300px;
+      height: 310px;
       min-width: 0;
-      min-height: 300px;
+      min-height: 310px;
     }
 
     .canvas-wrap.tall {
-      height: 340px;
-      min-height: 340px;
+      height: 360px;
+      min-height: 360px;
     }
 
     .diagnostic-metrics {
-      padding: 0 12px 12px;
+      padding: 0 14px 14px;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
+      gap: 12px;
     }
 
     .metric-card {
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 9px;
-      min-height: 82px;
+      border-radius: 12px;
+      padding: 11px;
+      min-height: 88px;
       overflow: hidden;
+      background: var(--surface-soft);
     }
 
     .metric-card h5 {
@@ -697,21 +715,21 @@ def build_html(data_json: str, chart_js: str) -> str:
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.35px;
-      color: #475467;
+      color: var(--ink-soft);
     }
 
     .metric-card p {
       margin: 6px 0 0;
       font-size: 13px;
-      color: #0f172a;
+      color: var(--ink);
       font-weight: 700;
       overflow-wrap: anywhere;
     }
 
     .risk-layout {
-      padding: 12px;
+      padding: 14px;
       display: grid;
-      gap: 10px;
+      gap: 12px;
       grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
       min-width: 0;
     }
@@ -726,12 +744,13 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     .table-head {
-      padding: 10px 11px;
+      padding: 12px 13px;
       border-bottom: 1px solid var(--border);
       font-size: 13px;
       font-weight: 700;
       color: var(--ink);
       overflow-wrap: anywhere;
+      background: var(--surface-soft);
     }
 
     .table-wrap {
@@ -815,18 +834,19 @@ def build_html(data_json: str, chart_js: str) -> str:
     .tier-churned { background: #475467; }
 
     .actions-grid {
-      padding: 12px;
+      padding: 14px;
       display: grid;
-      gap: 10px;
+      gap: 12px;
       grid-template-columns: repeat(5, minmax(0, 1fr));
     }
 
     .action-card {
       border: 1px solid var(--border);
-      border-radius: 11px;
-      padding: 9px;
-      min-height: 120px;
+      border-radius: 12px;
+      padding: 11px;
+      min-height: 126px;
       overflow: hidden;
+      background: var(--surface-soft);
     }
 
     .action-card h5 {
@@ -857,7 +877,7 @@ def build_html(data_json: str, chart_js: str) -> str:
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
     @media (max-width: 1580px) {
-      .filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .filters { grid-template-columns: repeat(5, minmax(0, 1fr)); }
       .summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .chart-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -877,7 +897,7 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     @media (max-width: 760px) {
-      .container { width: calc(100% - 14px); margin: 7px auto 14px; }
+      .container { width: calc(100% - 16px); margin: 10px auto 16px; }
       .filters { grid-template-columns: 1fr 1fr; }
       .summary-strip,
       .kpi-grid,
@@ -887,6 +907,70 @@ def build_html(data_json: str, chart_js: str) -> str:
       .canvas-wrap { height: 270px; min-height: 270px; }
       .canvas-wrap.tall { height: 320px; min-height: 320px; }
       table { min-width: 760px; }
+    }
+
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #0b1320;
+      }
+
+      .container {
+        width: 100%;
+        margin: 0;
+        gap: 12px;
+      }
+
+      .panel {
+        box-shadow: none;
+        border-color: #cbd5e1;
+        page-break-inside: avoid;
+      }
+
+      .filters,
+      .theme-toggle-wrap,
+      .scope-note { display: none !important; }
+
+      .header {
+        padding: 16px;
+        border: 1px solid #cbd5e1;
+      }
+
+      .summary-strip,
+      .kpi-grid,
+      .chart-grid-2,
+      .chart-grid-4,
+      .chart-grid-risk,
+      .risk-layout,
+      .actions-grid,
+      .diagnostic-metrics {
+        gap: 10px;
+      }
+
+      .chart-card,
+      .kpi-card,
+      .summary-card,
+      .metric-card,
+      .action-card,
+      .table-card,
+      .mini-card {
+        box-shadow: none;
+        border-color: #cbd5e1;
+      }
+
+      .canvas-wrap,
+      .canvas-wrap.tall {
+        height: 260px;
+        min-height: 260px;
+      }
+
+      table {
+        min-width: 0;
+        font-size: 10px;
+      }
+
+      thead th,
+      tbody td { padding: 6px; }
     }
   </style>
 </head>
@@ -922,7 +1006,12 @@ def build_html(data_json: str, chart_js: str) -> str:
         <div class="filter"><label for="filterChannel">Acquisition Channel</label><select id="filterChannel"></select></div>
         <div class="filter"><label for="filterPlan">Plan Type</label><select id="filterPlan"></select></div>
         <div class="filter"><label for="filterRiskTier">Risk Tier</label><select id="filterRiskTier"></select></div>
-        <div class="theme-toggle-wrap"><button id="themeToggle" class="theme-toggle" type="button">Dark Mode</button></div>
+        <div class="theme-toggle-wrap">
+          <div class="header-actions">
+            <button id="themeToggle" class="action-btn" type="button">Dark Mode</button>
+            <button id="printBtn" class="action-btn" type="button">Print</button>
+          </div>
+        </div>
       </div>
       <div class="scope-note" id="scopeNote"></div>
     </section>
@@ -935,13 +1024,13 @@ def build_html(data_json: str, chart_js: str) -> str:
         <p class="section-subtitle">Official KPI values from governed cubes. Trend KPIs are anchored to selected period end month.</p>
       </div>
       <div class="kpi-grid">
-        <div class="kpi-card"><div class="kpi-label">Active Customers</div><div class="kpi-value" id="kpiActive"></div><div class="kpi-note" id="kpiActiveNote"></div><div class="kpi-delta" id="kpiActiveDelta"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Customer Churn Rate</div><div class="kpi-value" id="kpiCustChurn"></div><div class="kpi-note" id="kpiCustChurnNote"></div><div class="kpi-delta" id="kpiCustChurnDelta"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Revenue Churn Rate</div><div class="kpi-value" id="kpiRevChurn"></div><div class="kpi-note" id="kpiRevChurnNote"></div><div class="kpi-delta" id="kpiRevChurnDelta"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Revenue at Risk</div><div class="kpi-value" id="kpiRevRisk"></div><div class="kpi-note" id="kpiRevRiskNote"></div><div class="kpi-delta" id="kpiRevRiskDelta"></div></div>
-        <div class="kpi-card"><div class="kpi-label">High-Risk Customers</div><div class="kpi-value" id="kpiHighRisk"></div><div class="kpi-note" id="kpiHighRiskNote"></div><div class="kpi-delta" id="kpiHighRiskDelta"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Critical-Risk Customers</div><div class="kpi-value" id="kpiCriticalRisk"></div><div class="kpi-note" id="kpiCriticalRiskNote"></div><div class="kpi-delta" id="kpiCriticalRiskDelta"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Avg Priority Score</div><div class="kpi-value" id="kpiAvgPriority"></div><div class="kpi-note" id="kpiAvgPriorityNote"></div><div class="kpi-delta" id="kpiAvgPriorityDelta"></div></div>
+        <div class="kpi-card kpi-primary"><div class="kpi-label">Active Customers</div><div class="kpi-value" id="kpiActive"></div><div class="kpi-note" id="kpiActiveNote"></div><div class="kpi-delta" id="kpiActiveDelta"></div></div>
+        <div class="kpi-card kpi-danger"><div class="kpi-label">Customer Churn Rate</div><div class="kpi-value" id="kpiCustChurn"></div><div class="kpi-note" id="kpiCustChurnNote"></div><div class="kpi-delta" id="kpiCustChurnDelta"></div></div>
+        <div class="kpi-card kpi-danger"><div class="kpi-label">Revenue Churn Rate</div><div class="kpi-value" id="kpiRevChurn"></div><div class="kpi-note" id="kpiRevChurnNote"></div><div class="kpi-delta" id="kpiRevChurnDelta"></div></div>
+        <div class="kpi-card kpi-warning"><div class="kpi-label">Revenue at Risk</div><div class="kpi-value" id="kpiRevRisk"></div><div class="kpi-note" id="kpiRevRiskNote"></div><div class="kpi-delta" id="kpiRevRiskDelta"></div></div>
+        <div class="kpi-card kpi-warning"><div class="kpi-label">High-Risk Customers</div><div class="kpi-value" id="kpiHighRisk"></div><div class="kpi-note" id="kpiHighRiskNote"></div><div class="kpi-delta" id="kpiHighRiskDelta"></div></div>
+        <div class="kpi-card kpi-danger"><div class="kpi-label">Critical-Risk Customers</div><div class="kpi-value" id="kpiCriticalRisk"></div><div class="kpi-note" id="kpiCriticalRiskNote"></div><div class="kpi-delta" id="kpiCriticalRiskDelta"></div></div>
+        <div class="kpi-card kpi-primary"><div class="kpi-label">Avg Priority Score</div><div class="kpi-value" id="kpiAvgPriority"></div><div class="kpi-note" id="kpiAvgPriorityNote"></div><div class="kpi-delta" id="kpiAvgPriorityDelta"></div></div>
       </div>
     </section>
 
@@ -1230,6 +1319,7 @@ function populateFilters() {
     renderDashboard();
   });
   document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
 
   document.querySelectorAll('#priorityTable thead th').forEach(th => {
     th.addEventListener('click', () => {
@@ -1401,7 +1491,7 @@ function commonOptions(yPercent = false, horizontal = false, maxTicks = 10) {
     plugins: {
       legend: {
         position: 'bottom',
-        labels: { boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 11 }, color: pal.text },
+        labels: { boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 12 }, color: pal.text },
       },
       tooltip: {
         mode: 'index',
@@ -1420,7 +1510,7 @@ function commonOptions(yPercent = false, horizontal = false, maxTicks = 10) {
           maxTicksLimit: maxTicks,
           minRotation: horizontal ? 0 : 0,
           maxRotation: horizontal ? 0 : 35,
-          font: { size: 11 },
+          font: { size: 12 },
           color: pal.text,
         },
         grid: { color: pal.grid, drawTicks: false },
@@ -1430,7 +1520,7 @@ function commonOptions(yPercent = false, horizontal = false, maxTicks = 10) {
         grid: { color: pal.grid },
         ticks: {
           maxTicksLimit: 6,
-          font: { size: 11 },
+          font: { size: 12 },
           color: pal.text,
           callback: yPercent ? (v => `${(Number(v) * 100).toFixed(0)}%`) : undefined,
         },
@@ -1501,8 +1591,8 @@ function renderSummary(filters, trendRows, riskKpi, scoredRows, snapshotRows) {
     { title: 'Behavior + Surface', body: `${pct(usageDeclineShare)} of high/critical accounts show usage decline; ${numFmt.format(Number(riskKpi.scored_customers || 0))} scored accounts are in current intervention scope.` },
   ];
 
-  strip.innerHTML = insights.map(i => `
-    <div class="summary-card">
+  strip.innerHTML = insights.map((i, idx) => `
+    <div class="summary-card summary-card-${idx + 1}">
       <p class="summary-title">${i.title}</p>
       <p class="summary-body">${i.body}</p>
     </div>

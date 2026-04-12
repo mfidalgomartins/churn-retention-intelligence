@@ -474,13 +474,9 @@ def write_markdown_reports(
     reports_dir = docs_dir / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
 
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # 1. Data profile summary.
+    # Combined data quality + profiling report (single source of truth).
     lines = [
-        "# Data Profile Summary",
-        "",
-        f"Generated at: `{created_at}`",
+        "# Data Quality + Profiling Report",
         "",
         "## Dataset-Level Overview",
         "",
@@ -538,26 +534,29 @@ def write_markdown_reports(
             for nrow in null_cols.itertuples(index=False):
                 lines.append(f"  - `{nrow.column_name}`: {nrow.null_count} ({nrow.null_rate:.2%})")
 
-    (reports_dir / "data_profile_summary.md").write_text("\n".join(lines), encoding="utf-8")
+    lines.extend(
+        [
+            "",
+            "## Data Quality Checks",
+        ]
+    )
 
-    # 2. Data quality issues report.
+    # Data quality issues report section.
     fail_checks = quality_checks[quality_checks["status"] == "FAIL"]
     pass_checks = quality_checks[quality_checks["status"] == "PASS"]
 
-    lines = [
-        "# Data Quality Issues Report",
-        "",
-        f"Generated at: `{created_at}`",
-        "",
-        f"- Total checks: {len(quality_checks)}",
-        f"- Passed checks: {len(pass_checks)}",
-        f"- Failed checks: {len(fail_checks)}",
-        "",
-        "## Explicit Required Checks",
-        "",
-        "| check_name | table | failed_rows | failure_rate | status |",
-        "|---|---|---:|---:|:---:|",
-    ]
+    lines.extend(
+        [
+            f"- Total checks: {len(quality_checks)}",
+            f"- Passed checks: {len(pass_checks)}",
+            f"- Failed checks: {len(fail_checks)}",
+            "",
+            "### Explicit Required Checks",
+            "",
+            "| check_name | table | failed_rows | failure_rate | status |",
+            "|---|---|---:|---:|:---:|",
+        ]
+    )
 
     explicit_order = [
         "overlapping_subscriptions",
@@ -575,7 +574,7 @@ def write_markdown_reports(
                 f"| {check_name} | {r['table_name']} | {int(r['failed_rows'])} | {r['failure_rate']:.4%} | {r['status']} |"
             )
 
-    lines.extend(["", "## Failed Checks", ""])
+    lines.extend(["", "### Failed Checks", ""])
 
     if fail_checks.empty:
         lines.append("No failed quality checks detected.")
@@ -591,35 +590,13 @@ def write_markdown_reports(
             f"- `{r.table_name}.{r.issue}`: {r.affected_rows} rows (`{r.threshold_or_rule}`). {r.note}"
         )
 
-    (reports_dir / "data_quality_issues_report.md").write_text("\n".join(lines), encoding="utf-8")
-
-    # 3. Recommended analytical focus areas.
-    status_dist = ""
-    subs_status = table_profile.loc[table_profile["table_name"] == "subscriptions"]
-    if not subs_status.empty:
-        status_dist = "Use subscription status (`active`/`at_risk`/`churned`) as the immediate supervisory target for retention prioritization."
-
-    lines = [
-        "# Recommended Analytical Focus Areas",
-        "",
-        "1. Build retention risk views segmented by `segment`, `region`, and `acquisition_channel` to isolate where future revenue leakage concentrates.",
-        "2. Prioritize payment-friction analysis using failed payment signals as a leading indicator of churn risk and intervention timing.",
-        "3. Model pre-churn behavioral decay using trailing usage trend features (`sessions`, `feature_adoption_score`, `support_tickets`, `nps_score`).",
-        "4. Quantify revenue-at-risk by combining subscription status with `monthly_revenue` and plan tier to rank customer cohorts by expected value loss.",
-        "5. Validate lifecycle timing features from temporal fields (`signup_date`, `subscription_start_date`, `subscription_end_date`, `usage_date`, `payment_date`) for time-to-churn analytics.",
-        "6. Define actionability slices for Customer Success: high-value at-risk accounts, support-heavy accounts, and payment-failure cohorts.",
-    ]
-    if status_dist:
-        lines.append(f"\nAdditional note: {status_dist}")
-
-    (reports_dir / "recommended_analytical_focus_areas.md").write_text("\n".join(lines), encoding="utf-8")
-
+    (reports_dir / "data_quality_profile_report.md").write_text("\n".join(lines), encoding="utf-8")
 
 def main() -> None:
     project_root = Path(__file__).resolve().parents[2]
     data_dir = project_root / "data" / "raw"
     docs_dir = project_root / "docs"
-    outputs_dir = project_root / "outputs" / "tables"
+    outputs_dir = project_root / "outputs" / "profiling"
     outputs_dir.mkdir(parents=True, exist_ok=True)
 
     tables = load_tables(data_dir)
@@ -646,13 +623,7 @@ def main() -> None:
     suspicious_values = compute_suspicious_values(tables)
     classification_summary = build_column_classification_summary()
 
-    table_profile.to_csv(outputs_dir / "table_profile_summary.csv", index=False)
-    column_profile.to_csv(outputs_dir / "column_profile_summary.csv", index=False)
-    cardinality.to_csv(outputs_dir / "dimension_cardinality_summary.csv", index=False)
-    date_coverage.to_csv(outputs_dir / "date_coverage_summary.csv", index=False)
     quality_checks.to_csv(outputs_dir / "data_quality_checks.csv", index=False)
-    suspicious_values.to_csv(outputs_dir / "suspicious_values_summary.csv", index=False)
-    classification_summary.to_csv(outputs_dir / "column_classification_summary.csv", index=False)
 
     write_markdown_reports(
         docs_dir=docs_dir,

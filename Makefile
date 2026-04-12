@@ -1,41 +1,38 @@
-.PHONY: install generate profile features analyze risk charts dashboard validate test qa-release all
+.PHONY: install data profile features analysis risk charts dashboard validate test all
 
-PYTHON := ./.venv/bin/python
+PY := ./.venv/bin/python
 
 install:
 	python -m venv .venv
-	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install -r requirements.txt
+	$(PY) -m pip install --upgrade pip
+	$(PY) -m pip install -r requirements.txt
 
-generate:
-	$(PYTHON) src/data_generation/generate_synthetic_data.py
+data:
+	$(PY) src/data_generation/generate_synthetic_data.py
 
 profile:
-	$(PYTHON) src/data_profiling/profile_data_quality.py
+	$(PY) src/data_profiling/profile_data_quality.py
 
 features:
-	$(PYTHON) src/feature_engineering/create_retention_features.py
+	$(PY) src/feature_engineering/create_retention_features.py
 
-analyze:
-	$(PYTHON) src/churn_analysis/run_main_analysis.py
+analysis:
+	$(PY) src/churn_analysis/run_main_analysis.py
 
 risk:
-	$(PYTHON) src/risk_scoring/build_risk_scores.py
+	$(PY) src/risk_scoring/build_risk_scores.py
 
 charts:
-	$(PYTHON) src/visualization/build_chart_pack.py
+	$(PY) src/visualization/build_chart_pack.py
 
 dashboard:
-	$(PYTHON) src/dashboard_builder/build_executive_dashboard.py
+	$(PY) src/dashboard_builder/build_executive_dashboard.py
 
 validate:
-	$(PYTHON) src/validation/validate_data_contracts.py
-	$(PYTHON) src/validation/run_final_validation.py
+	$(PY) src/validation/validate_data_contracts.py
+	$(PY) src/validation/run_final_validation.py
 
 test:
-	$(PYTHON) -m unittest discover -s tests -p "test_*.py" -v
+	$(PY) -m unittest discover -s tests -p "test_*.py" -v
 
-qa-release: validate test
-	@echo "QA release gates executed: validation + tests."
-
-all: generate profile features analyze risk charts dashboard validate
+all: data profile features analysis risk charts dashboard validate

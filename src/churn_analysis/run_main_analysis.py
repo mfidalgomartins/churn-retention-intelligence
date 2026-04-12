@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -193,21 +192,14 @@ def analyze_overall_health(features: pd.DataFrame, subscriptions: pd.DataFrame) 
     )
 
 
-def analyze_cohorts(cohort: pd.DataFrame) -> tuple[dict, pd.DataFrame]:
+def analyze_cohorts(cohort: pd.DataFrame) -> dict:
     cohort = cohort.copy()
     cohort["cohort_age_months"] = (
         (cohort["observation_month"].dt.year - cohort["cohort_month"].dt.year) * 12
         + (cohort["observation_month"].dt.month - cohort["cohort_month"].dt.month)
     )
 
-    latest_by_cohort = cohort.sort_values("observation_month").groupby("cohort_month", as_index=False).tail(1)
     six_month = cohort[cohort["cohort_age_months"] == 6].sort_values("cohort_month").copy()
-
-    cohort_summary = latest_by_cohort[
-        ["cohort_month", "observation_month", "retention_rate", "revenue_retention"]
-    ].copy()
-    cohort_summary["cohort_month"] = cohort_summary["cohort_month"].dt.date.astype(str)
-    cohort_summary["observation_month"] = cohort_summary["observation_month"].dt.date.astype(str)
 
     if len(six_month) >= 6:
         window = min(6, len(six_month) // 2)
@@ -236,7 +228,7 @@ def analyze_cohorts(cohort: pd.DataFrame) -> tuple[dict, pd.DataFrame]:
         "cohort_trend_label": trend_label,
     }
 
-    return result, cohort_summary
+    return result
 
 
 def churn_by_dimension(features: pd.DataFrame, dimension: str) -> pd.DataFrame:
@@ -585,166 +577,6 @@ def build_structured_findings(
     return pd.DataFrame(rows)
 
 
-def write_report(
-    docs_dir: Path,
-    overall: dict,
-    cohort_result: dict,
-    revenue_risk: dict,
-    seg_loss: pd.DataFrame,
-    relationships: pd.DataFrame,
-    drivers_ranked: pd.DataFrame,
-    interventions: pd.DataFrame,
-) -> None:
-    reports_dir = docs_dir / "reports"
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    top3_drivers = drivers_ranked.head(3)
-    top3_interventions = interventions.head(3)
-    top_loss_segment = seg_loss.iloc[0]
-
-    if overall["customer_churn_slope_last12"] < -0.0005:
-        trend_direction = "improving"
-    elif overall["customer_churn_slope_last12"] > 0.0005:
-        trend_direction = "deteriorating"
-    else:
-        trend_direction = "stable"
-
-    behavior_map = {
-        "usage_decline_flag": "Usage decline",
-        "high_support_ticket_flag": "High support ticket load",
-        "failed_payment_flag": "Failed payments",
-        "low_nps_flag": "Low NPS",
-    }
-    behavior_rows = (
-        relationships[relationships["relationship"].isin(list(behavior_map.keys()))]
-        .set_index("relationship")
-        .reindex(list(behavior_map.keys()))
-        .reset_index()
-    )
-
-    lines = [
-        "# Main Analysis Narrative",
-        "",
-        f"Generated at: `{timestamp}`",
-        "",
-        "## Concise Executive Summary",
-        "",
-        (
-            f"The current retention profile shows {overall['active_customers']:,} active customers out of {overall['total_customers']:,}, "
-            f"with customer churn at {pct(overall['customer_churn_rate'])} and revenue churn at {pct(overall['revenue_churn_rate'])}. "
-            f"Future revenue at risk is estimated at {money(overall['at_risk_mrr'])} from explicitly at-risk accounts, with additional hidden risk in behaviorally deteriorating accounts."
-        ),
-        (
-            f"Churn pressure is strongest in specific cohorts and commercial slices, and the top-ranked drivers indicate a mix of acquisition-quality effects and preventable "
-            "operational friction (usage decay, support burden, and payment failures)."
-        ),
-        "",
-        "## 1. Overall Retention Health",
-        "",
-        "Question being answered: What is the current health of the customer base and how much revenue is being lost?",
-        (
-            "Metrics used: active customer base, customer churn rate, revenue churn rate, customer churn vs revenue churn gap, and monthly retention trend."
-        ),
-        (
-            f"Result: active customers = {overall['active_customers']:,}; churned customers = {overall['churned_customers']:,}; "
-            f"customer churn = {pct(overall['customer_churn_rate'])}; revenue churn = {pct(overall['revenue_churn_rate'])}; "
-            f"delta (revenue - customer churn) = {pct(overall['customer_vs_revenue_churn_delta'])}; "
-            f"last-12-month average customer churn = {pct(overall['avg_customer_churn_last12'])} and trend = {trend_direction}."
-        ),
-        (
-            "Business interpretation: revenue churn close to or above customer churn indicates meaningful value loss per churn event, not just volume loss."
-        ),
-        "Caveat: monthly-value proxies are used for revenue churn, not full contractual ARR waterfalls.",
-        "",
-        "## 2. Cohort Retention",
-        "",
-        "Question being answered: Are newer signup cohorts retaining better than older cohorts?",
-        "Metrics used: cohort retention rate, cohort revenue retention, and 6-month mature-cohort comparison.",
-        (
-            f"Result: average 6-month retention = {pct(cohort_result['avg_6m_retention'])}; average 6-month revenue retention = "
-            f"{pct(cohort_result['avg_6m_revenue_retention'])}; mature cohort trend = {cohort_result['cohort_trend_label']}."
-        ),
-        "Business interpretation: onboarding and early lifecycle effectiveness can be inferred from fixed-age cohort performance.",
-        "Caveat: recent cohorts are incomplete and should not be over-interpreted at longer ages.",
-        "",
-        "## 3. Churn Drivers",
-        "",
-        "Question being answered: Which segments and behaviors are most associated with churn?",
-        "Metrics used: churn rates by segment/region/channel/plan and behavioral churn-rate lifts.",
-        (
-            "Result: top churn drivers by estimated excess MRR loss are listed below, combining prevalence, churn lift, and account value."
-        ),
-        "Business interpretation: churn is not random; it clusters in specific commercial and behavioral profiles that can be targeted.",
-        "Caveat: these are correlations and should guide hypotheses for intervention testing.",
-        "",
-        "Behavior relationships (required checks):",
-        "",
-        "| Behavior | Churn Rate In Group | Churn Rate Out Group | Lift |",
-        "|---|---:|---:|---:|",
-        "## 4. Revenue at Risk",
-        "",
-        "Question being answered: Where is future revenue most exposed, and is loss concentrated in high-value accounts?",
-        "Metrics used: at-risk MRR, high-value at-risk concentration, segment contribution to revenue loss, value-tier churn distribution.",
-        (
-            f"Result: future revenue at risk = {money(revenue_risk['future_revenue_at_risk'])}; "
-            f"high-value at-risk accounts = {revenue_risk['high_value_at_risk_count']} "
-            f"(MRR {money(revenue_risk['high_value_at_risk_mrr'])}); "
-            f"largest segment loss concentration = {top_loss_segment['segment']} "
-            f"({money(top_loss_segment['total_revenue_loss_proxy'])})."
-        ),
-        (
-            f"Business interpretation: concentration of risk in high-value cohorts requires precision retention motions, not broad campaigns."
-        ),
-        "Caveat: value concentration is quantile-based and should be revalidated on production revenue definitions.",
-        "",
-        "## 5. Retention Opportunities",
-        "",
-        "Question being answered: Which interventions are most actionable for near-term retention impact?",
-        "Metrics used: recoverable customers, recoverable MRR, benchmark churn rate, and priority score.",
-        "Result: intervention priorities are ranked below by estimated retention ROI proxy.",
-        "Business interpretation: top opportunities combine high MRR coverage with high observed churn propensity.",
-        "Caveat: opportunity priority should be validated with capacity constraints and conversion benchmarks.",
-        "",
-        "## Ranked Main Churn Drivers",
-        "",
-        "| Rank | Driver | Impacted Customers | Churn Lift | Estimated Excess MRR Loss |",
-        "|---:|---|---:|---:|---:|",
-    ]
-
-    behavior_detail_lines: list[str] = []
-    for row in behavior_rows.itertuples(index=False):
-        behavior_name = behavior_map.get(row.relationship, row.relationship)
-        behavior_detail_lines.append(
-            f"| {behavior_name} | {pct(row.churn_rate_in_group)} | {pct(row.churn_rate_out_group)} | {row.churn_rate_lift:.2f}x |"
-        )
-    if behavior_detail_lines:
-        insert_at = lines.index("## 4. Revenue at Risk")
-        lines[insert_at:insert_at] = behavior_detail_lines + [""]
-
-    for i, row in enumerate(top3_drivers.itertuples(index=False), start=1):
-        lines.append(
-            f"| {i} | {row.driver} | {row.impacted_customers} | {row.churn_rate_lift:.2f}x | {money(row.estimated_excess_mrr_loss)} |"
-        )
-
-    lines.extend(
-        [
-            "",
-            "## Prioritized Intervention Opportunities",
-            "",
-            "| Rank | Opportunity | Recoverable Customers | Recoverable MRR | Benchmark Churn Rate |",
-            "|---:|---|---:|---:|---:|",
-        ]
-    )
-
-    for i, row in enumerate(top3_interventions.itertuples(index=False), start=1):
-        lines.append(
-            f"| {i} | {row.opportunity} | {row.recoverable_customers} | {money(row.recoverable_mrr)} | {pct(row.benchmark_churn_rate)} |"
-        )
-
-    (reports_dir / "main_analysis_report.md").write_text("\n".join(lines), encoding="utf-8")
-
-
 def main() -> None:
     project_root = Path(__file__).resolve().parents[2]
     outputs_dir = project_root / "outputs" / "tables"
@@ -757,7 +589,7 @@ def main() -> None:
     overall, trend = analyze_overall_health(features, subscriptions)
     snapshot_date = pd.Timestamp(max(subscriptions["subscription_start_date"].max(), subscriptions["subscription_end_date"].max()))
     trend_dim = monthly_dimensional_trend(features, subscriptions, snapshot_date)
-    cohort_result, cohort_summary = analyze_cohorts(cohort)
+    cohort_result = analyze_cohorts(cohort)
 
     churn_segment = churn_by_dimension(features, "segment")
     churn_region = churn_by_dimension(features, "region")
@@ -767,7 +599,7 @@ def main() -> None:
     relationships, thresholds = behavioral_relationships(features)
     drivers_ranked = rank_churn_drivers(features, thresholds)
 
-    revenue_risk, high_value_at_risk, seg_loss, value_tier_stats = analyze_revenue_at_risk(features)
+    revenue_risk, _, seg_loss, value_tier_stats = analyze_revenue_at_risk(features)
     interventions = build_intervention_priorities(features)
 
     findings = build_structured_findings(
@@ -786,29 +618,15 @@ def main() -> None:
 
     trend.to_csv(outputs_dir / "overall_retention_trend_monthly.csv", index=False)
     trend_dim.to_csv(outputs_dir / "monthly_dimensional_trend.csv", index=False)
-    cohort_summary.to_csv(outputs_dir / "cohort_retention_latest_view.csv", index=False)
     churn_segment.to_csv(outputs_dir / "churn_by_segment.csv", index=False)
     churn_region.to_csv(outputs_dir / "churn_by_region.csv", index=False)
     churn_channel.to_csv(outputs_dir / "churn_by_acquisition_channel.csv", index=False)
     churn_plan.to_csv(outputs_dir / "churn_by_plan_type.csv", index=False)
     relationships.to_csv(outputs_dir / "behavioral_churn_relationships.csv", index=False)
     drivers_ranked.to_csv(outputs_dir / "main_analysis_churn_driver_ranking.csv", index=False)
-    high_value_at_risk.to_csv(outputs_dir / "high_value_at_risk_customers.csv", index=False)
     seg_loss.to_csv(outputs_dir / "segment_revenue_risk_contribution.csv", index=False)
-    value_tier_stats.to_csv(outputs_dir / "value_tier_churn_concentration.csv", index=False)
     interventions.to_csv(outputs_dir / "main_analysis_intervention_priorities.csv", index=False)
     findings.to_csv(outputs_dir / "main_analysis_structured_findings.csv", index=False)
-
-    write_report(
-        docs_dir=docs_dir,
-        overall=overall,
-        cohort_result=cohort_result,
-        revenue_risk=revenue_risk,
-        seg_loss=seg_loss,
-        relationships=relationships,
-        drivers_ranked=drivers_ranked,
-        interventions=interventions,
-    )
 
     print("Main analysis completed.")
     print(
@@ -822,8 +640,6 @@ def main() -> None:
     print(
         "Outputs -> findings:",
         outputs_dir / "main_analysis_structured_findings.csv",
-        ", report:",
-        docs_dir / "reports" / "main_analysis_report.md",
     )
 
 

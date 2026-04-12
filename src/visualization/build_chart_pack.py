@@ -376,27 +376,6 @@ def write_chart_index(charts_dir: Path, index_rows: list[dict]) -> None:
     index_df.insert(0, "chart_number", np.arange(1, len(index_df) + 1))
     index_df.to_csv(charts_dir / "chart_index.csv", index=False)
 
-    lines = [
-        "# Chart Pack Narrative Support",
-        "",
-        f"Generated at: `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`",
-        "",
-        "This file maps each chart to the business narrative it supports.",
-        "",
-    ]
-
-    for row in index_df.itertuples(index=False):
-        lines.extend(
-            [
-                f"## {row.chart_number}. {row.chart_title}",
-                f"- File: `outputs/charts/{row.file_name}`",
-                f"- Supports narrative: {row.business_narrative_support}",
-                "",
-            ]
-        )
-
-    (charts_dir / "chart_narrative_support.md").write_text("\n".join(lines), encoding="utf-8")
-
 
 def main() -> None:
     project_root = Path(__file__).resolve().parents[2]
@@ -466,7 +445,7 @@ def main() -> None:
 
     print("Chart pack generation completed.")
     print("Charts generated:", len(index_rows))
-    print("Index files:", charts_dir / "chart_index.csv", "and", charts_dir / "chart_narrative_support.md")
+    print("Index file:", charts_dir / "chart_index.csv")
 
 
 if __name__ == "__main__":

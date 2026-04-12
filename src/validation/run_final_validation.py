@@ -1346,8 +1346,6 @@ def main() -> int:
     lines = [
         "# Final Validation Report",
         "",
-        f"Generated at: `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`",
-        "",
         "## Validation Scope",
         "- Data quality checks (raw and processed tables)",
         "- Metric correctness checks (flags, churn/revenue metrics, cohort logic)",
@@ -1409,67 +1407,60 @@ def main() -> int:
     for row in matrix_rows:
         lines.append(f"| {row['state']} | {row['active']} | {row['criterion']} | {row['evidence']} |")
 
-    lines.extend(
-        [
-            "",
-            "## Fixes Applied",
-            "- Validation step only. No direct remediation changes are applied inside this report.",
-            "",
-            "## Required Stakeholder Caveats",
-        ]
-    )
-    lines.extend([f"- {c}" for c in caveats])
-    lines.extend(
-        [
-            "",
-            "## Final Confidence Assessment",
-            f"**{confidence}**",
-            "",
-            "## Release Readiness Recommendation",
-            f"**{recommended_release_state}**",
-            "",
-            "## Generated Artifacts",
-            f"- `outputs/tables/final_validation_checks.csv`",
-            f"- `outputs/tables/final_validation_issues.csv`",
-            f"- `outputs/tables/release_readiness_matrix.csv`",
-            f"- `docs/reports/final_validation_report.md`",
-        ]
-    )
-
-    reports_dir = docs_dir / "reports"
     governance_dir = docs_dir / "governance"
-    reports_dir.mkdir(parents=True, exist_ok=True)
     governance_dir.mkdir(parents=True, exist_ok=True)
-    (reports_dir / "final_validation_report.md").write_text("\n".join(lines), encoding="utf-8")
 
-    governance_lines = [
-        "# Release Readiness Summary",
+    qa_lines = [
+        "# QA + Release Summary",
         "",
-        f"Generated at: `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`",
+        "## Validation Scope",
+        "- Data quality checks (raw and processed tables)",
+        "- Metric correctness (flags, churn/revenue metrics, cohort logic)",
+        "- Analytical integrity (joins, denominators, overclaiming risk)",
+        "- Visualization review (chart pack structure/readability)",
+        "- Dashboard review (KPI/chart/filter/table consistency)",
         "",
-        f"- Recommended release state: **{recommended_release_state}**",
-        f"- Confidence label: **{confidence}**",
-        f"- Blocker FAIL count: **{blocker_fail_count}**",
-        f"- Major WARN count: **{major_warn_count}**",
+        "## Summary",
+        f"- Total checks: **{total}**",
+        f"- PASS: **{pass_count}**",
+        f"- WARN: **{warn_count}**",
+        f"- FAIL: **{fail_count}**",
+        f"- Blocker FAILs: **{blocker_fail_count}**",
         "",
-        "## State Matrix",
-        "",
-        "| State | Active |",
-        "|---|---|",
+        "## Issues (Required Disclosure)",
     ]
-    for row in matrix_rows:
-        governance_lines.append(f"| {row['state']} | {row['active']} |")
-    governance_lines.extend(
+
+    if issue_rows:
+        qa_lines.extend(
+            [
+                "",
+                "| Category | Check | Severity | Evidence |",
+                "|---|---|---|---|",
+            ]
+        )
+        for i in issue_rows:
+            qa_lines.append(
+                f"| {i['category']} | {i['check_name']} | {i['severity']} | {i['evidence']} |"
+            )
+    else:
+        qa_lines.append("- No issues found.")
+
+    qa_lines.extend(
         [
             "",
-            "## Policy",
-            "- `publish-blocked` blocks external publication and executive distribution.",
-            "- `screening-grade only` allows exploratory/internal sandbox use only.",
-            "- `decision-support only` allows operational steering with explicit caveats.",
-            "- `not committee-grade` means conclusions are not sufficient for committee-level capital/strategy approval.",
+            "## Release State",
+            "",
+            "| State | Active |",
+            "|---|---|",
         ]
     )
-    (governance_dir / "release_readiness_summary.md").write_text("\n".join(governance_lines), encoding="utf-8")
+    for row in matrix_rows:
+        qa_lines.append(f"| {row['state']} | {row['active']} |")
+
+    qa_lines.extend(["", "## Required Caveats"])
+    qa_lines.extend([f"- {c}" for c in caveats])
+
+    (governance_dir / "qa_release_summary.md").write_text("\n".join(qa_lines), encoding="utf-8")
 
     print("Validation complete.")
     print("Checks:", total, "| PASS:", pass_count, "| WARN:", warn_count, "| FAIL:", fail_count)

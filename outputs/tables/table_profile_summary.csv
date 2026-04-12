@@ -1,5 +1,0 @@
-table_name,grain,row_count,column_count,candidate_primary_key,candidate_pk_valid,candidate_pk_nulls,candidate_pk_duplicates,duplicate_row_count
-customers,One row per customer account,3500,6,customer_id,True,0,0,0
-subscriptions,One row per subscription record (current simulation has one subscription per customer),3500,8,subscription_id,True,0,0,0
-product_usage,One row per customer usage event date (weekly cadence),367054,7,usage_id,True,0,0,0
-payments,One row per payment attempt,56445,5,payment_id,True,0,0,0
