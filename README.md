@@ -1,191 +1,57 @@
 # Churn & Retention Intelligence System
 
-## 1) Project Title
-**Churn & Retention Intelligence System**  
-Portfolio project simulating an internal analytics workflow for churn diagnostics, revenue-risk prioritization, and executive decision support.
+**One‑line:** Executive retention intelligence system that turns churn signals into prioritized revenue‑protection actions.
 
-## 2) Business Problem
-B2B subscription businesses rarely fail because they cannot measure churn; they fail because they cannot convert churn signals into prioritized action.  
-The core question in this project is:
+## Business problem
+Churn is measurable, but action is usually unprioritized. This project focuses on where future revenue is leaking and which accounts should be saved first.
 
-**Where is the company losing future revenue, which customers are most at risk, and what actions should be prioritized first?**
+## What the system does
+- Simulates realistic subscription data and customer health signals.
+- Builds retention features, churn diagnostics, and interpretable risk scores.
+- Produces a decision memo, QA summary, and an executive HTML dashboard.
 
-## 3) Objective
-Build a complete retention analytics system that:
-- Quantifies customer and revenue churn
-- Identifies concentration of risk across segments, channels, plans, and regions
-- Produces interpretable customer-level risk scores
-- Surfaces intervention priorities for Revenue, Customer Success, and Operations
-- Delivers an executive HTML command center for decision-making
+## Decisions supported
+- Which segments and channels are driving churn concentration.
+- Which accounts are high‑risk and high‑value, and should be prioritized first.
+- Which intervention plays should be sequenced now.
 
-## 4) Repository Structure
+## Project architecture
+Data generation → profiling → feature engineering → churn analysis → risk scoring → visualization → dashboard → QA gates.
+
+## Repository structure
 ```text
-churn-retention-intelligence-system/
-├── data/
-│   ├── raw/                         # Synthetic source tables
-│   └── processed/                   # Engineered feature tables + risk outputs
-├── src/
-│   ├── data_generation/
-│   ├── data_profiling/
-│   ├── feature_engineering/
-│   ├── churn_analysis/
-│   ├── retention_analysis/
-│   ├── risk_scoring/
-│   ├── visualization/
-│   ├── dashboard_builder/
-│   └── validation/
-├── tests/                           # Smoke/integrity checks
-├── outputs/
-│   ├── tables/                      # Analysis outputs, summaries, validation logs
-│   ├── charts/                      # Publication-quality chart pack
-│   ├── profiling/                   # Detailed profiling artifacts (kept separate from decision outputs)
-│   └── dashboard/                   # Final executive HTML dashboard artifact
-├── sql/                             # Illustrative SQL models (staging + marts)
-├── assets/
-│   └── vendor/                      # Vendored runtime dependencies for offline dashboard packaging
-├── config/
-│   ├── contracts/                   # Data contracts and required schema/keys
-│   └── governance/                  # Release policy + score stability baseline
-├── docs/                            # Methodology notes, decision memo, QA artifacts
-│   ├── architecture/                # Dashboard product/design docs
-│   ├── methodology/                 # Feature/risk/scoring references
-│   ├── reports/                     # Decision memo + data quality profile
-│   └── governance/                  # QA framework and release readiness outputs
-├── requirements.txt
-├── Makefile
+src/        core pipeline (generation → features → scoring → dashboard)
+data/       raw + processed tables
+outputs/    governed outputs, charts, final dashboard
+docs/       decision memo, QA summary, methodology
+sql/        staging + marts (warehouse equivalents)
+config/     data contracts + QA policy
+tests/      integrity + bounds checks
 ```
 
-## 5) Methodology
-The project follows a production-style analytics lifecycle:
-1. Synthetic data simulation with business behavior assumptions
-2. Formal profiling and data quality checks
-3. Feature engineering for retention and risk signals
-4. Main churn/revenue analysis (cohorts, drivers, concentration)
-5. Interpretable risk scoring and action mapping
-6. Visualization pack for narrative support
-7. Executive dashboard build
-8. End-to-end QA validation before stakeholder delivery
-9. SQL equivalents for core models (staging + marts) to support warehouse translation
+## Core outputs
+- Decision memo: `docs/reports/executive_decision_memo.md`
+- QA summary: `docs/governance/qa_release_summary.md`
+- Dashboard: `outputs/dashboard/churn_retention_command_center.html`
+- Key tables: `outputs/tables/main_analysis_structured_findings.csv`, `outputs/tables/risk_tier_summary.csv`
 
-## 6) Data Generation or Data Source
-This project uses **synthetic data** designed to mimic subscription business dynamics:
-- `customers`
-- `subscriptions`
-- `product_usage`
-- `payments`
+## Why this project is strong
+- End‑to‑end pipeline with governance and QA gates, not just charts.
+- Interpretable scoring with explicit drivers and action mapping.
+- Executive‑ready dashboard generated from governed outputs.
+- SQL equivalents included for warehouse translation.
 
-Simulation logic includes:
-- Segment/channel/region differences in churn propensity
-- Usage decline and support burden patterns before churn
-- Failed payment signals in some churn pathways
-- Revenue skew and account value distribution
-
-## 7) Key Engineered Features
-Core engineered outputs are in `data/processed/customer_retention_features.csv`, including:
-- Lifecycle: `tenure_days`, `renewal_near_flag`
-- Revenue: `current_mrr`, `avg_monthly_revenue`, `lifetime_revenue`
-- Engagement: `recent_sessions_30d`, `recent_sessions_90d`, `usage_trend`
-- Product health: `feature_adoption_score_recent`, `nps_score_recent`
-- Support/billing: `support_tickets_30d`, `support_tickets_90d`, `failed_payments_90d`, `payment_failure_flag`
-- Status flags: `churn_flag`, `at_risk_flag`, `contraction_flag`
-
-Additional analytical tables:
-- `cohort_retention_table.csv`
-- `segment_retention_summary.csv`
-
-## 8) Risk Scoring Framework
-The scoring layer is intentionally interpretable (no black-box model):
-- **`churn_risk_score`**: weighted behavioral + operational risk signals
-- **`revenue_risk_score`**: value importance using percentile-ranked revenue features
-- **`retention_priority_score`**: combined intervention priority (`0.65 * churn_risk + 0.35 * revenue_risk`)
-- **`risk_tier`**: `low`, `medium`, `high`, `critical`
-- **`main_risk_driver`** + **`recommended_action`** for operational routing
-
-Outputs:
-- `data/processed/customer_risk_scores.csv`
-- `data/processed/customer_risk_priority_ranked.csv`
-- `outputs/tables/risk_tier_summary.csv`
-
-## 9) Key Findings
-From the current analytical run:
-- Customer churn: **27.2%** (953 / 3,500)
-- Revenue churn (monthly-value proxy): **13.8%**
-- Explicit at-risk MRR: **$142,193**
-- Estimated future revenue at risk (explicit + hidden): **$214,300**
-- Highest churn concentrations:
-  - Segment: **Startup (44.8%)**
-  - Region: **LATAM (35.0%)**
-  - Acquisition channel: **Affiliate (42.1%)**
-  - Plan: **Basic (44.7%)**
-- Largest revenue loss concentration: **SMB**
-
-Decision memo:
-- `docs/reports/executive_decision_memo.md`
-
-## 10) Business Recommendations
-1. Stand up a **Renewal Save Desk** for renewal-near high-risk accounts (CS + Sales).
-2. Run **Service Recovery** motion for high-support / low-NPS accounts (Support + CS Ops).
-3. Launch **adoption reactivation campaigns** for usage/adoption deterioration (Product + CS).
-4. Apply **retention-weighted CAC governance** to Affiliate and Paid Search (Marketing + RevOps).
-5. Maintain a **high-value account protection list** with executive escalation for critical-risk accounts.
-
-## 11) Dashboard Overview
-The executive dashboard is available at:
-- `outputs/dashboard/churn_retention_command_center.html`
-
-It includes:
-- KPI strip (active base, churn, revenue at risk, high/critical counts)
-- Retention trends and cohort views
-- Diagnostic breakdowns (segment/region/channel/plan + behavioral indicators)
-- Customer prioritization table with recommended actions
-- Action-oriented intervention grouping
-- Offline packaging for clean executive exports
-
-## 12) How to Run
-From project root:
-
-```bash
-python -m venv .venv
-./.venv/bin/python -m pip install --upgrade pip
-./.venv/bin/python -m pip install -r requirements.txt
-
-./.venv/bin/python src/data_generation/generate_synthetic_data.py
-./.venv/bin/python src/data_profiling/profile_data_quality.py
-./.venv/bin/python src/feature_engineering/create_retention_features.py
-./.venv/bin/python src/churn_analysis/run_main_analysis.py
-./.venv/bin/python src/risk_scoring/build_risk_scores.py
-./.venv/bin/python src/visualization/build_chart_pack.py
-./.venv/bin/python src/dashboard_builder/build_executive_dashboard.py
-./.venv/bin/python src/validation/validate_data_contracts.py
-./.venv/bin/python src/validation/run_final_validation.py
-./.venv/bin/python -m unittest discover -s tests -p "test_*.py" -v
-```
-
-Then open:
-- `outputs/dashboard/churn_retention_command_center.html`
-
-Shortcut:
-
+## How to run
 ```bash
 make install
 make all
 make test
 ```
 
-## 13) Limitations
-- Data is synthetic and does not represent live production behavior.
-- Revenue churn uses monthly-value proxy logic, not full ARR contract accounting.
-- Behavioral relationships are associative, not causal.
-- Synthetic-data governance policy marks outputs as **not committee-grade** even when technically strong.
-- Current release recommendation should be read from:
-  - `outputs/tables/data_contract_checks.csv`
-  - `docs/governance/data_contract_validation_report.md`
-  - `outputs/tables/release_readiness_matrix.csv`
-  - `docs/governance/qa_release_summary.md`
+## Limitations
+- Synthetic data; decision‑support only.
+- Revenue churn uses monthly‑value proxy, not contractual ARR.
+- Behavioral signals are correlational.
 
-## 14) Future Improvements
-- Add causal testing layer (A/B intervention lift measurement).
-- Add probabilistic calibration and backtesting for risk scoring.
-- Integrate real CRM/billing/support sources with data contracts.
-- Add CI checks for metric definitions and dashboard consistency.
-- Add orchestration (scheduled pipeline runs + alerting on risk spikes).
+## Tools
+Tools: Python, SQL, pandas, DuckDB, Chart.js.
