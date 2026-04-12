@@ -32,6 +32,9 @@ tests/      integrity + bounds checks
 - Dashboard: `outputs/dashboard/churn_retention_command_center.html`
 - Key tables: `outputs/tables/main_analysis_structured_findings.csv`, `outputs/tables/risk_tier_summary.csv`
 
+Live dashboard (GitHub Pages):
+`https://mfidalgomartins.github.io/churn-retention-intelligence/dashboard/`
+
 ### Why it stands out
 It is not a chart gallery. It is an end‑to‑end decision system with QA gates, interpretable scoring, and a dashboard generated strictly from governed outputs. SQL equivalents are included for warehouse translation.
 

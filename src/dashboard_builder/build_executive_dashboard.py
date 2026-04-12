@@ -2033,6 +2033,8 @@ def main() -> None:
     project_root = Path(__file__).resolve().parents[2]
     dashboard_dir = project_root / "outputs" / "dashboard"
     dashboard_dir.mkdir(parents=True, exist_ok=True)
+    pages_dir = project_root / "docs" / "dashboard"
+    pages_dir.mkdir(parents=True, exist_ok=True)
 
     data = load_data(project_root)
     data_json = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
@@ -2044,8 +2046,11 @@ def main() -> None:
     html = build_html(data_json, chart_js)
     output_file = dashboard_dir / OFFICIAL_DASHBOARD_FILENAME
     output_file.write_text(html, encoding="utf-8")
+    pages_file = pages_dir / "index.html"
+    pages_file.write_text(html, encoding="utf-8")
 
     print("Executive dashboard generated:", output_file)
+    print("GitHub Pages dashboard:", pages_file)
     print("Dashboard version:", data["meta"]["dashboard_version"])
     print("Builder version:", data["meta"]["builder_version"])
     print("Payload bytes:", len(html.encode("utf-8")))
