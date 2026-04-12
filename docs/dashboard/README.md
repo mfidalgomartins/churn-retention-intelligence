@@ -1,6 +1,6 @@
-# Live Dashboard
+# Executive Dashboard
 
-Open the dashboard directly in your browser:  
+Live, interactive dashboard (recommended):  
 `https://mfidalgomartins.github.io/churn-retention-intelligence/dashboard/`
 
-This folder contains the GitHub Pages entry point (`index.html`).
+If you open the HTML file inside GitHub, it will show source code—not the interactive view. Use the live link above.
