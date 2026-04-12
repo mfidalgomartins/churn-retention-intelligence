@@ -1,7 +1,7 @@
-# Executive Dashboard
+# Dashboard Executivo
 
-Open the live, interactive view (recommended):  
+Dashboard interativo (recomendado):  
 `https://mfidalgomartins.github.io/churn-retention-intelligence/dashboard/`
 
-Local HTML artifact (for download or archival):  
+Acesso alternativo (HTML local para download/arquivo):  
 `executive-retention-command-center.html`

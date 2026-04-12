@@ -1,6 +1,6 @@
-# Executive Dashboard
+# Dashboard Executivo
 
-Live, interactive dashboard (recommended):  
+Dashboard interativo (recomendado):  
 `https://mfidalgomartins.github.io/churn-retention-intelligence/dashboard/`
 
-If you open the HTML file inside GitHub, it will show source code—not the interactive view. Use the live link above.
+Ao abrir o HTML dentro do GitHub, verá o código‑fonte, não a experiência interativa. Use o link acima.
