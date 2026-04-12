@@ -29,7 +29,7 @@ tests/      integrity + bounds checks
 ### Core outputs
 - Decision memo: `docs/reports/executive_decision_memo.md`
 - QA summary: `docs/governance/qa_release_summary.md`
-- Dashboard: `outputs/dashboard/churn_retention_command_center.html`
+- Dashboard: `outputs/dashboard/executive-retention-command-center.html`
 - Key tables: `outputs/tables/main_analysis_structured_findings.csv`, `outputs/tables/risk_tier_summary.csv`
 
 Live dashboard (GitHub Pages):

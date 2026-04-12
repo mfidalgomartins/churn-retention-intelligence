@@ -152,7 +152,7 @@ class TestProjectIntegrity(unittest.TestCase):
 
     def test_dashboard_has_region_chart_and_date_filtered_customers(self) -> None:
         builder_path = ROOT / "src/dashboard_builder/build_executive_dashboard.py"
-        html_path = ROOT / "outputs/dashboard/churn_retention_command_center.html"
+        html_path = ROOT / "outputs/dashboard/executive-retention-command-center.html"
 
         builder_text = builder_path.read_text(encoding="utf-8")
         html_text = html_path.read_text(encoding="utf-8")
@@ -174,7 +174,7 @@ class TestProjectIntegrity(unittest.TestCase):
         dashboard_dir = ROOT / "outputs/dashboard"
         html_files = sorted(dashboard_dir.glob("*.html"))
         self.assertEqual(len(html_files), 1, f"Expected one official dashboard HTML, found {[p.name for p in html_files]}")
-        self.assertEqual(html_files[0].name, "churn_retention_command_center.html")
+        self.assertEqual(html_files[0].name, "executive-retention-command-center.html")
 
         html_text = html_files[0].read_text(encoding="utf-8")
         self.assertNotIn("src=\"http://", html_text)
@@ -191,11 +191,18 @@ class TestProjectIntegrity(unittest.TestCase):
 
     def test_only_one_project_html_outside_virtualenv(self) -> None:
         html_files = [p for p in ROOT.rglob("*.html") if ".venv" not in p.parts]
-        rel = [str(p.relative_to(ROOT)) for p in html_files]
-        self.assertEqual(rel, ["outputs/dashboard/churn_retention_command_center.html"])
+        rel = sorted(str(p.relative_to(ROOT)) for p in html_files)
+        self.assertEqual(
+            rel,
+            [
+                "docs/dashboard/index.html",
+                "docs/index.html",
+                "outputs/dashboard/executive-retention-command-center.html",
+            ],
+        )
 
     def test_dashboard_payload_size_sanity(self) -> None:
-        html_path = ROOT / "outputs/dashboard/churn_retention_command_center.html"
+        html_path = ROOT / "outputs/dashboard/executive-retention-command-center.html"
         size_bytes = html_path.stat().st_size
         self.assertGreaterEqual(size_bytes, 250_000)
         self.assertLessEqual(size_bytes, 3_000_000)

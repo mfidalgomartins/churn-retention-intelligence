@@ -27,7 +27,7 @@ Visualization Review,Chart index consistency,PASS,info,communication_quality,Fal
 Visualization Review,Title quality,PASS,info,communication_quality,False,Detected 9 chart titles in script; short/non-insight titles=[].
 Visualization Review,Axis correctness,PASS,info,communication_quality,False,Percent-format axes references=5; currency-format axes references=1.
 Visualization Review,Misleading chart risk,PASS,info,communication_quality,False,No inverted/truncated y-axis directives found for churn and retention bar/line charts; heatmap bounded at 0-1.
-Dashboard Review,Official dashboard output uniqueness,PASS,info,decision_product_quality,False,Dashboard HTML files detected: ['churn_retention_command_center.html'].
+Dashboard Review,Official dashboard output uniqueness,PASS,info,decision_product_quality,False,Dashboard HTML files detected: ['executive-retention-command-center.html'].
 Dashboard Review,Governed data-source usage,PASS,info,decision_product_quality,True,Builder uses governed processed/output artifacts and does not query raw source files directly.
 Dashboard Review,Required diagnostics coverage (region),PASS,info,decision_product_quality,False,Region-level churn diagnostic chart is present in the dashboard.
 Dashboard Review,Dashboard payload integrity,PASS,info,decision_product_quality,True,Embedded payload contains governed cubes and rendering tables.

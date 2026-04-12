@@ -25,5 +25,5 @@ Build an executive retention command center that turns churn analytics into inte
 - Built with readable vanilla JS + Chart.js and generated via a Python builder script for repeatable refreshes.
 
 ## Output
-- Main file: `outputs/dashboard/churn_retention_command_center.html`
+- Main file: `outputs/dashboard/executive-retention-command-center.html`
 - Builder script: `src/dashboard_builder/build_executive_dashboard.py`

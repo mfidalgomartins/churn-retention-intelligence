@@ -11,7 +11,7 @@ import pandas as pd
 
 ALL_TOKEN = "__all__"
 RISK_ORDER = ["critical", "high", "medium", "low", "churned"]
-OFFICIAL_DASHBOARD_FILENAME = "churn_retention_command_center.html"
+OFFICIAL_DASHBOARD_FILENAME = "executive-retention-command-center.html"
 
 
 def _json_records(df: pd.DataFrame) -> list[dict]:

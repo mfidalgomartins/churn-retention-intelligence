@@ -862,7 +862,7 @@ def main() -> int:
     # 5) DASHBOARD REVIEW
     # ----------------------------
     dashboard_builder = (project_root / "src" / "dashboard_builder" / "build_executive_dashboard.py").read_text(encoding="utf-8")
-    dashboard_path = project_root / "outputs" / "dashboard" / "churn_retention_command_center.html"
+    dashboard_path = project_root / "outputs" / "dashboard" / "executive-retention-command-center.html"
     dashboard_html = dashboard_path.read_text(encoding="utf-8")
     dashboard_htmls = sorted((project_root / "outputs" / "dashboard").glob("*.html"))
 
@@ -870,7 +870,7 @@ def main() -> int:
         Check(
             "Dashboard Review",
             "Official dashboard output uniqueness",
-            "PASS" if len(dashboard_htmls) == 1 and dashboard_htmls[0].name == "churn_retention_command_center.html" else "WARN",
+            "PASS" if len(dashboard_htmls) == 1 and dashboard_htmls[0].name == "executive-retention-command-center.html" else "WARN",
             f"Dashboard HTML files detected: {[p.name for p in dashboard_htmls]}.",
         )
     )
