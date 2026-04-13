@@ -13,6 +13,7 @@
   - `methodology/risk_scoring_methodology.md`
   - `governance/data_contract_validation_report.md`
   - `governance/qa_release_summary.md`
+  - `governance/release_runbook.md`
 - Maintained manually:
   - `reports/executive_decision_memo.md`
   - `methodology/synthetic_data_generation_note.md`

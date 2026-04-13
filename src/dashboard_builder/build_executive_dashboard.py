@@ -2023,6 +2023,47 @@ renderDashboard();
     return html
 
 
+def build_redirect_html(target_href: str) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="refresh" content="0; url={target_href}" />
+  <title>Dashboard Redirect</title>
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #f5f7fb;
+      color: #15212b;
+    }}
+    .box {{
+      text-align: center;
+      max-width: 560px;
+      padding: 24px;
+    }}
+    a {{
+      color: #0b5fcc;
+      text-decoration: none;
+      font-weight: 600;
+    }}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Churn & Retention Dashboard</h1>
+    <p>Redirecting to the live dashboard...</p>
+    <p><a href="{target_href}">Open dashboard</a></p>
+  </div>
+</body>
+</html>
+"""
+
+
 def _enforce_single_official_html(dashboard_dir: Path, official_filename: str) -> None:
     for html_path in dashboard_dir.glob("*.html"):
         if html_path.name != official_filename:
@@ -2048,9 +2089,15 @@ def main() -> None:
     output_file = dashboard_dir / OFFICIAL_DASHBOARD_FILENAME
     output_file.write_text(html, encoding="utf-8")
     pages_file = pages_dir / "index.html"
-    pages_file.write_text(html, encoding="utf-8")
+    pages_file.write_text(
+        build_redirect_html(f"./outputs/dashboard/{OFFICIAL_DASHBOARD_FILENAME}"),
+        encoding="utf-8",
+    )
     docs_pages_file = docs_pages_dir / "index.html"
-    docs_pages_file.write_text(html, encoding="utf-8")
+    docs_pages_file.write_text(
+        build_redirect_html(f"../outputs/dashboard/{OFFICIAL_DASHBOARD_FILENAME}"),
+        encoding="utf-8",
+    )
 
     print("Executive dashboard generated:", output_file)
     print("GitHub Pages dashboard:", pages_file)

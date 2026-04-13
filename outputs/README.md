@@ -1,14 +1,14 @@
 # Outputs
 
-Esta pasta contém os artefactos gerados do projeto.
+This folder contains governed generated artifacts.
 
-- `dashboard/` — dashboard executivo (link interativo abaixo).
-- `tables/` — tabelas analíticas e métricas governadas.
-- `charts/` — gráficos de apoio (pack estático).
-- `profiling/` — artefactos de QA e profiling.
+- `dashboard/` — official dashboard artifact.
+- `tables/` — governed analytical tables and QA outputs.
+- `charts/` — static chart pack for publication/reporting.
+- `profiling/` — data profiling artifacts.
 
-Dashboard ao vivo (recomendado):  
+Live dashboard (recommended):  
 `https://mfidalgomartins.github.io/churn-retention-intelligence/`
 
-Pasta do dashboard:  
+Dashboard artifact folder:  
 `outputs/dashboard/`

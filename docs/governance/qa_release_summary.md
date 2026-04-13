@@ -8,8 +8,8 @@
 - Dashboard review (KPI/chart/filter/table consistency)
 
 ## Summary
-- Total checks: **47**
-- PASS: **46**
+- Total checks: **48**
+- PASS: **47**
 - WARN: **1**
 - FAIL: **0**
 - Blocker FAILs: **0**

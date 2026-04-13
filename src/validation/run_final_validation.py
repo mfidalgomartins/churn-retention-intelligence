@@ -864,6 +864,8 @@ def main() -> int:
     dashboard_builder = (project_root / "src" / "dashboard_builder" / "build_executive_dashboard.py").read_text(encoding="utf-8")
     dashboard_path = project_root / "outputs" / "dashboard" / "executive-retention-command-center.html"
     dashboard_html = dashboard_path.read_text(encoding="utf-8")
+    root_index_html = (project_root / "index.html").read_text(encoding="utf-8")
+    docs_index_html = (project_root / "docs" / "index.html").read_text(encoding="utf-8")
     dashboard_htmls = sorted((project_root / "outputs" / "dashboard").glob("*.html"))
 
     checks.append(
@@ -872,6 +874,23 @@ def main() -> int:
             "Official dashboard output uniqueness",
             "PASS" if len(dashboard_htmls) == 1 and dashboard_htmls[0].name == "executive-retention-command-center.html" else "WARN",
             f"Dashboard HTML files detected: {[p.name for p in dashboard_htmls]}.",
+        )
+    )
+
+    redirect_ok = (
+        ("http-equiv=\"refresh\"" in root_index_html)
+        and ("./outputs/dashboard/executive-retention-command-center.html" in root_index_html)
+        and ("const DATA =" not in root_index_html)
+        and ("http-equiv=\"refresh\"" in docs_index_html)
+        and ("../outputs/dashboard/executive-retention-command-center.html" in docs_index_html)
+        and ("const DATA =" not in docs_index_html)
+    )
+    checks.append(
+        Check(
+            "Dashboard Review",
+            "Single dashboard payload copy",
+            "PASS" if redirect_ok else "FAIL",
+            "Root/docs entrypoints are lightweight redirects and only outputs/dashboard carries full embedded payload.",
         )
     )
 

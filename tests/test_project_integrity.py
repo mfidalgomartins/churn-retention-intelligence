@@ -15,7 +15,6 @@ class TestProjectIntegrity(unittest.TestCase):
             "data/raw",
             "data/processed",
             "src",
-            "src/retention_analysis",
             "sql",
             "sql/staging",
             "sql/marts",
@@ -39,7 +38,6 @@ class TestProjectIntegrity(unittest.TestCase):
             "requirements.txt",
             ".gitignore",
             "Makefile",
-            "config/contracts/data_contracts.yml",
             "config/contracts/data_contracts.json",
             "config/governance/release_policy.yml",
             "config/governance/score_stability_baseline.json",
@@ -206,6 +204,20 @@ class TestProjectIntegrity(unittest.TestCase):
         size_bytes = html_path.stat().st_size
         self.assertGreaterEqual(size_bytes, 250_000)
         self.assertLessEqual(size_bytes, 3_000_000)
+
+    def test_pages_entrypoints_redirect_to_official_dashboard(self) -> None:
+        root_index = (ROOT / "index.html").read_text(encoding="utf-8")
+        docs_index = (ROOT / "docs/index.html").read_text(encoding="utf-8")
+        dashboard_html = (ROOT / "outputs/dashboard/executive-retention-command-center.html").read_text(encoding="utf-8")
+
+        self.assertIn("http-equiv=\"refresh\"", root_index)
+        self.assertIn("./outputs/dashboard/executive-retention-command-center.html", root_index)
+        self.assertIn("http-equiv=\"refresh\"", docs_index)
+        self.assertIn("../outputs/dashboard/executive-retention-command-center.html", docs_index)
+
+        self.assertNotIn("const DATA =", root_index)
+        self.assertNotIn("const DATA =", docs_index)
+        self.assertIn("const DATA =", dashboard_html)
 
     def test_make_validate_includes_contract_gate(self) -> None:
         makefile_path = ROOT / "Makefile"

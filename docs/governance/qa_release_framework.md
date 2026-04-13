@@ -26,9 +26,9 @@ This project now tracks readiness using explicit states:
 - `info`: pass/trace information
 
 ## Policy Files
-- `config/contracts/data_contracts.yml`
 - `config/governance/release_policy.yml`
 - `config/governance/score_stability_baseline.json`
+- `config/contracts/data_contracts.json`
 
 ## Enforcement Outputs
 - `outputs/tables/data_contract_checks.csv`
@@ -38,3 +38,6 @@ This project now tracks readiness using explicit states:
 - `outputs/tables/release_readiness_matrix.csv`
 - `docs/governance/data_contract_validation_report.md`
 - `docs/governance/qa_release_summary.md`
+
+## Operational Runbook
+- `docs/governance/release_runbook.md`

@@ -52,12 +52,11 @@ def compute_scores(df: pd.DataFrame) -> pd.DataFrame:
     weighted_base = sum(scored[col] * w for col, w in weights.items())
 
     # Transparent adjustments for strong operational risk flags.
-    scored["at_risk_adjustment"] = scored["at_risk_flag"] * 12.0
     scored["contraction_adjustment"] = scored["contraction_flag"] * 8.0
     scored["dormancy_adjustment"] = (scored["recent_sessions_30d"] == 0).astype(int) * 6.0
 
     scored["churn_risk_score"] = (100.0 * weighted_base) + scored[
-        ["at_risk_adjustment", "contraction_adjustment", "dormancy_adjustment"]
+        ["contraction_adjustment", "dormancy_adjustment"]
     ].sum(axis=1)
     scored["churn_risk_score"] = scored["churn_risk_score"].clip(lower=0.0, upper=100.0).round(2)
 
@@ -194,6 +193,7 @@ def write_methodology_note(docs_dir: Path) -> None:
 ## Scope
 - This scoring layer targets **recoverable customers only** (`churn_flag = 0`).
 - Goal: prioritize intervention effort by combining behavioral churn risk and economic importance.
+- `at_risk_flag` is intentionally excluded from score magnitude to avoid label leakage from simulated operational status.
 
 ## Score 1: `churn_risk_score` (0-100)
 `churn_risk_score = 100 * weighted_signal_sum + adjustments`
@@ -215,7 +215,6 @@ Signal definitions (all clipped to `[0,1]`):
 - `contract_renewal_risk_signal = renewal_near_flag * (0.60 + 0.40 * max(usage_decline_signal, failed_payment_signal, low_nps_signal, low_adoption_signal))`
 
 Adjustments:
-- `+12` if `at_risk_flag = 1`
 - `+8` if `contraction_flag = 1`
 - `+6` if `recent_sessions_30d = 0`
 

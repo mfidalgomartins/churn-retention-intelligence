@@ -28,6 +28,7 @@ Visualization Review,Title quality,PASS,info,communication_quality,False,Detecte
 Visualization Review,Axis correctness,PASS,info,communication_quality,False,Percent-format axes references=5; currency-format axes references=1.
 Visualization Review,Misleading chart risk,PASS,info,communication_quality,False,No inverted/truncated y-axis directives found for churn and retention bar/line charts; heatmap bounded at 0-1.
 Dashboard Review,Official dashboard output uniqueness,PASS,info,decision_product_quality,False,Dashboard HTML files detected: ['executive-retention-command-center.html'].
+Dashboard Review,Single dashboard payload copy,PASS,info,decision_product_quality,False,Root/docs entrypoints are lightweight redirects and only outputs/dashboard carries full embedded payload.
 Dashboard Review,Governed data-source usage,PASS,info,decision_product_quality,True,Builder uses governed processed/output artifacts and does not query raw source files directly.
 Dashboard Review,Required diagnostics coverage (region),PASS,info,decision_product_quality,False,Region-level churn diagnostic chart is present in the dashboard.
 Dashboard Review,Dashboard payload integrity,PASS,info,decision_product_quality,True,Embedded payload contains governed cubes and rendering tables.
@@ -38,11 +39,11 @@ Dashboard Review,Priority table schema consistency,PASS,info,decision_product_qu
 Dashboard Review,Chart density and readability scope,PASS,info,decision_product_quality,False,Unique chart canvases detected: 10.
 Dashboard Review,Responsive/layout safety,PASS,info,decision_product_quality,False,Layout uses grid-based responsive rules with constrained overflow and without fragile absolute positioning.
 Dashboard Review,Offline/self-contained packaging,PASS,info,decision_product_quality,False,Dashboard HTML is packaged without external network script/style dependencies.
-Dashboard Review,Payload size/performance sanity,PASS,info,decision_product_quality,False,Dashboard HTML payload size=2389009 bytes.
+Dashboard Review,Payload size/performance sanity,PASS,info,decision_product_quality,False,Dashboard HTML payload size=2320472 bytes.
 Dashboard Review,Version stamping and traceability,PASS,info,decision_product_quality,True,Dashboard embeds version metadata in governed payload and exposes period traceability controls in the UI.
 Governance & Release,Risk tier summary cross-output consistency,PASS,info,general,False,Tier count absolute diff between risk_scores and risk_tier_summary: 0.
 Governance & Release,Priority ranking monotonicity,PASS,info,general,False,Rows violating non-increasing priority order: 0.
-Governance & Release,Risk tier score monotonicity,PASS,info,general,False,"Tier average priority monotonicity violations=0; averages={'high': 63.98487179487179, 'medium': 46.258989113530326, 'low': 28.148166219839144}."
+Governance & Release,Risk tier score monotonicity,PASS,info,general,False,"Tier average priority monotonicity violations=0; averages={'high': 62.68666666666666, 'medium': 46.11399624765478, 'low': 27.758279139569787}."
 Governance & Release,Recommended-action rule consistency,PASS,info,general,False,Action rows violating scoring policy rules: 0.
 Governance & Release,Financial tie-out consistency,PASS,info,general,False,Max absolute diff between segment financial outputs and feature recomputation: 0.0000.
-Governance & Release,Score stability baseline drift,PASS,info,general,False,max_tier_share_drift=0.0000; avg_priority_drift=0.0000; baseline_version=2026-04-02-v1.
+Governance & Release,Score stability baseline drift,PASS,info,general,False,max_tier_share_drift=0.0000; avg_priority_drift=0.0000; baseline_version=2026-04-13-v2.

@@ -1,13 +1,13 @@
 {
-  "baseline_version": "2026-04-02-v1",
-  "generated_at_utc": "2026-04-02 12:31:55 UTC",
+  "baseline_version": "2026-04-13-v2",
+  "generated_at_utc": "2026-04-13 00:00:00 UTC",
   "population": 2547,
   "tier_share": {
     "critical": 0.0,
-    "high": 0.015312131919905771,
-    "medium": 0.2524538672948567,
-    "low": 0.7322340007852375
+    "high": 0.005889281507656066,
+    "medium": 0.20926580290537888,
+    "low": 0.784844915586965
   },
-  "avg_priority_score": 33.26905,
-  "notes": "Synthetic-seed baseline for drift guardrails in final validation."
+  "avg_priority_score": 31.805206124852763,
+  "notes": "Synthetic-seed baseline refreshed after leakage-resistant scoring update."
 }

@@ -1,9 +1,9 @@
-# SQL Layer (Illustrative)
+# SQL Layer
 
-This project is primarily executed in Python, but the core logic is also expressed in SQL to reflect analytics‑engineering discipline and enable warehouse translation.
+This project is primarily executed in Python, and selected core logic is mirrored in SQL for warehouse translation and metric governance checks.
 
 ## Contents
 - `staging/`: basic cleaning and standardization
 - `marts/`: analytical models (features + KPIs)
 
-These files are intentionally minimal and focus on clarity, not exhaustiveness.
+The SQL models focus on key transformations and KPI semantics, not full production orchestration.

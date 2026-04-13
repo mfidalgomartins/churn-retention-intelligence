@@ -36,7 +36,7 @@ Live dashboard (GitHub Pages):
 `https://mfidalgomartins.github.io/churn-retention-intelligence/`
 
 ### Why it stands out
-It is not a chart gallery. It is an end‑to‑end decision system with QA gates, interpretable scoring, and a dashboard generated strictly from governed outputs. SQL equivalents are included for warehouse translation.
+It is not a chart gallery. It is an end‑to‑end decision system with QA gates, interpretable scoring, and a dashboard generated strictly from governed outputs. The SQL layer covers key KPI/feature logic and is intentionally scoped.
 
 ### Run
 ```bash
@@ -45,7 +45,9 @@ make all
 make test
 ```
 
+CI pipeline: `.github/workflows/ci.yml`
+
 ### Limits
 Synthetic data; decision‑support only. Revenue churn uses a monthly‑value proxy. Behavioral drivers are correlational.
 
-Tools: Python, SQL, pandas, DuckDB, Chart.js.
+Tools: Python, SQL, pandas, matplotlib, Chart.js.
