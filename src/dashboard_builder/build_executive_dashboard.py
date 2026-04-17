@@ -325,73 +325,91 @@ def build_html(data_json: str, chart_js: str) -> str:
   <title>Churn & Retention Command Center</title>
   <style>
     :root {
-      --bg: #f2f5f9;
-      --surface: #ffffff;
-      --surface-soft: #f8fafc;
+      --bg: #edf3f8;
+      --bg-deep: #dce7f0;
+      --surface: rgba(255, 255, 255, 0.9);
+      --surface-soft: #f6f9fc;
+      --surface-strong: #eef4f9;
       --surface-elev: #ffffff;
-      --ink: #0b1320;
-      --ink-soft: #425466;
-      --brand: #0f3b66;
-      --brand-2: #1c5a8f;
-      --danger: #b42318;
-      --success: #0f766e;
-      --warning: #a16207;
-      --border: #d4dee9;
-      --shadow: 0 12px 28px rgba(11, 19, 32, 0.08);
-      --radius: 18px;
-      --space: 16px;
-      --font: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
-      --font-strong: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
-      --input-bg: #f5fbff;
-      --input-border: #8aaec4;
-      --input-ink: #173a51;
-      --thead-bg: #f8fafc;
-      --row-alt: #fbfdff;
-      --table-row-border: #edf2f7;
-      --stack-border: #e2e8f0;
-      --header-grad-1: #113f67;
-      --header-grad-2: #1a4f77;
-      --header-grad-3: #102f49;
-      --header-ink: #f1f6fb;
-      --header-soft: #d7e9f5;
-      --header-soft-2: #cde0ee;
-      --header-strong: #e8f3fb;
-      --toggle-bg: rgba(255, 255, 255, 0.13);
-      --toggle-border: rgba(226, 242, 255, 0.45);
-      --toggle-ink: #eaf5ff;
+      --ink: #0d1726;
+      --ink-soft: #4d6074;
+      --ink-subtle: #74859a;
+      --brand: #123a5d;
+      --brand-2: #2f7098;
+      --brand-3: #93bed4;
+      --danger: #b73a32;
+      --danger-soft: #f7d7d3;
+      --success: #0d7b70;
+      --warning: #9c6012;
+      --border: rgba(134, 156, 178, 0.28);
+      --border-strong: rgba(98, 126, 150, 0.34);
+      --shadow: 0 26px 56px rgba(15, 26, 44, 0.10);
+      --shadow-soft: 0 14px 30px rgba(15, 26, 44, 0.08);
+      --radius: 22px;
+      --space: 18px;
+      --font: "IBM Plex Sans", "Aptos", "Segoe UI Variable Text", "Avenir Next", sans-serif;
+      --font-strong: "Aptos Display", "Avenir Next Condensed", "IBM Plex Sans", "Segoe UI Variable Display", sans-serif;
+      --input-bg: rgba(255, 255, 255, 0.92);
+      --input-border: rgba(148, 177, 199, 0.55);
+      --input-ink: #18344f;
+      --thead-bg: #f4f8fb;
+      --row-alt: #f9fbfd;
+      --table-row-border: #e7eef5;
+      --stack-border: rgba(164, 182, 201, 0.42);
+      --header-grad-1: #0c2238;
+      --header-grad-2: #123652;
+      --header-grad-3: #0e2135;
+      --header-ink: #eff6fd;
+      --header-soft: #c7d8e8;
+      --header-soft-2: #a7bdd2;
+      --header-strong: #f7fbff;
+      --toggle-bg: rgba(255, 255, 255, 0.10);
+      --toggle-border: rgba(216, 232, 245, 0.22);
+      --toggle-ink: #ebf4fd;
+      --hero-border: rgba(229, 239, 247, 0.16);
+      --hero-panel: rgba(8, 18, 31, 0.22);
     }
 
     body[data-theme="dark"] {
-      --bg: #080f1a;
-      --surface: #0f1725;
-      --surface-soft: #0c1422;
-      --surface-elev: #101b2c;
-      --ink: #e6edf7;
-      --ink-soft: #9db1c8;
-      --brand: #9dc7e8;
-      --brand-2: #63a1cf;
-      --danger: #f07770;
-      --success: #4bc7bc;
-      --warning: #e5c167;
-      --border: #203044;
-      --shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
-      --input-bg: #122136;
-      --input-border: #314962;
-      --input-ink: #e4eef8;
-      --thead-bg: #132033;
-      --row-alt: #111b2b;
-      --table-row-border: #24364d;
-      --stack-border: #2e425b;
-      --header-grad-1: #09121f;
-      --header-grad-2: #0f1f34;
-      --header-grad-3: #152942;
-      --header-ink: #e7f0fb;
-      --header-soft: #b9cde2;
-      --header-soft-2: #9fb8d1;
-      --header-strong: #f1f7ff;
-      --toggle-bg: rgba(159, 200, 234, 0.16);
-      --toggle-border: rgba(159, 200, 234, 0.45);
-      --toggle-ink: #e6f3ff;
+      --bg: #08111d;
+      --bg-deep: #050b14;
+      --surface: rgba(13, 22, 35, 0.9);
+      --surface-soft: #0c1522;
+      --surface-strong: #101b2a;
+      --surface-elev: #101b2a;
+      --ink: #e9f0f8;
+      --ink-soft: #a5b8cc;
+      --ink-subtle: #7f93aa;
+      --brand: #a9d0ec;
+      --brand-2: #6fb0d6;
+      --brand-3: #3e5d78;
+      --danger: #ef8a82;
+      --danger-soft: rgba(239, 138, 130, 0.16);
+      --success: #66d3c5;
+      --warning: #e7c777;
+      --border: rgba(90, 111, 133, 0.34);
+      --border-strong: rgba(119, 146, 170, 0.42);
+      --shadow: 0 26px 56px rgba(0, 0, 0, 0.36);
+      --shadow-soft: 0 16px 34px rgba(0, 0, 0, 0.24);
+      --input-bg: rgba(15, 27, 42, 0.96);
+      --input-border: rgba(101, 128, 153, 0.48);
+      --input-ink: #e9f0f8;
+      --thead-bg: #122033;
+      --row-alt: #101a29;
+      --table-row-border: #22364b;
+      --stack-border: rgba(79, 104, 129, 0.55);
+      --header-grad-1: #08111d;
+      --header-grad-2: #0e243a;
+      --header-grad-3: #0d1d2f;
+      --header-ink: #edf5fc;
+      --header-soft: #bfd2e3;
+      --header-soft-2: #96aec5;
+      --header-strong: #f7fbff;
+      --toggle-bg: rgba(168, 205, 233, 0.12);
+      --toggle-border: rgba(168, 205, 233, 0.26);
+      --toggle-ink: #eaf4ff;
+      --hero-border: rgba(208, 226, 242, 0.12);
+      --hero-panel: rgba(3, 10, 18, 0.36);
     }
 
     * { box-sizing: border-box; }
@@ -401,14 +419,47 @@ def build_html(data_json: str, chart_js: str) -> str:
       font-family: var(--font);
       color: var(--ink);
       background:
-        radial-gradient(1200px 480px at 100% 0%, rgba(20, 72, 120, 0.14), transparent 60%),
-        linear-gradient(180deg, color-mix(in srgb, var(--bg) 88%, #ffffff 12%) 0%, var(--bg) 38%);
+        radial-gradient(1200px 640px at 100% -8%, rgba(54, 108, 149, 0.22), transparent 58%),
+        radial-gradient(860px 420px at 0% 6%, rgba(157, 79, 58, 0.10), transparent 56%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
       line-height: 1.4;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: auto;
+      pointer-events: none;
+      border-radius: 999px;
+      filter: blur(20px);
+      opacity: 0.72;
+      z-index: 0;
+    }
+
+    body::before {
+      width: 360px;
+      height: 360px;
+      top: 82px;
+      right: -120px;
+      background: radial-gradient(circle, rgba(94, 147, 184, 0.18), transparent 68%);
+    }
+
+    body::after {
+      width: 280px;
+      height: 280px;
+      bottom: 110px;
+      left: -110px;
+      background: radial-gradient(circle, rgba(184, 91, 69, 0.12), transparent 70%);
     }
 
     .container {
-      width: min(1720px, 100% - 38px);
-      margin: 20px auto 32px;
+      position: relative;
+      z-index: 1;
+      width: min(1760px, 100% - 38px);
+      margin: 22px auto 34px;
       display: grid;
       gap: var(--space);
     }
@@ -420,67 +471,181 @@ def build_html(data_json: str, chart_js: str) -> str:
       box-shadow: var(--shadow);
       min-width: 0;
       overflow: hidden;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
 
     .header {
-      background: linear-gradient(132deg, var(--header-grad-1) 0%, var(--header-grad-2) 42%, var(--header-grad-3) 100%);
+      position: relative;
+      background:
+        radial-gradient(800px 360px at 100% 0%, rgba(149, 189, 216, 0.16), transparent 60%),
+        linear-gradient(132deg, var(--header-grad-1) 0%, var(--header-grad-2) 42%, var(--header-grad-3) 100%);
       color: var(--header-ink);
-      padding: 22px;
+      padding: 26px;
+    }
+
+    .header-shell {
       display: grid;
-      gap: 16px;
+      gap: 20px;
     }
 
     .header-top {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 12px;
+      grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.95fr);
+      gap: 18px;
       align-items: start;
       min-width: 0;
     }
 
+    .header-intro {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      color: var(--header-soft);
+    }
+
     .title {
       margin: 0;
-      font-size: clamp(22px, 2.3vw, 31px);
-      line-height: 1.1;
+      font-size: clamp(28px, 3vw, 42px);
+      line-height: 1;
       overflow-wrap: anywhere;
       font-family: var(--font-strong);
-      letter-spacing: 0.2px;
+      letter-spacing: 0.01em;
+      max-width: 940px;
     }
 
     .subtitle {
-      margin: 6px 0 0;
-      max-width: 980px;
-      font-size: 14px;
+      margin: 0;
+      max-width: 920px;
+      font-size: 15px;
+      line-height: 1.6;
       color: var(--header-soft);
       overflow-wrap: anywhere;
-      max-width: 950px;
     }
 
-    .header-meta {
-      text-align: right;
-      font-size: 12px;
+    .meta-panel {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border-radius: 20px;
+      border: 1px solid var(--hero-border);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), var(--hero-panel));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .meta-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .meta-item {
+      display: grid;
+      gap: 4px;
+      padding: 12px 13px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      min-width: 0;
+    }
+
+    .meta-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
       color: var(--header-soft-2);
-      white-space: nowrap;
     }
 
-    .header-meta strong { color: var(--header-strong); }
+    .meta-item strong {
+      color: var(--header-strong);
+      font-size: 14px;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+
+    .decision-box {
+      display: grid;
+      gap: 8px;
+    }
+
+    .decision-title {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--header-soft-2);
+    }
+
+    .decision-list {
+      margin: 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 6px;
+      color: var(--header-soft);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .filters-shell {
+      display: grid;
+      gap: 14px;
+      padding: 16px 18px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--hero-border);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(5, 14, 26, 0.14));
+    }
+
+    .filters-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .filters-kicker {
+      margin: 0 0 5px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--header-soft-2);
+    }
+
+    .filters-title {
+      margin: 0;
+      font-size: 18px;
+      font-family: var(--font-strong);
+      color: var(--header-strong);
+      line-height: 1.2;
+    }
 
     .filters {
       display: grid;
-      grid-template-columns: repeat(9, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 12px;
       min-width: 0;
     }
 
     .filter {
       display: grid;
-      gap: 4px;
+      gap: 6px;
       min-width: 0;
     }
 
     .filter label {
       font-size: 11px;
-      letter-spacing: 0.35px;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
       font-weight: 700;
       color: var(--header-soft);
@@ -491,157 +656,216 @@ def build_html(data_json: str, chart_js: str) -> str:
       min-height: 36px;
       width: 100%;
       border: 1px solid var(--input-border);
-      border-radius: 9px;
+      border-radius: 12px;
       background: var(--input-bg);
       color: var(--input-ink);
-      padding: 7px 10px;
+      padding: 9px 12px;
       font-size: 13px;
       min-width: 0;
-    }
-
-    .theme-toggle-wrap {
-      display: flex;
-      align-items: end;
-      justify-content: flex-end;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
     }
 
     .header-actions {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      display: flex;
       gap: 8px;
-      width: 100%;
+      flex-wrap: wrap;
     }
 
     .action-btn {
       min-height: 36px;
-      border-radius: 10px;
+      border-radius: 999px;
       border: 1px solid var(--toggle-border);
       background: var(--toggle-bg);
       color: var(--toggle-ink);
       font-size: 12px;
       font-weight: 700;
-      padding: 7px 11px;
-      width: 100%;
+      padding: 8px 14px;
       cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease, background 0.2s ease;
     }
 
-    .action-btn:hover { filter: brightness(1.07); }
+    .action-btn:hover {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
+    }
 
     .scope-note {
       font-size: 12px;
       color: var(--header-soft);
+      padding-top: 2px;
       overflow-wrap: anywhere;
     }
 
     .summary-strip {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
+      gap: 14px;
     }
 
     .summary-card {
-      background: var(--surface);
+      background:
+        radial-gradient(circle at top right, rgba(47, 112, 152, 0.06), transparent 34%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), var(--surface-elev) 100%);
       border: 1px solid var(--border);
-      border-left: 4px solid var(--brand-2);
-      border-radius: 12px;
-      padding: 12px 13px;
-      min-height: 98px;
+      border-top: 4px solid var(--brand-2);
+      border-radius: 18px;
+      padding: 16px 17px;
+      min-height: 116px;
       overflow: hidden;
+      box-shadow: var(--shadow-soft);
+    }
+    .summary-card.summary-card-1 { border-top-color: #184e77; }
+    .summary-card.summary-card-2 { border-top-color: #a33333; }
+    .summary-card.summary-card-3 { border-top-color: #0b7a70; }
+    .summary-card.summary-card-4 { border-top-color: #a46414; }
+
+    .summary-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
-    .summary-card.summary-card-1 { border-left-color: #1d4e89; }
-    .summary-card.summary-card-2 { border-left-color: #9f1239; }
-    .summary-card.summary-card-3 { border-left-color: #0f766e; }
-    .summary-card.summary-card-4 { border-left-color: #b45309; }
+    .summary-index {
+      display: inline-grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      flex: 0 0 36px;
+      border-radius: 12px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      color: var(--brand);
+      font-family: var(--font-strong);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
 
     .summary-title {
       margin: 0;
-      font-size: 10px;
+      font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
-      color: var(--ink-soft);
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
       font-weight: 700;
     }
 
     .summary-body {
-      margin: 7px 0 0;
-      font-size: 13px;
+      margin: 12px 0 0;
+      font-size: 14px;
+      line-height: 1.55;
       color: var(--ink);
-      font-weight: 650;
+      font-weight: 600;
       overflow-wrap: anywhere;
     }
 
     .section-header {
-      background: var(--surface-soft);
-      padding: 14px 16px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      background: linear-gradient(180deg, var(--surface-strong), var(--surface-soft) 100%);
+      padding: 18px 20px 17px;
       border-bottom: 1px solid var(--border);
-      border-left: 4px solid #c7d8e8;
+    }
+
+    .section-heading {
+      display: grid;
+      gap: 4px;
+    }
+
+    .section-kicker {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-subtle);
     }
 
     .section-title {
       margin: 0;
-      font-size: 18px;
-      line-height: 1.2;
+      font-size: 24px;
+      line-height: 1.06;
       font-family: var(--font-strong);
     }
 
     .section-subtitle {
-      margin: 4px 0 0;
-      font-size: 12px;
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.55;
       color: var(--ink-soft);
+      max-width: 760px;
       overflow-wrap: anywhere;
     }
 
     .kpi-grid {
-      padding: 14px;
+      padding: 20px;
       display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 14px;
     }
 
     .kpi-card {
+      grid-column: span 3;
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
-      min-height: 122px;
+      border-top: 4px solid transparent;
+      border-radius: 18px;
+      padding: 16px 16px 14px;
+      min-height: 146px;
       overflow: hidden;
-      background: linear-gradient(180deg, var(--surface-elev) 0%, var(--surface) 100%);
+      background:
+        radial-gradient(circle at top right, rgba(47, 112, 152, 0.08), transparent 36%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.94), var(--surface-elev) 100%);
+      box-shadow: var(--shadow-soft);
     }
 
-    .kpi-card.kpi-primary { border-top: 3px solid #0f3b66; }
-    .kpi-card.kpi-danger { border-top: 3px solid #b42318; }
-    .kpi-card.kpi-warning { border-top: 3px solid #b45309; }
-    .kpi-card.kpi-success { border-top: 3px solid #0f766e; }
+    .kpi-grid .kpi-card:nth-child(n + 5) { grid-column: span 4; }
+    .kpi-card.kpi-primary { border-top-color: #133e64; }
+    .kpi-card.kpi-danger { border-top-color: #b53a32; }
+    .kpi-card.kpi-warning { border-top-color: #aa6a12; }
+    .kpi-card.kpi-success { border-top-color: #0c7d72; }
 
     .kpi-label {
-      font-size: 10px;
+      position: relative;
+      z-index: 1;
+      font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.55px;
-      color: var(--ink-soft);
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
       font-weight: 700;
       overflow-wrap: anywhere;
     }
 
     .kpi-value {
-      margin-top: 5px;
-      font-size: clamp(22px, 2.2vw, 28px);
-      line-height: 1.05;
+      position: relative;
+      z-index: 1;
+      margin-top: 10px;
+      font-size: clamp(28px, 2.5vw, 38px);
+      line-height: 0.96;
       color: var(--brand);
-      font-weight: 750;
+      font-family: var(--font-strong);
+      font-weight: 800;
       overflow-wrap: anywhere;
     }
 
     .kpi-note {
-      margin-top: 4px;
+      position: relative;
+      z-index: 1;
+      margin-top: 10px;
       font-size: 12px;
+      line-height: 1.5;
       color: var(--ink-soft);
       overflow-wrap: anywhere;
     }
 
     .kpi-delta {
-      margin-top: 4px;
+      position: relative;
+      z-index: 1;
+      margin-top: 10px;
       font-size: 11px;
       font-weight: 700;
+      letter-spacing: 0.02em;
       overflow-wrap: anywhere;
     }
 
@@ -652,9 +876,9 @@ def build_html(data_json: str, chart_js: str) -> str:
     .chart-grid-2,
     .chart-grid-4,
     .chart-grid-risk {
-      padding: 14px;
+      padding: 20px;
       display: grid;
-      gap: 12px;
+      gap: 14px;
       min-width: 0;
     }
 
@@ -664,72 +888,100 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .chart-card {
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
-      background: var(--surface-elev);
+      border-radius: 18px;
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), var(--surface-elev) 100%);
       min-width: 0;
       overflow: hidden;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .chart-head {
+      display: grid;
+      gap: 5px;
+      margin-bottom: 12px;
+      min-width: 0;
+    }
+
+    .chart-kicker {
+      margin: 0;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
+      font-weight: 700;
     }
 
     .chart-title {
-      margin: 0 0 10px;
-      font-size: 13px;
-      line-height: 1.25;
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.2;
       color: var(--ink);
+      font-family: var(--font-strong);
       font-weight: 700;
       overflow-wrap: anywhere;
-      letter-spacing: 0.15px;
+      letter-spacing: 0.01em;
+    }
+
+    .chart-note {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--ink-soft);
+      overflow-wrap: anywhere;
     }
 
     .canvas-wrap {
       position: relative;
       width: 100%;
-      height: 310px;
+      height: 320px;
       min-width: 0;
-      min-height: 310px;
+      min-height: 320px;
     }
 
     .canvas-wrap.tall {
-      height: 360px;
-      min-height: 360px;
+      height: 382px;
+      min-height: 382px;
     }
 
     .diagnostic-metrics {
-      padding: 0 14px 14px;
+      padding: 0 20px 20px;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
+      gap: 14px;
     }
 
     .metric-card {
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 11px;
-      min-height: 88px;
+      border-radius: 18px;
+      padding: 14px 15px;
+      min-height: 108px;
       overflow: hidden;
-      background: var(--surface-soft);
+      background: linear-gradient(180deg, var(--surface-soft), var(--surface-elev) 100%);
+      box-shadow: var(--shadow-soft);
     }
 
     .metric-card h5 {
       margin: 0;
       font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.35px;
-      color: var(--ink-soft);
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
     }
 
     .metric-card p {
-      margin: 6px 0 0;
-      font-size: 13px;
+      margin: 10px 0 0;
+      font-size: 14px;
+      line-height: 1.55;
       color: var(--ink);
-      font-weight: 700;
+      font-weight: 600;
       overflow-wrap: anywhere;
     }
 
     .risk-layout {
-      padding: 14px;
+      padding: 20px;
       display: grid;
-      gap: 12px;
+      gap: 14px;
       grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
       min-width: 0;
     }
@@ -737,20 +989,49 @@ def build_html(data_json: str, chart_js: str) -> str:
     .table-card,
     .mini-card {
       border: 1px solid var(--border);
-      border-radius: 11px;
-      background: var(--surface-elev);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), var(--surface-elev) 100%);
       min-width: 0;
       overflow: hidden;
+      box-shadow: var(--shadow-soft);
     }
 
     .table-head {
-      padding: 12px 13px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 15px 18px;
       border-bottom: 1px solid var(--border);
-      font-size: 13px;
-      font-weight: 700;
       color: var(--ink);
       overflow-wrap: anywhere;
-      background: var(--surface-soft);
+      background: linear-gradient(180deg, var(--surface-strong), var(--surface-soft));
+    }
+
+    .table-head-block {
+      display: grid;
+      gap: 4px;
+    }
+
+    .table-overline {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
+      font-weight: 700;
+    }
+
+    .table-head-label {
+      font-size: 16px;
+      line-height: 1.2;
+      font-family: var(--font-strong);
+      font-weight: 700;
+    }
+
+    .table-head-note {
+      font-size: 12px;
+      color: var(--ink-soft);
+      text-align: right;
     }
 
     .table-wrap {
@@ -773,16 +1054,19 @@ def build_html(data_json: str, chart_js: str) -> str:
       z-index: 2;
       background: var(--thead-bg);
       border-bottom: 1px solid var(--border);
-      color: var(--ink-soft);
+      color: var(--ink-subtle);
       text-align: left;
-      padding: 8px;
+      padding: 11px 10px;
       cursor: pointer;
       white-space: nowrap;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.1em;
     }
 
     tbody td {
       border-bottom: 1px solid var(--table-row-border);
-      padding: 8px;
+      padding: 10px;
       color: var(--ink);
       white-space: nowrap;
     }
@@ -791,27 +1075,50 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .risk-side {
       display: grid;
-      gap: 9px;
+      gap: 12px;
       min-width: 0;
       grid-template-rows: auto auto 1fr;
     }
 
+    .mini-card-body {
+      padding: 15px 16px 16px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .mini-kicker {
+      margin: 0;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
+    }
+
+    .mini-note {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--ink-soft);
+    }
+
     .stacked-tier {
       width: 100%;
-      height: 14px;
+      height: 16px;
       border-radius: 999px;
       overflow: hidden;
       display: flex;
       border: 1px solid var(--stack-border);
-      margin-top: 8px;
+      margin-top: 2px;
+      background: var(--surface-soft);
     }
 
     .stacked-tier > div { height: 100%; min-width: 2px; }
 
     .tier-legend {
-      margin-top: 8px;
+      margin-top: 4px;
       display: grid;
-      gap: 6px;
+      gap: 8px;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       font-size: 12px;
       color: var(--ink-soft);
@@ -820,7 +1127,7 @@ def build_html(data_json: str, chart_js: str) -> str:
     .pill {
       display: inline-block;
       border-radius: 999px;
-      padding: 2px 7px;
+      padding: 3px 8px;
       font-size: 11px;
       font-weight: 700;
       color: #fff;
@@ -834,78 +1141,190 @@ def build_html(data_json: str, chart_js: str) -> str:
     .tier-churned { background: #475467; }
 
     .actions-grid {
-      padding: 14px;
+      padding: 20px;
       display: grid;
-      gap: 12px;
+      gap: 14px;
       grid-template-columns: repeat(5, minmax(0, 1fr));
     }
 
     .action-card {
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 11px;
-      min-height: 126px;
+      border-top: 4px solid var(--brand-2);
+      border-radius: 18px;
+      padding: 15px 15px 14px;
+      min-height: 168px;
       overflow: hidden;
-      background: var(--surface-soft);
+      background:
+        radial-gradient(circle at top right, rgba(47, 112, 152, 0.08), transparent 36%),
+        linear-gradient(180deg, var(--surface-soft), var(--surface-elev) 100%);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .action-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .action-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
     }
 
     .action-card h5 {
-      margin: 0 0 6px;
-      font-size: 13px;
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.25;
       color: var(--ink);
+      font-family: var(--font-strong);
       text-transform: capitalize;
       overflow-wrap: anywhere;
     }
 
+    .action-primary {
+      font-family: var(--font-strong);
+      font-size: 28px;
+      line-height: 1;
+      color: var(--brand);
+      font-weight: 800;
+    }
+
+    .action-primary-note {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--ink-soft);
+    }
+
     .action-card .meta {
+      margin-top: 12px;
       text-align: left;
       white-space: normal;
       color: var(--ink-soft);
       display: grid;
-      gap: 4px;
+      gap: 6px;
       font-size: 12px;
     }
 
     .footer {
-      padding: 11px 13px;
+      padding: 18px 20px;
       font-size: 12px;
-      line-height: 1.5;
+      line-height: 1.6;
       color: var(--ink-soft);
       overflow-wrap: anywhere;
+      background: linear-gradient(180deg, var(--surface-strong), var(--surface-soft));
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
+      gap: 14px;
+    }
+
+    .footer strong {
+      color: var(--ink);
+    }
+
+    .footer-note {
+      padding-left: 14px;
+      border-left: 1px solid var(--border-strong);
     }
 
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
+    @keyframes riseIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .panel,
+    .summary-card {
+      animation: riseIn 0.55s ease both;
+    }
+
+    .summary-card:nth-child(2) { animation-delay: 0.03s; }
+    .summary-card:nth-child(3) { animation-delay: 0.06s; }
+    .summary-card:nth-child(4) { animation-delay: 0.09s; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
     @media (max-width: 1580px) {
-      .filters { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .kpi-grid {
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+      }
+      .kpi-card { grid-column: span 2; }
+      .kpi-grid .kpi-card:nth-child(n + 5) { grid-column: span 4; }
       .chart-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .actions-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
 
     @media (max-width: 1200px) {
       .header-top { grid-template-columns: 1fr; }
-      .header-meta { text-align: left; white-space: normal; }
-      .theme-toggle-wrap { justify-content: stretch; }
+      .meta-panel { grid-template-columns: 1fr; }
+      .filters-head { align-items: flex-start; }
       .chart-grid-2 { grid-template-columns: 1fr; }
       .chart-grid-risk { grid-template-columns: 1fr; }
       .risk-layout { grid-template-columns: 1fr; }
       .risk-side { grid-template-rows: auto; }
       .actions-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .diagnostic-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .footer-grid { grid-template-columns: 1fr; }
+      .footer-note {
+        padding-left: 0;
+        border-left: 0;
+        padding-top: 10px;
+        border-top: 1px solid var(--border-strong);
+      }
     }
 
     @media (max-width: 760px) {
       .container { width: calc(100% - 16px); margin: 10px auto 16px; }
+      .header { padding: 18px; }
       .filters { grid-template-columns: 1fr 1fr; }
+      .meta-grid { grid-template-columns: 1fr; }
       .summary-strip,
-      .kpi-grid,
       .chart-grid-4,
       .diagnostic-metrics,
       .actions-grid { grid-template-columns: 1fr; }
-      .canvas-wrap { height: 270px; min-height: 270px; }
-      .canvas-wrap.tall { height: 320px; min-height: 320px; }
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+      .kpi-card,
+      .kpi-grid .kpi-card:nth-child(n + 5) {
+        grid-column: auto;
+      }
+      .section-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .canvas-wrap { height: 280px; min-height: 280px; }
+      .canvas-wrap.tall { height: 330px; min-height: 330px; }
       table { min-width: 760px; }
     }
 
@@ -928,7 +1347,7 @@ def build_html(data_json: str, chart_js: str) -> str:
       }
 
       .filters,
-      .theme-toggle-wrap,
+      .header-actions,
       .scope-note { display: none !important; }
 
       .header {
@@ -958,6 +1377,13 @@ def build_html(data_json: str, chart_js: str) -> str:
         border-color: #cbd5e1;
       }
 
+      .summary-card::before,
+      .kpi-card::before,
+      .action-card::before,
+      .kpi-card::after,
+      body::before,
+      body::after { display: none !important; }
+
       .canvas-wrap,
       .canvas-wrap.tall {
         height: 260px;
@@ -977,51 +1403,73 @@ def build_html(data_json: str, chart_js: str) -> str:
 <body>
   <div class="container">
     <section class="panel header">
-      <div class="header-top">
-        <div>
-          <h1 class="title">Churn & Retention Command Center</h1>
-          <p class="subtitle">Core business question: Where is the company losing future revenue, which customers are most at risk, and what actions should be prioritized?</p>
-        </div>
-        <div class="header-meta">
-          <div><strong>Available period:</strong> <span id="coverageText"></span></div>
-          <div><strong>Selected period:</strong> <span id="selectedPeriodText"></span></div>
-        </div>
-      </div>
-
-      <div class="filters">
-        <div class="filter"><label for="filterStartMonth">Date Start</label><input type="date" id="filterStartMonth" /></div>
-        <div class="filter"><label for="filterEndMonth">Date End</label><input type="date" id="filterEndMonth" /></div>
-        <div class="filter">
-          <label for="filterPeriodPreset">Period Preset</label>
-          <select id="filterPeriodPreset">
-            <option value="all">All period</option>
-            <option value="12m">Last 12 months</option>
-            <option value="6m">Last 6 months</option>
-            <option value="3m">Last 3 months</option>
-            <option value="custom">Custom range</option>
-          </select>
-        </div>
-        <div class="filter"><label for="filterSegment">Segment</label><select id="filterSegment"></select></div>
-        <div class="filter"><label for="filterRegion">Region</label><select id="filterRegion"></select></div>
-        <div class="filter"><label for="filterChannel">Acquisition Channel</label><select id="filterChannel"></select></div>
-        <div class="filter"><label for="filterPlan">Plan Type</label><select id="filterPlan"></select></div>
-        <div class="filter"><label for="filterRiskTier">Risk Tier</label><select id="filterRiskTier"></select></div>
-        <div class="theme-toggle-wrap">
-          <div class="header-actions">
-            <button id="themeToggle" class="action-btn" type="button">Dark Mode</button>
-            <button id="printBtn" class="action-btn" type="button">Print</button>
+      <div class="header-shell">
+        <div class="header-top">
+          <div class="header-intro">
+            <p class="eyebrow">Executive Retention System</p>
+            <h1 class="title">Churn & Retention Command Center</h1>
+            <p class="subtitle">A decision surface for revenue protection. Use it to pinpoint where churn is concentrating, how much MRR is exposed, and which accounts should move first into intervention.</p>
           </div>
+          <aside class="meta-panel">
+            <div class="meta-grid">
+              <div class="meta-item"><span class="meta-label">Available period</span><strong id="coverageText"></strong></div>
+              <div class="meta-item"><span class="meta-label">Selected period</span><strong id="selectedPeriodText"></strong></div>
+            </div>
+            <div class="decision-box">
+              <p class="decision-title">Decision focus</p>
+              <ul class="decision-list">
+                <li>Locate the segments and channels where churn is accelerating.</li>
+                <li>Quantify revenue exposure before it becomes realized loss.</li>
+                <li>Translate diagnosis into a ranked intervention queue.</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+
+        <div class="filters-shell">
+          <div class="filters-head">
+            <div>
+              <p class="filters-kicker">Scope Controls</p>
+              <h2 class="filters-title">Re-cut the story by date, segment, region, channel, plan, and risk tier.</h2>
+            </div>
+            <div class="header-actions">
+              <button id="themeToggle" class="action-btn" type="button">Dark Mode</button>
+              <button id="printBtn" class="action-btn" type="button">Print</button>
+            </div>
+          </div>
+          <div class="filters">
+            <div class="filter"><label for="filterStartMonth">Date Start</label><input type="date" id="filterStartMonth" /></div>
+            <div class="filter"><label for="filterEndMonth">Date End</label><input type="date" id="filterEndMonth" /></div>
+            <div class="filter">
+              <label for="filterPeriodPreset">Period Preset</label>
+              <select id="filterPeriodPreset">
+                <option value="all">All period</option>
+                <option value="12m">Last 12 months</option>
+                <option value="6m">Last 6 months</option>
+                <option value="3m">Last 3 months</option>
+                <option value="custom">Custom range</option>
+              </select>
+            </div>
+            <div class="filter"><label for="filterSegment">Segment</label><select id="filterSegment"></select></div>
+            <div class="filter"><label for="filterRegion">Region</label><select id="filterRegion"></select></div>
+            <div class="filter"><label for="filterChannel">Acquisition Channel</label><select id="filterChannel"></select></div>
+            <div class="filter"><label for="filterPlan">Plan Type</label><select id="filterPlan"></select></div>
+            <div class="filter"><label for="filterRiskTier">Risk Tier</label><select id="filterRiskTier"></select></div>
+          </div>
+          <div class="scope-note" id="scopeNote"></div>
         </div>
       </div>
-      <div class="scope-note" id="scopeNote"></div>
     </section>
 
     <section class="summary-strip" id="summaryStrip"></section>
 
     <section class="panel">
       <div class="section-header">
-        <h3 class="section-title">KPI Snapshot</h3>
-        <p class="section-subtitle">Official KPI values from governed cubes. Trend KPIs are anchored to selected period end month.</p>
+        <div class="section-heading">
+          <p class="section-kicker">Portfolio Pulse</p>
+          <h3 class="section-title">KPI Snapshot</h3>
+        </div>
+        <p class="section-subtitle">Official decision metrics anchored to the selected period end month and current commercial scope.</p>
       </div>
       <div class="kpi-grid">
         <div class="kpi-card kpi-primary"><div class="kpi-label">Active Customers</div><div class="kpi-value" id="kpiActive"></div><div class="kpi-note" id="kpiActiveNote"></div><div class="kpi-delta" id="kpiActiveDelta"></div></div>
@@ -1036,27 +1484,61 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     <section class="panel">
       <div class="section-header">
-        <h3 class="section-title">Primary Retention</h3>
-        <p class="section-subtitle">Trend signals for volume loss, value loss, and cohort durability.</p>
+        <div class="section-heading">
+          <p class="section-kicker">Executive Trendline</p>
+          <h3 class="section-title">Primary Retention</h3>
+        </div>
+        <p class="section-subtitle">Signals for volume loss, value loss, and cohort durability inside the selected time window.</p>
       </div>
       <div class="chart-grid-2">
-        <div class="chart-card"><h4 class="chart-title">Customer Churn Trend (Monthly)</h4><div class="canvas-wrap"><canvas id="chartCustomerChurnTrend"></canvas></div></div>
-        <div class="chart-card"><h4 class="chart-title">Revenue Churn Trend (Monthly)</h4><div class="canvas-wrap"><canvas id="chartRevenueChurnTrend"></canvas></div></div>
-        <div class="chart-card"><h4 class="chart-title">Cohort Retention Curves (Recent Cohorts)</h4><div class="canvas-wrap tall"><canvas id="chartCohortRetention"></canvas></div></div>
-        <div class="chart-card"><h4 class="chart-title">Cohort Revenue Retention (Latest Observation)</h4><div class="canvas-wrap tall"><canvas id="chartRevenueRetentionCohort"></canvas></div></div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <p class="chart-kicker">Trend signal</p>
+            <h4 class="chart-title">Customer Churn Trend</h4>
+            <p class="chart-note">Monthly churn intensity on the customer base active at period start.</p>
+          </div>
+          <div class="canvas-wrap"><canvas id="chartCustomerChurnTrend"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <p class="chart-kicker">Trend signal</p>
+            <h4 class="chart-title">Revenue Churn Trend</h4>
+            <p class="chart-note">Value leakage rate across the selected monthly revenue base.</p>
+          </div>
+          <div class="canvas-wrap"><canvas id="chartRevenueChurnTrend"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <p class="chart-kicker">Cohort durability</p>
+            <h4 class="chart-title">Cohort Retention Curves</h4>
+            <p class="chart-note">Recent cohorts tracked by age so you can separate fresh softness from structural deterioration.</p>
+          </div>
+          <div class="canvas-wrap tall"><canvas id="chartCohortRetention"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <p class="chart-kicker">Cohort durability</p>
+            <h4 class="chart-title">Revenue Retention by Cohort</h4>
+            <p class="chart-note">Latest observed revenue retention across the most recent cohort set.</p>
+          </div>
+          <div class="canvas-wrap tall"><canvas id="chartRevenueRetentionCohort"></canvas></div>
+        </div>
       </div>
     </section>
 
     <section class="panel">
       <div class="section-header">
-        <h3 class="section-title">Diagnostic View</h3>
-        <p class="section-subtitle">Commercial concentration and behavioral deterioration signals.</p>
+        <div class="section-heading">
+          <p class="section-kicker">Driver Diagnosis</p>
+          <h3 class="section-title">Diagnostic View</h3>
+        </div>
+        <p class="section-subtitle">Commercial concentration, behavioral deterioration, and customer quality gaps that explain the headline churn picture.</p>
       </div>
       <div class="chart-grid-4">
-        <div class="chart-card"><h4 class="chart-title">Where Churn Is Highest: Segment</h4><div class="canvas-wrap"><canvas id="chartChurnSegment"></canvas></div></div>
-        <div class="chart-card"><h4 class="chart-title">Where Churn Is Highest: Region</h4><div class="canvas-wrap"><canvas id="chartChurnRegion"></canvas></div></div>
-        <div class="chart-card"><h4 class="chart-title">Where Churn Is Highest: Acquisition Channel</h4><div class="canvas-wrap"><canvas id="chartChurnChannel"></canvas></div></div>
-        <div class="chart-card"><h4 class="chart-title">Where Churn Is Highest: Plan Type</h4><div class="canvas-wrap"><canvas id="chartChurnPlan"></canvas></div></div>
+        <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Commercial mix</p><h4 class="chart-title">Where Churn Is Highest: Segment</h4><p class="chart-note">Shows which customer segments are losing the most accounts relative to their own base.</p></div><div class="canvas-wrap"><canvas id="chartChurnSegment"></canvas></div></div>
+        <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Commercial mix</p><h4 class="chart-title">Where Churn Is Highest: Region</h4><p class="chart-note">Compares churn intensity across regional portfolios inside the current scope.</p></div><div class="canvas-wrap"><canvas id="chartChurnRegion"></canvas></div></div>
+        <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Commercial mix</p><h4 class="chart-title">Where Churn Is Highest: Acquisition Channel</h4><p class="chart-note">Highlights acquisition channels that are under-delivering on retention quality.</p></div><div class="canvas-wrap"><canvas id="chartChurnChannel"></canvas></div></div>
+        <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Commercial mix</p><h4 class="chart-title">Where Churn Is Highest: Plan Type</h4><p class="chart-note">Shows whether pricing or packaging structure is associated with faster customer loss.</p></div><div class="canvas-wrap"><canvas id="chartChurnPlan"></canvas></div></div>
       </div>
       <div class="diagnostic-metrics">
         <div class="metric-card"><h5>Usage Trend</h5><p id="diagUsage"></p></div>
@@ -1068,12 +1550,21 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     <section class="panel">
       <div class="section-header">
-        <h3 class="section-title">Risk Prioritization</h3>
-        <p class="section-subtitle">Intervention queue ranked by risk likelihood and revenue importance.</p>
+        <div class="section-heading">
+          <p class="section-kicker">Intervention Queue</p>
+          <h3 class="section-title">Risk Prioritization</h3>
+        </div>
+        <p class="section-subtitle">The ranked queue that should drive revenue protection meetings, save motions, and customer triage.</p>
       </div>
       <div class="risk-layout">
         <div class="table-card">
-          <div class="table-head">Ranked High-Priority Customers</div>
+          <div class="table-head">
+            <div class="table-head-block">
+              <span class="table-overline">Priority table</span>
+              <span class="table-head-label">Ranked High-Priority Customers</span>
+            </div>
+            <span class="table-head-note">Live sort on every column.</span>
+          </div>
           <div class="table-wrap">
             <table id="priorityTable">
               <thead>
@@ -1093,14 +1584,18 @@ def build_html(data_json: str, chart_js: str) -> str:
           </div>
         </div>
         <div class="risk-side">
-          <div class="mini-card" style="padding:10px;">
-            <h4 class="chart-title" style="margin-bottom:4px;">Risk Tier Distribution</h4>
+          <div class="mini-card">
+            <div class="mini-card-body">
+            <p class="mini-kicker">Coverage mix</p>
+            <h4 class="chart-title">Risk Tier Distribution</h4>
+            <p class="mini-note">Shows how the current scope is split between monitoring, intervention, and already churned customers.</p>
             <div class="stacked-tier" id="riskTierStack"></div>
             <div class="tier-legend" id="riskTierLegend"></div>
+            </div>
           </div>
           <div class="chart-grid-risk" style="padding:0;">
-            <div class="chart-card"><h4 class="chart-title">Top Risk Drivers in Scope</h4><div class="canvas-wrap"><canvas id="chartRiskDrivers"></canvas></div></div>
-            <div class="chart-card"><h4 class="chart-title">Revenue at Risk Concentration by Segment</h4><div class="canvas-wrap"><canvas id="chartRevenueRiskSegment"></canvas></div></div>
+            <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Driver mix</p><h4 class="chart-title">Top Risk Drivers in Scope</h4><p class="chart-note">Most common reasons behind high-priority accounts inside the current lens.</p></div><div class="canvas-wrap"><canvas id="chartRiskDrivers"></canvas></div></div>
+            <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Revenue exposure</p><h4 class="chart-title">Revenue at Risk by Segment</h4><p class="chart-note">Where current revenue exposure is concentrated and where executive attention should escalate first.</p></div><div class="canvas-wrap"><canvas id="chartRevenueRiskSegment"></canvas></div></div>
           </div>
         </div>
       </div>
@@ -1108,15 +1603,20 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     <section class="panel">
       <div class="section-header">
-        <h3 class="section-title">Action Orientation</h3>
-        <p class="section-subtitle">Execution playbooks grouped by customer volume and MRR coverage.</p>
+        <div class="section-heading">
+          <p class="section-kicker">Execution Lens</p>
+          <h3 class="section-title">Action Orientation</h3>
+        </div>
+        <p class="section-subtitle">Execution playbooks grouped by customer count, MRR coverage, and average intervention priority.</p>
       </div>
       <div class="actions-grid" id="actionsGrid"></div>
     </section>
 
     <section class="panel footer">
-      <strong>Presentation note:</strong> Use this view to align leadership on retention health, risk concentration, and intervention priorities.
-      <div style="margin-top:6px;"><strong>Caveat:</strong> Cohort charts are portfolio-level and date-filtered; commercial and risk filters apply to trends, diagnostics, and prioritization views.</div>
+      <div class="footer-grid">
+        <div><strong>Presentation note:</strong> Use this view to align leadership on retention health, value leakage, and the next accounts that deserve intervention.</div>
+        <div class="footer-note"><strong>Caveat:</strong> Cohort views remain portfolio-level inside the selected date window; commercial and risk filters apply to trend, diagnostic, and prioritization surfaces.</div>
+      </div>
     </section>
   </div>
 
@@ -1488,10 +1988,16 @@ function commonOptions(yPercent = false, horizontal = false, maxTicks = 10) {
     maintainAspectRatio: false,
     animation: false,
     indexAxis: horizontal ? 'y' : 'x',
+    interaction: {
+      mode: horizontal ? 'nearest' : 'index',
+      axis: horizontal ? 'y' : 'x',
+      intersect: false,
+    },
     plugins: {
       legend: {
         position: 'bottom',
-        labels: { boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 12 }, color: pal.text },
+        align: 'start',
+        labels: { boxWidth: 12, boxHeight: 12, padding: 16, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 11, weight: '600' }, color: pal.text },
       },
       tooltip: {
         mode: 'index',
@@ -1565,7 +2071,7 @@ function compactCategories(rows, limit = 10) {
 function renderScopeNote(filters) {
   const scope = document.getElementById('scopeNote');
   const tierTxt = filters.riskTier === 'all' ? 'all tiers' : filters.riskTier;
-  scope.textContent = `Date + commercial filters drive trend, diagnostics, risk table, and action sections. Cohort charts are date-filtered at portfolio level. Current risk scope: ${tierTxt}.`;
+  scope.textContent = `Commercial filters update trends, diagnostics, the intervention queue, and action groupings. Cohort views remain portfolio-level inside the selected dates. Current risk lens: ${tierTxt}.`;
 }
 
 function renderSummary(filters, trendRows, riskKpi, scoredRows, snapshotRows) {
@@ -1593,7 +2099,10 @@ function renderSummary(filters, trendRows, riskKpi, scoredRows, snapshotRows) {
 
   strip.innerHTML = insights.map((i, idx) => `
     <div class="summary-card summary-card-${idx + 1}">
-      <p class="summary-title">${i.title}</p>
+      <div class="summary-head">
+        <span class="summary-index">0${idx + 1}</span>
+        <p class="summary-title">${i.title}</p>
+      </div>
       <p class="summary-body">${i.body}</p>
     </div>
   `).join('');
@@ -1762,6 +2271,9 @@ function renderPrimaryCharts(trendRows, cohortRows) {
         borderColor: pal.retentionBorder,
         backgroundColor: pal.retentionBar,
         borderWidth: 1,
+        borderRadius: 8,
+        borderSkipped: false,
+        maxBarThickness: 42,
       }],
     },
     options: commonOptions(true, false, 12),
@@ -1782,6 +2294,9 @@ function renderDiagnosticCharts(snapshotRows) {
           borderColor: color,
           backgroundColor: `${color}bb`,
           borderWidth: 1,
+          borderRadius: 8,
+          borderSkipped: false,
+          maxBarThickness: 44,
         }],
       },
       options: commonOptions(true, false, Math.min(10, rows.length + 1)),
@@ -1898,6 +2413,9 @@ function renderRiskSection(scoredRows) {
         backgroundColor: pal.driverBar,
         borderColor: pal.driverBorder,
         borderWidth: 1,
+        borderRadius: 8,
+        borderSkipped: false,
+        maxBarThickness: 42,
       }],
     },
     options: commonOptions(false, true, 8),
@@ -1926,6 +2444,9 @@ function renderRiskSection(scoredRows) {
         backgroundColor: pal.riskBar,
         borderColor: pal.riskBorder,
         borderWidth: 1,
+        borderRadius: 8,
+        borderSkipped: false,
+        maxBarThickness: 48,
       }],
     },
     options: {
@@ -1978,12 +2499,16 @@ function renderActions(scoredRows) {
 
     return `
       <div class="action-card">
-        <h5>${action}</h5>
+        <div class="action-card-head">
+          <h5>${action}</h5>
+          <span class="action-badge">${numFmt.format(count)} accts</span>
+        </div>
+        <div class="action-primary">${money(mrr)}</div>
+        <div class="action-primary-note">MRR currently routed into this playbook.</div>
         <div class="meta">
-          <div><strong>Customers:</strong> ${numFmt.format(count)}</div>
-          <div><strong>MRR coverage:</strong> ${money(mrr)}</div>
           <div><strong>Avg priority:</strong> ${num(avgPr, 1)}</div>
           <div><strong>Top segment:</strong> ${topSeg} (${money(topSegMrr)})</div>
+          <div><strong>Account volume:</strong> ${numFmt.format(count)}</div>
         </div>
       </div>
     `;
