@@ -343,8 +343,8 @@ def build_html(data_json: str, chart_js: str) -> str:
       --warning: #9c6012;
       --border: rgba(120, 142, 164, 0.24);
       --border-strong: rgba(94, 118, 142, 0.32);
-      --shadow: 0 22px 54px rgba(15, 26, 44, 0.08);
-      --shadow-soft: 0 10px 28px rgba(15, 26, 44, 0.06);
+      --shadow: 0 18px 44px rgba(15, 26, 44, 0.07);
+      --shadow-soft: 0 8px 20px rgba(15, 26, 44, 0.05);
       --radius: 20px;
       --space: 20px;
       --font: "IBM Plex Sans", "Aptos", "Segoe UI Variable Text", "Avenir Next", sans-serif;
@@ -389,8 +389,8 @@ def build_html(data_json: str, chart_js: str) -> str:
       --warning: #e7c777;
       --border: rgba(90, 111, 133, 0.34);
       --border-strong: rgba(119, 146, 170, 0.42);
-      --shadow: 0 24px 58px rgba(0, 0, 0, 0.34);
-      --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.22);
+      --shadow: 0 20px 48px rgba(0, 0, 0, 0.30);
+      --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.18);
       --input-bg: rgba(15, 27, 42, 0.96);
       --input-border: rgba(101, 128, 153, 0.48);
       --input-ink: #e9f0f8;
@@ -419,49 +419,18 @@ def build_html(data_json: str, chart_js: str) -> str:
       font-family: var(--font);
       color: var(--ink);
       background:
-        radial-gradient(1200px 620px at 100% -8%, rgba(60, 106, 140, 0.16), transparent 56%),
-        radial-gradient(960px 420px at 12% 0%, rgba(116, 149, 177, 0.08), transparent 54%),
+        radial-gradient(980px 420px at 100% -8%, rgba(60, 106, 140, 0.10), transparent 56%),
+        radial-gradient(760px 320px at 12% 0%, rgba(116, 149, 177, 0.05), transparent 54%),
         linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
       line-height: 1.45;
       min-height: 100vh;
-      position: relative;
-    }
-
-    body::before,
-    body::after {
-      content: "";
-      position: fixed;
-      inset: auto;
-      pointer-events: none;
-      border-radius: 999px;
-      filter: blur(20px);
-      opacity: 0.48;
-      z-index: 0;
-    }
-
-    body::before {
-      width: 300px;
-      height: 300px;
-      top: 88px;
-      right: -130px;
-      background: radial-gradient(circle, rgba(94, 147, 184, 0.12), transparent 68%);
-    }
-
-    body::after {
-      width: 220px;
-      height: 220px;
-      bottom: 120px;
-      left: -90px;
-      background: radial-gradient(circle, rgba(84, 112, 136, 0.08), transparent 70%);
     }
 
     .container {
-      position: relative;
-      z-index: 1;
-      width: min(1720px, 100% - 40px);
-      margin: 24px auto 38px;
+      width: min(1700px, 100% - 40px);
+      margin: 18px auto 34px;
       display: grid;
-      gap: var(--space);
+      gap: 18px;
     }
 
     .panel {
@@ -476,21 +445,21 @@ def build_html(data_json: str, chart_js: str) -> str:
     .header {
       position: relative;
       background:
-        radial-gradient(760px 340px at 100% 0%, rgba(149, 189, 216, 0.14), transparent 60%),
+        radial-gradient(760px 320px at 100% 0%, rgba(149, 189, 216, 0.10), transparent 58%),
         linear-gradient(132deg, var(--header-grad-1) 0%, var(--header-grad-2) 42%, var(--header-grad-3) 100%);
       color: var(--header-ink);
-      padding: 28px;
+      padding: 20px 22px 18px;
     }
 
     .header-shell {
       display: grid;
-      gap: 20px;
+      gap: 14px;
     }
 
     .header-top {
       display: grid;
       grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.95fr);
-      gap: 18px;
+      gap: 14px;
       align-items: start;
       min-width: 0;
     }
@@ -503,37 +472,37 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .eyebrow {
       margin: 0;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: 0.26em;
+      letter-spacing: 0.22em;
       text-transform: uppercase;
       color: var(--header-soft);
     }
 
     .title {
       margin: 0;
-      font-size: clamp(30px, 3vw, 44px);
-      line-height: 0.98;
+      font-size: clamp(26px, 2.5vw, 36px);
+      line-height: 1;
       overflow-wrap: anywhere;
       font-family: var(--font-strong);
       letter-spacing: 0;
-      max-width: 900px;
+      max-width: 820px;
     }
 
     .subtitle {
       margin: 0;
-      max-width: 860px;
-      font-size: 15px;
-      line-height: 1.65;
+      max-width: 760px;
+      font-size: 14px;
+      line-height: 1.55;
       color: var(--header-soft);
       overflow-wrap: anywhere;
     }
 
     .meta-panel {
       display: grid;
-      gap: 14px;
-      padding: 18px;
-      border-radius: 20px;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 16px;
       border: 1px solid var(--hero-border);
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), var(--hero-panel));
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -541,15 +510,15 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .meta-grid {
       display: grid;
-      gap: 10px;
+      gap: 8px;
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .meta-item {
       display: grid;
-      gap: 4px;
-      padding: 12px 13px;
-      border-radius: 14px;
+      gap: 3px;
+      padding: 10px 11px;
+      border-radius: 12px;
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.08);
       min-width: 0;
@@ -565,14 +534,14 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .meta-item strong {
       color: var(--header-strong);
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.3;
       overflow-wrap: anywhere;
     }
 
     .decision-box {
       display: grid;
-      gap: 8px;
+      gap: 6px;
     }
 
     .decision-title {
@@ -586,34 +555,43 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .decision-list {
       margin: 0;
-      padding-left: 18px;
+      padding: 0;
       display: grid;
-      gap: 6px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      list-style: none;
       color: var(--header-soft);
-      font-size: 13px;
-      line-height: 1.55;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .decision-list li {
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .filters-shell {
       display: grid;
-      gap: 16px;
-      padding: 18px 20px 16px;
-      border-radius: 20px;
+      gap: 10px;
+      padding: 12px 14px 13px;
+      border-radius: 16px;
       border: 1px solid var(--hero-border);
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(5, 14, 26, 0.11));
     }
 
     .filters-head {
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       justify-content: space-between;
-      gap: 14px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
     .filters-kicker {
       margin: 0 0 5px;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.16em;
@@ -622,28 +600,29 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .filters-title {
       margin: 0;
-      font-size: 17px;
+      font-size: 14px;
       font-family: var(--font-strong);
       color: var(--header-strong);
-      line-height: 1.3;
+      line-height: 1.35;
+      max-width: 620px;
     }
 
     .filters {
       display: grid;
       grid-template-columns: repeat(8, minmax(0, 1fr));
-      gap: 12px;
+      gap: 10px;
       min-width: 0;
     }
 
     .filter {
       display: grid;
-      gap: 6px;
+      gap: 5px;
       min-width: 0;
     }
 
     .filter label {
-      font-size: 11px;
-      letter-spacing: 0.14em;
+      font-size: 10px;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
       font-weight: 700;
       color: var(--header-soft);
@@ -651,34 +630,42 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .filter input,
     .filter select {
-      min-height: 40px;
+      min-height: 38px;
       width: 100%;
       border: 1px solid var(--input-border);
-      border-radius: 14px;
+      border-radius: 12px;
       background: var(--input-bg);
       color: var(--input-ink);
-      padding: 10px 13px;
-      font-size: 13px;
+      padding: 8px 12px;
+      font-size: 12px;
       font-weight: 500;
       min-width: 0;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
     }
 
+    .filter input:focus,
+    .filter select:focus,
+    .action-btn:focus-visible {
+      outline: none;
+      border-color: color-mix(in srgb, var(--brand-3) 68%, white 32%);
+      box-shadow: 0 0 0 3px rgba(151, 191, 216, 0.20);
+    }
+
     .header-actions {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
     }
 
     .action-btn {
-      min-height: 40px;
+      min-height: 36px;
       border-radius: 999px;
       border: 1px solid var(--toggle-border);
       background: var(--toggle-bg);
       color: var(--toggle-ink);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
-      padding: 9px 15px;
+      padding: 7px 13px;
       cursor: pointer;
       transition: transform 0.2s ease, filter 0.2s ease, background 0.2s ease;
     }
@@ -689,16 +676,16 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     .scope-note {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--header-soft);
-      padding-top: 2px;
+      padding-top: 0;
       overflow-wrap: anywhere;
     }
 
     .summary-strip {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
+      gap: 12px;
     }
 
     .summary-card {
@@ -707,9 +694,9 @@ def build_html(data_json: str, chart_js: str) -> str:
         linear-gradient(180deg, rgba(255, 255, 255, 0.98), var(--surface-elev) 100%);
       border: 1px solid var(--border);
       border-top: 3px solid var(--brand-2);
-      border-radius: 18px;
-      padding: 18px;
-      min-height: 124px;
+      border-radius: 16px;
+      padding: 14px 15px;
+      min-height: 102px;
       overflow: hidden;
       box-shadow: var(--shadow-soft);
     }
@@ -721,16 +708,16 @@ def build_html(data_json: str, chart_js: str) -> str:
     .summary-head {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .summary-index {
       display: inline-grid;
       place-items: center;
-      width: 34px;
-      height: 34px;
-      flex: 0 0 34px;
-      border-radius: 12px;
+      width: 30px;
+      height: 30px;
+      flex: 0 0 30px;
+      border-radius: 10px;
       background: var(--surface-strong);
       border: 1px solid var(--border);
       color: var(--brand);
@@ -750,9 +737,9 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     .summary-body {
-      margin: 14px 0 0;
-      font-size: 14px;
-      line-height: 1.6;
+      margin: 10px 0 0;
+      font-size: 13px;
+      line-height: 1.5;
       color: var(--ink);
       font-weight: 600;
       overflow-wrap: anywhere;
@@ -762,9 +749,9 @@ def build_html(data_json: str, chart_js: str) -> str:
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
       align-items: flex-end;
-      gap: 18px;
+      gap: 14px;
       background: linear-gradient(180deg, var(--surface-strong), var(--surface-soft) 100%);
-      padding: 20px 22px 18px;
+      padding: 15px 18px 14px;
       border-bottom: 1px solid var(--border);
     }
 
@@ -784,35 +771,35 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .section-title {
       margin: 0;
-      font-size: 25px;
-      line-height: 1.05;
+      font-size: 22px;
+      line-height: 1.08;
       font-family: var(--font-strong);
     }
 
     .section-subtitle {
       margin: 0;
-      font-size: 13px;
-      line-height: 1.6;
+      font-size: 12px;
+      line-height: 1.5;
       color: var(--ink-soft);
-      max-width: 720px;
+      max-width: 600px;
       overflow-wrap: anywhere;
       justify-self: end;
     }
 
     .kpi-grid {
-      padding: 22px;
+      padding: 18px;
       display: grid;
       grid-template-columns: repeat(12, minmax(0, 1fr));
-      gap: 16px;
+      gap: 12px;
     }
 
     .kpi-card {
       grid-column: span 3;
       border: 1px solid var(--border);
       border-top: 3px solid transparent;
-      border-radius: 18px;
-      padding: 18px 18px 16px;
-      min-height: 156px;
+      border-radius: 16px;
+      padding: 14px 15px 13px;
+      min-height: 132px;
       overflow: hidden;
       background:
         radial-gradient(circle at top right, rgba(47, 112, 152, 0.06), transparent 36%),
@@ -840,8 +827,8 @@ def build_html(data_json: str, chart_js: str) -> str:
     .kpi-value {
       position: relative;
       z-index: 1;
-      margin-top: 12px;
-      font-size: clamp(30px, 2.5vw, 40px);
+      margin-top: 8px;
+      font-size: clamp(25px, 2.1vw, 34px);
       line-height: 0.96;
       color: var(--brand);
       font-family: var(--font-strong);
@@ -853,9 +840,9 @@ def build_html(data_json: str, chart_js: str) -> str:
     .kpi-note {
       position: relative;
       z-index: 1;
-      margin-top: 10px;
-      font-size: 12px;
-      line-height: 1.5;
+      margin-top: 8px;
+      font-size: 11px;
+      line-height: 1.45;
       color: var(--ink-soft);
       overflow-wrap: anywhere;
     }
@@ -863,7 +850,7 @@ def build_html(data_json: str, chart_js: str) -> str:
     .kpi-delta {
       position: relative;
       z-index: 1;
-      margin-top: 10px;
+      margin-top: 8px;
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.02em;
@@ -877,9 +864,9 @@ def build_html(data_json: str, chart_js: str) -> str:
     .chart-grid-2,
     .chart-grid-4,
     .chart-grid-risk {
-      padding: 22px;
+      padding: 18px;
       display: grid;
-      gap: 16px;
+      gap: 12px;
       min-width: 0;
     }
 
@@ -889,8 +876,8 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .chart-card {
       border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 18px;
+      border-radius: 16px;
+      padding: 14px;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), var(--surface-elev) 100%);
       min-width: 0;
       overflow: hidden;
@@ -899,8 +886,8 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .chart-head {
       display: grid;
-      gap: 6px;
-      margin-bottom: 14px;
+      gap: 4px;
+      margin-bottom: 10px;
       min-width: 0;
     }
 
@@ -915,7 +902,7 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .chart-title {
       margin: 0;
-      font-size: 18px;
+      font-size: 16px;
       line-height: 1.2;
       color: var(--ink);
       font-family: var(--font-strong);
@@ -926,8 +913,8 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .chart-note {
       margin: 0;
-      font-size: 12px;
-      line-height: 1.55;
+      font-size: 11px;
+      line-height: 1.45;
       color: var(--ink-soft);
       overflow-wrap: anywhere;
     }
@@ -935,28 +922,28 @@ def build_html(data_json: str, chart_js: str) -> str:
     .canvas-wrap {
       position: relative;
       width: 100%;
-      height: 326px;
+      height: 286px;
       min-width: 0;
-      min-height: 326px;
+      min-height: 286px;
     }
 
     .canvas-wrap.tall {
-      height: 390px;
-      min-height: 390px;
+      height: 336px;
+      min-height: 336px;
     }
 
     .diagnostic-metrics {
-      padding: 0 22px 22px;
+      padding: 0 18px 18px;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 16px;
+      gap: 12px;
     }
 
     .metric-card {
       border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 16px 16px 15px;
-      min-height: 112px;
+      border-radius: 16px;
+      padding: 13px;
+      min-height: 92px;
       overflow: hidden;
       background: linear-gradient(180deg, var(--surface-soft), var(--surface-elev) 100%);
       box-shadow: var(--shadow-soft);
@@ -971,18 +958,18 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     .metric-card p {
-      margin: 10px 0 0;
-      font-size: 14px;
-      line-height: 1.55;
+      margin: 8px 0 0;
+      font-size: 13px;
+      line-height: 1.45;
       color: var(--ink);
       font-weight: 600;
       overflow-wrap: anywhere;
     }
 
     .risk-layout {
-      padding: 22px;
+      padding: 18px;
       display: grid;
-      gap: 16px;
+      gap: 12px;
       grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
       min-width: 0;
     }
@@ -990,7 +977,7 @@ def build_html(data_json: str, chart_js: str) -> str:
     .table-card,
     .mini-card {
       border: 1px solid var(--border);
-      border-radius: 18px;
+      border-radius: 16px;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), var(--surface-elev) 100%);
       min-width: 0;
       overflow: hidden;
@@ -1002,7 +989,7 @@ def build_html(data_json: str, chart_js: str) -> str:
       align-items: flex-end;
       justify-content: space-between;
       gap: 12px;
-      padding: 16px 18px;
+      padding: 13px 15px;
       border-bottom: 1px solid var(--border);
       color: var(--ink);
       overflow-wrap: anywhere;
@@ -1040,6 +1027,7 @@ def build_html(data_json: str, chart_js: str) -> str:
       max-height: 460px;
       width: 100%;
       min-width: 0;
+      scrollbar-gutter: stable;
     }
 
     table {
@@ -1068,7 +1056,7 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     tbody td {
       border-bottom: 1px solid var(--table-row-border);
-      padding: 10px;
+      padding: 9px 10px;
       color: var(--ink);
       white-space: nowrap;
     }
@@ -1095,9 +1083,9 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     .mini-card-body {
-      padding: 15px 16px 16px;
+      padding: 13px 14px 14px;
       display: grid;
-      gap: 8px;
+      gap: 6px;
     }
 
     .mini-kicker {
@@ -1155,18 +1143,18 @@ def build_html(data_json: str, chart_js: str) -> str:
     .tier-churned { background: #475467; }
 
     .actions-grid {
-      padding: 22px;
+      padding: 18px;
       display: grid;
-      gap: 16px;
+      gap: 12px;
       grid-template-columns: repeat(5, minmax(0, 1fr));
     }
 
     .action-card {
       border: 1px solid var(--border);
       border-top: 3px solid var(--brand-2);
-      border-radius: 18px;
-      padding: 17px 17px 16px;
-      min-height: 176px;
+      border-radius: 16px;
+      padding: 14px;
+      min-height: 152px;
       overflow: hidden;
       background:
         radial-gradient(circle at top right, rgba(47, 112, 152, 0.06), transparent 36%),
@@ -1208,7 +1196,7 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .action-primary {
       font-family: var(--font-strong);
-      font-size: 30px;
+      font-size: 26px;
       line-height: 1;
       color: var(--brand);
       font-weight: 800;
@@ -1216,25 +1204,25 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     .action-primary-note {
-      margin-top: 6px;
-      font-size: 12px;
+      margin-top: 5px;
+      font-size: 11px;
       color: var(--ink-soft);
     }
 
     .action-card .meta {
-      margin-top: 12px;
+      margin-top: 10px;
       text-align: left;
       white-space: normal;
       color: var(--ink-soft);
       display: grid;
-      gap: 6px;
-      font-size: 12px;
+      gap: 5px;
+      font-size: 11px;
     }
 
     .footer {
-      padding: 18px 20px;
-      font-size: 12px;
-      line-height: 1.6;
+      padding: 14px 16px;
+      font-size: 11px;
+      line-height: 1.5;
       color: var(--ink-soft);
       overflow-wrap: anywhere;
       background: linear-gradient(180deg, var(--surface-strong), var(--surface-soft));
@@ -1257,31 +1245,10 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-    @keyframes riseIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .panel,
-    .summary-card {
-      animation: riseIn 0.55s ease both;
-    }
-
-    .summary-card:nth-child(2) { animation-delay: 0.03s; }
-    .summary-card:nth-child(3) { animation-delay: 0.06s; }
-    .summary-card:nth-child(4) { animation-delay: 0.09s; }
-
     @media (prefers-reduced-motion: reduce) {
       *,
       *::before,
       *::after {
-        animation: none !important;
         transition: none !important;
         scroll-behavior: auto !important;
       }
@@ -1302,6 +1269,7 @@ def build_html(data_json: str, chart_js: str) -> str:
     @media (max-width: 1200px) {
       .header-top { grid-template-columns: 1fr; }
       .meta-panel { grid-template-columns: 1fr; }
+      .decision-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .filters-head { align-items: flex-start; }
       .chart-grid-2 { grid-template-columns: 1fr; }
       .chart-grid-risk { grid-template-columns: 1fr; }
@@ -1320,9 +1288,10 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     @media (max-width: 760px) {
       .container { width: calc(100% - 16px); margin: 10px auto 16px; }
-      .header { padding: 18px; }
+      .header { padding: 16px; }
       .filters { grid-template-columns: 1fr 1fr; }
       .meta-grid { grid-template-columns: 1fr; }
+      .decision-list { grid-template-columns: 1fr; }
       .summary-strip,
       .chart-grid-4,
       .diagnostic-metrics,
@@ -1339,8 +1308,8 @@ def build_html(data_json: str, chart_js: str) -> str:
         align-items: flex-start;
       }
       .section-subtitle { justify-self: start; }
-      .canvas-wrap { height: 280px; min-height: 280px; }
-      .canvas-wrap.tall { height: 330px; min-height: 330px; }
+      .canvas-wrap { height: 260px; min-height: 260px; }
+      .canvas-wrap.tall { height: 300px; min-height: 300px; }
       table { min-width: 760px; }
     }
 
@@ -1392,13 +1361,6 @@ def build_html(data_json: str, chart_js: str) -> str:
         box-shadow: none;
         border-color: #cbd5e1;
       }
-
-      .summary-card::before,
-      .kpi-card::before,
-      .action-card::before,
-      .kpi-card::after,
-      body::before,
-      body::after { display: none !important; }
 
       .canvas-wrap,
       .canvas-wrap.tall {
