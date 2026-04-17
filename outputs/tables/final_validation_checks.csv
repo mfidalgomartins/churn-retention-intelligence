@@ -39,7 +39,7 @@ Dashboard Review,Priority table schema consistency,PASS,info,decision_product_qu
 Dashboard Review,Chart density and readability scope,PASS,info,decision_product_quality,False,Unique chart canvases detected: 10.
 Dashboard Review,Responsive/layout safety,PASS,info,decision_product_quality,False,Layout uses grid-based responsive rules with constrained overflow and without fragile absolute positioning.
 Dashboard Review,Offline/self-contained packaging,PASS,info,decision_product_quality,False,Dashboard HTML is packaged without external network script/style dependencies.
-Dashboard Review,Payload size/performance sanity,PASS,info,decision_product_quality,False,Dashboard HTML payload size=2336487 bytes.
+Dashboard Review,Payload size/performance sanity,PASS,info,decision_product_quality,False,Dashboard HTML payload size=2337023 bytes.
 Dashboard Review,Version stamping and traceability,PASS,info,decision_product_quality,True,Dashboard embeds version metadata in governed payload and exposes period traceability controls in the UI.
 Governance & Release,Risk tier summary cross-output consistency,PASS,info,general,False,Tier count absolute diff between risk_scores and risk_tier_summary: 0.
 Governance & Release,Priority ranking monotonicity,PASS,info,general,False,Rows violating non-increasing priority order: 0.

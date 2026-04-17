@@ -325,46 +325,46 @@ def build_html(data_json: str, chart_js: str) -> str:
   <title>Churn & Retention Command Center</title>
   <style>
     :root {
-      --bg: #edf3f8;
-      --bg-deep: #dce7f0;
-      --surface: rgba(255, 255, 255, 0.9);
-      --surface-soft: #f6f9fc;
-      --surface-strong: #eef4f9;
+      --bg: #f2f6f9;
+      --bg-deep: #e4edf4;
+      --surface: #ffffff;
+      --surface-soft: #f7fafc;
+      --surface-strong: #edf3f8;
       --surface-elev: #ffffff;
       --ink: #0d1726;
-      --ink-soft: #4d6074;
-      --ink-subtle: #74859a;
-      --brand: #123a5d;
-      --brand-2: #2f7098;
-      --brand-3: #93bed4;
+      --ink-soft: #536679;
+      --ink-subtle: #7a8b9d;
+      --brand: #153854;
+      --brand-2: #3a6d90;
+      --brand-3: #9dbbcc;
       --danger: #b73a32;
       --danger-soft: #f7d7d3;
       --success: #0d7b70;
       --warning: #9c6012;
-      --border: rgba(134, 156, 178, 0.28);
-      --border-strong: rgba(98, 126, 150, 0.34);
-      --shadow: 0 26px 56px rgba(15, 26, 44, 0.10);
-      --shadow-soft: 0 14px 30px rgba(15, 26, 44, 0.08);
-      --radius: 22px;
-      --space: 18px;
+      --border: rgba(120, 142, 164, 0.24);
+      --border-strong: rgba(94, 118, 142, 0.32);
+      --shadow: 0 22px 54px rgba(15, 26, 44, 0.08);
+      --shadow-soft: 0 10px 28px rgba(15, 26, 44, 0.06);
+      --radius: 20px;
+      --space: 20px;
       --font: "IBM Plex Sans", "Aptos", "Segoe UI Variable Text", "Avenir Next", sans-serif;
-      --font-strong: "Aptos Display", "Avenir Next Condensed", "IBM Plex Sans", "Segoe UI Variable Display", sans-serif;
-      --input-bg: rgba(255, 255, 255, 0.92);
-      --input-border: rgba(148, 177, 199, 0.55);
+      --font-strong: "Aptos Display", "Segoe UI Variable Display", "Avenir Next", "IBM Plex Sans", sans-serif;
+      --input-bg: rgba(255, 255, 255, 0.96);
+      --input-border: rgba(144, 170, 192, 0.48);
       --input-ink: #18344f;
-      --thead-bg: #f4f8fb;
-      --row-alt: #f9fbfd;
+      --thead-bg: #f3f7fa;
+      --row-alt: #fbfcfe;
       --table-row-border: #e7eef5;
       --stack-border: rgba(164, 182, 201, 0.42);
-      --header-grad-1: #0c2238;
-      --header-grad-2: #123652;
-      --header-grad-3: #0e2135;
+      --header-grad-1: #0d2034;
+      --header-grad-2: #13324c;
+      --header-grad-3: #0f2439;
       --header-ink: #eff6fd;
-      --header-soft: #c7d8e8;
-      --header-soft-2: #a7bdd2;
+      --header-soft: #ccdceb;
+      --header-soft-2: #a9c0d4;
       --header-strong: #f7fbff;
-      --toggle-bg: rgba(255, 255, 255, 0.10);
-      --toggle-border: rgba(216, 232, 245, 0.22);
+      --toggle-bg: rgba(255, 255, 255, 0.09);
+      --toggle-border: rgba(216, 232, 245, 0.18);
       --toggle-ink: #ebf4fd;
       --hero-border: rgba(229, 239, 247, 0.16);
       --hero-panel: rgba(8, 18, 31, 0.22);
@@ -389,8 +389,8 @@ def build_html(data_json: str, chart_js: str) -> str:
       --warning: #e7c777;
       --border: rgba(90, 111, 133, 0.34);
       --border-strong: rgba(119, 146, 170, 0.42);
-      --shadow: 0 26px 56px rgba(0, 0, 0, 0.36);
-      --shadow-soft: 0 16px 34px rgba(0, 0, 0, 0.24);
+      --shadow: 0 24px 58px rgba(0, 0, 0, 0.34);
+      --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.22);
       --input-bg: rgba(15, 27, 42, 0.96);
       --input-border: rgba(101, 128, 153, 0.48);
       --input-ink: #e9f0f8;
@@ -419,10 +419,10 @@ def build_html(data_json: str, chart_js: str) -> str:
       font-family: var(--font);
       color: var(--ink);
       background:
-        radial-gradient(1200px 640px at 100% -8%, rgba(54, 108, 149, 0.22), transparent 58%),
-        radial-gradient(860px 420px at 0% 6%, rgba(157, 79, 58, 0.10), transparent 56%),
+        radial-gradient(1200px 620px at 100% -8%, rgba(60, 106, 140, 0.16), transparent 56%),
+        radial-gradient(960px 420px at 12% 0%, rgba(116, 149, 177, 0.08), transparent 54%),
         linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
-      line-height: 1.4;
+      line-height: 1.45;
       min-height: 100vh;
       position: relative;
     }
@@ -435,31 +435,31 @@ def build_html(data_json: str, chart_js: str) -> str:
       pointer-events: none;
       border-radius: 999px;
       filter: blur(20px);
-      opacity: 0.72;
+      opacity: 0.48;
       z-index: 0;
     }
 
     body::before {
-      width: 360px;
-      height: 360px;
-      top: 82px;
-      right: -120px;
-      background: radial-gradient(circle, rgba(94, 147, 184, 0.18), transparent 68%);
+      width: 300px;
+      height: 300px;
+      top: 88px;
+      right: -130px;
+      background: radial-gradient(circle, rgba(94, 147, 184, 0.12), transparent 68%);
     }
 
     body::after {
-      width: 280px;
-      height: 280px;
-      bottom: 110px;
-      left: -110px;
-      background: radial-gradient(circle, rgba(184, 91, 69, 0.12), transparent 70%);
+      width: 220px;
+      height: 220px;
+      bottom: 120px;
+      left: -90px;
+      background: radial-gradient(circle, rgba(84, 112, 136, 0.08), transparent 70%);
     }
 
     .container {
       position: relative;
       z-index: 1;
-      width: min(1760px, 100% - 38px);
-      margin: 22px auto 34px;
+      width: min(1720px, 100% - 40px);
+      margin: 24px auto 38px;
       display: grid;
       gap: var(--space);
     }
@@ -471,17 +471,15 @@ def build_html(data_json: str, chart_js: str) -> str:
       box-shadow: var(--shadow);
       min-width: 0;
       overflow: hidden;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
     }
 
     .header {
       position: relative;
       background:
-        radial-gradient(800px 360px at 100% 0%, rgba(149, 189, 216, 0.16), transparent 60%),
+        radial-gradient(760px 340px at 100% 0%, rgba(149, 189, 216, 0.14), transparent 60%),
         linear-gradient(132deg, var(--header-grad-1) 0%, var(--header-grad-2) 42%, var(--header-grad-3) 100%);
       color: var(--header-ink);
-      padding: 26px;
+      padding: 28px;
     }
 
     .header-shell {
@@ -514,19 +512,19 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .title {
       margin: 0;
-      font-size: clamp(28px, 3vw, 42px);
-      line-height: 1;
+      font-size: clamp(30px, 3vw, 44px);
+      line-height: 0.98;
       overflow-wrap: anywhere;
       font-family: var(--font-strong);
-      letter-spacing: 0.01em;
-      max-width: 940px;
+      letter-spacing: 0;
+      max-width: 900px;
     }
 
     .subtitle {
       margin: 0;
-      max-width: 920px;
+      max-width: 860px;
       font-size: 15px;
-      line-height: 1.6;
+      line-height: 1.65;
       color: var(--header-soft);
       overflow-wrap: anywhere;
     }
@@ -598,11 +596,11 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .filters-shell {
       display: grid;
-      gap: 14px;
-      padding: 16px 18px 14px;
+      gap: 16px;
+      padding: 18px 20px 16px;
       border-radius: 20px;
       border: 1px solid var(--hero-border);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(5, 14, 26, 0.14));
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(5, 14, 26, 0.11));
     }
 
     .filters-head {
@@ -624,10 +622,10 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .filters-title {
       margin: 0;
-      font-size: 18px;
+      font-size: 17px;
       font-family: var(--font-strong);
       color: var(--header-strong);
-      line-height: 1.2;
+      line-height: 1.3;
     }
 
     .filters {
@@ -653,16 +651,17 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .filter input,
     .filter select {
-      min-height: 36px;
+      min-height: 40px;
       width: 100%;
       border: 1px solid var(--input-border);
-      border-radius: 12px;
+      border-radius: 14px;
       background: var(--input-bg);
       color: var(--input-ink);
-      padding: 9px 12px;
+      padding: 10px 13px;
       font-size: 13px;
+      font-weight: 500;
       min-width: 0;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
     }
 
     .header-actions {
@@ -672,14 +671,14 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     .action-btn {
-      min-height: 36px;
+      min-height: 40px;
       border-radius: 999px;
       border: 1px solid var(--toggle-border);
       background: var(--toggle-bg);
       color: var(--toggle-ink);
       font-size: 12px;
       font-weight: 700;
-      padding: 8px 14px;
+      padding: 9px 15px;
       cursor: pointer;
       transition: transform 0.2s ease, filter 0.2s ease, background 0.2s ease;
     }
@@ -704,13 +703,13 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .summary-card {
       background:
-        radial-gradient(circle at top right, rgba(47, 112, 152, 0.06), transparent 34%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.96), var(--surface-elev) 100%);
+        radial-gradient(circle at top right, rgba(47, 112, 152, 0.05), transparent 34%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), var(--surface-elev) 100%);
       border: 1px solid var(--border);
-      border-top: 4px solid var(--brand-2);
+      border-top: 3px solid var(--brand-2);
       border-radius: 18px;
-      padding: 16px 17px;
-      min-height: 116px;
+      padding: 18px;
+      min-height: 124px;
       overflow: hidden;
       box-shadow: var(--shadow-soft);
     }
@@ -728,9 +727,9 @@ def build_html(data_json: str, chart_js: str) -> str:
     .summary-index {
       display: inline-grid;
       place-items: center;
-      width: 36px;
-      height: 36px;
-      flex: 0 0 36px;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
       border-radius: 12px;
       background: var(--surface-strong);
       border: 1px solid var(--border);
@@ -751,21 +750,21 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     .summary-body {
-      margin: 12px 0 0;
+      margin: 14px 0 0;
       font-size: 14px;
-      line-height: 1.55;
+      line-height: 1.6;
       color: var(--ink);
       font-weight: 600;
       overflow-wrap: anywhere;
     }
 
     .section-header {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
       align-items: flex-end;
-      justify-content: space-between;
       gap: 18px;
       background: linear-gradient(180deg, var(--surface-strong), var(--surface-soft) 100%);
-      padding: 18px 20px 17px;
+      padding: 20px 22px 18px;
       border-bottom: 1px solid var(--border);
     }
 
@@ -785,38 +784,39 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .section-title {
       margin: 0;
-      font-size: 24px;
-      line-height: 1.06;
+      font-size: 25px;
+      line-height: 1.05;
       font-family: var(--font-strong);
     }
 
     .section-subtitle {
       margin: 0;
       font-size: 13px;
-      line-height: 1.55;
+      line-height: 1.6;
       color: var(--ink-soft);
-      max-width: 760px;
+      max-width: 720px;
       overflow-wrap: anywhere;
+      justify-self: end;
     }
 
     .kpi-grid {
-      padding: 20px;
+      padding: 22px;
       display: grid;
       grid-template-columns: repeat(12, minmax(0, 1fr));
-      gap: 14px;
+      gap: 16px;
     }
 
     .kpi-card {
       grid-column: span 3;
       border: 1px solid var(--border);
-      border-top: 4px solid transparent;
+      border-top: 3px solid transparent;
       border-radius: 18px;
-      padding: 16px 16px 14px;
-      min-height: 146px;
+      padding: 18px 18px 16px;
+      min-height: 156px;
       overflow: hidden;
       background:
-        radial-gradient(circle at top right, rgba(47, 112, 152, 0.08), transparent 36%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.94), var(--surface-elev) 100%);
+        radial-gradient(circle at top right, rgba(47, 112, 152, 0.06), transparent 36%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), var(--surface-elev) 100%);
       box-shadow: var(--shadow-soft);
     }
 
@@ -840,12 +840,13 @@ def build_html(data_json: str, chart_js: str) -> str:
     .kpi-value {
       position: relative;
       z-index: 1;
-      margin-top: 10px;
-      font-size: clamp(28px, 2.5vw, 38px);
+      margin-top: 12px;
+      font-size: clamp(30px, 2.5vw, 40px);
       line-height: 0.96;
       color: var(--brand);
       font-family: var(--font-strong);
       font-weight: 800;
+      font-variant-numeric: tabular-nums;
       overflow-wrap: anywhere;
     }
 
@@ -876,9 +877,9 @@ def build_html(data_json: str, chart_js: str) -> str:
     .chart-grid-2,
     .chart-grid-4,
     .chart-grid-risk {
-      padding: 20px;
+      padding: 22px;
       display: grid;
-      gap: 14px;
+      gap: 16px;
       min-width: 0;
     }
 
@@ -889,8 +890,8 @@ def build_html(data_json: str, chart_js: str) -> str:
     .chart-card {
       border: 1px solid var(--border);
       border-radius: 18px;
-      padding: 16px;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), var(--surface-elev) 100%);
+      padding: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), var(--surface-elev) 100%);
       min-width: 0;
       overflow: hidden;
       box-shadow: var(--shadow-soft);
@@ -898,8 +899,8 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .chart-head {
       display: grid;
-      gap: 5px;
-      margin-bottom: 12px;
+      gap: 6px;
+      margin-bottom: 14px;
       min-width: 0;
     }
 
@@ -914,7 +915,7 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .chart-title {
       margin: 0;
-      font-size: 17px;
+      font-size: 18px;
       line-height: 1.2;
       color: var(--ink);
       font-family: var(--font-strong);
@@ -926,7 +927,7 @@ def build_html(data_json: str, chart_js: str) -> str:
     .chart-note {
       margin: 0;
       font-size: 12px;
-      line-height: 1.5;
+      line-height: 1.55;
       color: var(--ink-soft);
       overflow-wrap: anywhere;
     }
@@ -934,28 +935,28 @@ def build_html(data_json: str, chart_js: str) -> str:
     .canvas-wrap {
       position: relative;
       width: 100%;
-      height: 320px;
+      height: 326px;
       min-width: 0;
-      min-height: 320px;
+      min-height: 326px;
     }
 
     .canvas-wrap.tall {
-      height: 382px;
-      min-height: 382px;
+      height: 390px;
+      min-height: 390px;
     }
 
     .diagnostic-metrics {
-      padding: 0 20px 20px;
+      padding: 0 22px 22px;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
+      gap: 16px;
     }
 
     .metric-card {
       border: 1px solid var(--border);
       border-radius: 18px;
-      padding: 14px 15px;
-      min-height: 108px;
+      padding: 16px 16px 15px;
+      min-height: 112px;
       overflow: hidden;
       background: linear-gradient(180deg, var(--surface-soft), var(--surface-elev) 100%);
       box-shadow: var(--shadow-soft);
@@ -979,9 +980,9 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     .risk-layout {
-      padding: 20px;
+      padding: 22px;
       display: grid;
-      gap: 14px;
+      gap: 16px;
       grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
       min-width: 0;
     }
@@ -1001,7 +1002,7 @@ def build_html(data_json: str, chart_js: str) -> str:
       align-items: flex-end;
       justify-content: space-between;
       gap: 12px;
-      padding: 15px 18px;
+      padding: 16px 18px;
       border-bottom: 1px solid var(--border);
       color: var(--ink);
       overflow-wrap: anywhere;
@@ -1046,6 +1047,7 @@ def build_html(data_json: str, chart_js: str) -> str:
       width: 100%;
       min-width: 860px;
       font-size: 12px;
+      font-variant-numeric: tabular-nums;
     }
 
     thead th {
@@ -1072,6 +1074,18 @@ def build_html(data_json: str, chart_js: str) -> str:
     }
 
     tbody tr:nth-child(even) { background: var(--row-alt); }
+    tbody tr:hover { background: rgba(58, 109, 144, 0.05); }
+
+    #priorityTable th:nth-child(3),
+    #priorityTable th:nth-child(4),
+    #priorityTable th:nth-child(5),
+    #priorityTable th:nth-child(6),
+    #priorityTable td:nth-child(3),
+    #priorityTable td:nth-child(4),
+    #priorityTable td:nth-child(5),
+    #priorityTable td:nth-child(6) {
+      text-align: right;
+    }
 
     .risk-side {
       display: grid;
@@ -1141,21 +1155,21 @@ def build_html(data_json: str, chart_js: str) -> str:
     .tier-churned { background: #475467; }
 
     .actions-grid {
-      padding: 20px;
+      padding: 22px;
       display: grid;
-      gap: 14px;
+      gap: 16px;
       grid-template-columns: repeat(5, minmax(0, 1fr));
     }
 
     .action-card {
       border: 1px solid var(--border);
-      border-top: 4px solid var(--brand-2);
+      border-top: 3px solid var(--brand-2);
       border-radius: 18px;
-      padding: 15px 15px 14px;
-      min-height: 168px;
+      padding: 17px 17px 16px;
+      min-height: 176px;
       overflow: hidden;
       background:
-        radial-gradient(circle at top right, rgba(47, 112, 152, 0.08), transparent 36%),
+        radial-gradient(circle at top right, rgba(47, 112, 152, 0.06), transparent 36%),
         linear-gradient(180deg, var(--surface-soft), var(--surface-elev) 100%);
       box-shadow: var(--shadow-soft);
     }
@@ -1194,10 +1208,11 @@ def build_html(data_json: str, chart_js: str) -> str:
 
     .action-primary {
       font-family: var(--font-strong);
-      font-size: 28px;
+      font-size: 30px;
       line-height: 1;
       color: var(--brand);
       font-weight: 800;
+      font-variant-numeric: tabular-nums;
     }
 
     .action-primary-note {
@@ -1320,9 +1335,10 @@ def build_html(data_json: str, chart_js: str) -> str:
         grid-column: auto;
       }
       .section-header {
+        grid-template-columns: 1fr;
         align-items: flex-start;
-        flex-direction: column;
       }
+      .section-subtitle { justify-self: start; }
       .canvas-wrap { height: 280px; min-height: 280px; }
       .canvas-wrap.tall { height: 330px; min-height: 330px; }
       table { min-width: 760px; }
