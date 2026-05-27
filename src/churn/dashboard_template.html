@@ -1,40 +1,73 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Retention review — Churn & Retention Intelligence</title>
+  <title>Retention review — Churn &amp; Retention Intelligence</title>
   <meta name="description" content="Quarterly retention review: where churn lives, what it costs, and which accounts to save first." />
+  <!-- No-flash theme init: runs before CSS paint -->
+  <script>(function(){var s=localStorage.getItem('cri-theme'),d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',s||(d?'dark':'light'));})();</script>
   <style>
+    /* ── Shared tokens ──────────────────────────────────── */
     :root {
-      --bg: #FBFAF7;
-      --surface: #FFFFFF;
-      --surface-tint: #F6F4EF;
-      --ink: #0E0E0C;
-      --ink-soft: #4D4D49;
-      --ink-mute: #908E87;
-      --ink-faint: #B7B4AC;
-      --hairline: #E7E4DC;
-      --hairline-strong: #D9D5CA;
-      --loss: #B0382B;
-      --loss-soft: #F4E2DE;
-      --gain: #1F6B47;
-      --gain-soft: #DDE9E1;
-      --caution: #9B6A12;
-      --neutral-bar: #1B1B19;
-      --neutral-bar-soft: rgba(27, 27, 25, 0.08);
-
       --serif: ui-serif, "New York", "Iowan Old Style", "Charter", "Cambria", "Times New Roman", Times, serif;
       --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
       --mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
-
       --container: 1240px;
       --gutter: 32px;
+      --radius: 5px;
+      --radius-sm: 3px;
+
+      /* ── Light (default) ── */
+      --bg:          #F5F4F1;
+      --surface:     #FFFFFF;
+      --surface-2:   #EEECEA;
+      --ink:         #111110;
+      --ink-2:       #46443C;
+      --ink-3:       #8A8880;
+      --ink-4:       #C0BDB5;
+      --border:      #DEDAD2;
+      --border-2:    #CAC7BE;
+      --loss:        #B83530;
+      --loss-bg:     rgba(184, 53, 48, 0.08);
+      --gain:        #1B6640;
+      --gain-bg:     rgba(27, 102, 64, 0.08);
+      --warn:        #9E6010;
+      --warn-bg:     rgba(158, 96, 16, 0.08);
+      --grid-line:   rgba(17, 17, 16, 0.07);
+      --grid-axis:   rgba(17, 17, 16, 0.15);
+      --topbar-bg:   rgba(245, 244, 241, 0.94);
+      --topbar-blur: saturate(160%) blur(10px);
+      --card-shadow: none;
     }
 
-    * { box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; }
+    /* ── Dark ─────────────────────────────────────────── */
+    :root[data-theme="dark"] {
+      --bg:          #0C0C0B;
+      --surface:     #161614;
+      --surface-2:   #1D1D1B;
+      --ink:         #ECEAE2;
+      --ink-2:       #A09C94;
+      --ink-3:       #737068;
+      --ink-4:       #3A3936;
+      --border:      #242320;
+      --border-2:    #302E2B;
+      --loss:        #DC5245;
+      --loss-bg:     rgba(220, 82, 69, 0.14);
+      --gain:        #38A866;
+      --gain-bg:     rgba(56, 168, 102, 0.11);
+      --warn:        #CE9035;
+      --warn-bg:     rgba(206, 144, 53, 0.11);
+      --grid-line:   rgba(236, 234, 226, 0.055);
+      --grid-axis:   rgba(236, 234, 226, 0.14);
+      --topbar-bg:   #161614;
+      --topbar-blur: none;
+      --card-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+    }
 
+    /* ── Reset ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
       margin: 0;
       background: var(--bg);
@@ -46,565 +79,364 @@
       text-rendering: optimizeLegibility;
     }
 
+    /* ── Accessibility ──────────────────────────────────── */
     .skip-link {
-      position: absolute;
-      left: -9999px;
-      top: 0;
-      background: var(--ink);
-      color: var(--surface);
-      padding: 8px 12px;
-      border-radius: 4px;
+      position: absolute; left: -9999px; top: 0;
+      background: var(--ink); color: var(--surface); padding: 8px 12px;
     }
-    .skip-link:focus { left: 16px; top: 16px; z-index: 10; }
+    .skip-link:focus { left: 16px; top: 16px; z-index: 100; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
 
-    /* ---------- Top bar ---------- */
+    /* ── Topbar ─────────────────────────────────────────── */
     .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      background: rgba(251, 250, 247, 0.92);
-      backdrop-filter: saturate(140%) blur(8px);
-      -webkit-backdrop-filter: saturate(140%) blur(8px);
-      border-bottom: 1px solid var(--hairline);
+      position: sticky; top: 0; z-index: 20;
+      background: var(--topbar-bg);
+      backdrop-filter: var(--topbar-blur);
+      -webkit-backdrop-filter: var(--topbar-blur);
+      border-bottom: 1px solid var(--border);
     }
     .topbar-inner {
-      max-width: var(--container);
-      margin: 0 auto;
-      padding: 14px var(--gutter);
-      display: flex;
-      align-items: center;
-      gap: 24px;
+      max-width: var(--container); margin: 0 auto;
+      padding: 11px var(--gutter);
+      display: flex; align-items: center; gap: 18px;
     }
     .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-family: var(--serif);
-      font-size: 16px;
-      letter-spacing: -0.01em;
-      color: var(--ink);
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--serif); font-size: 15px;
+      letter-spacing: -0.01em; color: var(--ink);
+      text-decoration: none;
     }
     .brand-mark {
-      width: 26px;
-      height: 26px;
-      border-radius: 6px;
-      background: var(--ink);
-      color: var(--bg);
-      display: grid;
-      place-items: center;
-      font-family: var(--serif);
-      font-weight: 500;
-      font-size: 13px;
-      letter-spacing: 0;
+      width: 22px; height: 22px;
+      border-radius: 3px;
+      background: var(--ink); color: var(--bg);
+      display: grid; place-items: center;
+      font-family: var(--serif); font-weight: 500; font-size: 12px;
+      flex-shrink: 0;
     }
     .brand-name { font-weight: 500; }
-    .brand-name em {
-      font-style: italic;
-      color: var(--ink-soft);
-      font-weight: 400;
-    }
-
+    .brand-name em { font-style: italic; color: var(--ink-2); font-weight: 400; }
     .topbar-spacer { flex: 1; }
 
-    .control-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .control-group { display: flex; align-items: center; gap: 7px; }
     .control-label {
-      font-size: 11px;
-      color: var(--ink-mute);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
+      font-size: 11px; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--ink-3); font-weight: 500;
     }
     .control {
-      font: inherit;
-      font-size: 13px;
-      padding: 6px 28px 6px 10px;
-      border: 1px solid var(--hairline-strong);
-      border-radius: 6px;
-      background: var(--surface);
-      color: var(--ink);
-      appearance: none;
-      -webkit-appearance: none;
+      font: inherit; font-size: 13px;
+      padding: 5px 26px 5px 9px;
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--ink);
+      appearance: none; -webkit-appearance: none;
       background-image:
-        linear-gradient(45deg, transparent 50%, var(--ink-soft) 50%),
-        linear-gradient(135deg, var(--ink-soft) 50%, transparent 50%);
-      background-position:
-        calc(100% - 14px) 50%,
-        calc(100% - 10px) 50%;
+        linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+        linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+      background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
       background-size: 4px 4px, 4px 4px;
       background-repeat: no-repeat;
-      cursor: pointer;
-      min-width: 110px;
+      cursor: pointer; min-width: 106px;
+      transition: border-color 0.1s;
     }
-    .control:focus-visible {
-      outline: 2px solid var(--ink);
-      outline-offset: 2px;
-    }
+    .control:hover { border-color: var(--ink-3); }
+    .control:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
     .control[type="date"] {
-      background-image: none;
-      padding-right: 10px;
-      min-width: 138px;
-      font-family: var(--mono);
-      font-size: 12px;
+      background-image: none; padding-right: 9px; min-width: 134px;
+      font-family: var(--mono); font-size: 12px;
     }
-    .btn-ghost {
-      font: inherit;
-      font-size: 13px;
-      padding: 6px 12px;
-      border: 1px solid var(--hairline-strong);
-      border-radius: 6px;
-      background: var(--surface);
-      color: var(--ink);
-      cursor: pointer;
-    }
-    .btn-ghost:hover { background: var(--surface-tint); }
 
-    /* ---------- Layout ---------- */
-    main {
-      max-width: var(--container);
-      margin: 0 auto;
-      padding: 56px var(--gutter) 64px;
+    .btn-ghost {
+      font: inherit; font-size: 13px; padding: 5px 11px;
+      border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--ink-2); cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
     }
-    section + section { margin-top: 56px; }
+    .btn-ghost:hover { background: var(--surface-2); border-color: var(--ink-3); color: var(--ink); }
+
+    .btn-icon {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px;
+      border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--ink-3);
+      cursor: pointer; padding: 0; flex-shrink: 0;
+      transition: background 0.1s, color 0.1s;
+    }
+    .btn-icon:hover { background: var(--surface-2); color: var(--ink); }
+    .btn-icon svg {
+      width: 13px; height: 13px; fill: none;
+      stroke: currentColor; stroke-width: 1.6;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    [data-theme="light"] .icon-sun  { display: none; }
+    [data-theme="dark"]  .icon-moon { display: none; }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    main {
+      max-width: var(--container); margin: 0 auto;
+      padding: 50px var(--gutter) 64px;
+    }
+    section + section { margin-top: 52px; }
 
     .eyebrow {
-      font-size: 11px;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--ink-mute);
-      margin: 0 0 16px;
-      font-weight: 500;
+      font-size: 11px; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--ink-3);
+      margin: 0 0 13px; font-weight: 500;
     }
     .eyebrow-bar {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 24px;
-      margin-bottom: 16px;
+      display: flex; align-items: baseline;
+      justify-content: space-between; gap: 16px; margin-bottom: 13px;
     }
     .eyebrow-bar .eyebrow { margin: 0; }
-    .eyebrow-note {
-      font-size: 12px;
-      color: var(--ink-mute);
-    }
+    .eyebrow-note { font-size: 12px; color: var(--ink-3); }
 
+    /* ── Hero ───────────────────────────────────────────── */
     .h1 {
-      font-family: var(--serif);
-      font-weight: 400;
-      font-size: clamp(38px, 4.4vw, 56px);
-      line-height: 1.06;
-      letter-spacing: -0.02em;
-      margin: 0 0 24px;
-      color: var(--ink);
-      text-wrap: balance;
+      font-family: var(--serif); font-weight: 400;
+      font-size: clamp(32px, 3.8vw, 50px);
+      line-height: 1.09; letter-spacing: -0.022em;
+      margin: 0 0 20px; color: var(--ink);
     }
     .h1 .h1-accent { color: var(--loss); font-style: italic; }
-    .h1 .h1-mute { color: var(--ink-mute); }
 
     .lede {
-      font-family: var(--serif);
-      font-size: 18px;
-      line-height: 1.55;
-      color: var(--ink-soft);
-      max-width: 64ch;
-      margin: 0;
+      font-family: var(--serif); font-size: 17px;
+      line-height: 1.6; color: var(--ink-2);
+      max-width: 62ch; margin: 0;
     }
     .lede strong { color: var(--ink); font-weight: 500; }
 
-    .h2 {
-      font-family: var(--serif);
-      font-weight: 400;
-      font-size: 28px;
-      line-height: 1.2;
-      letter-spacing: -0.015em;
-      margin: 0;
-      color: var(--ink);
-    }
-    .section-sub {
-      font-size: 13px;
-      color: var(--ink-soft);
-      margin: 6px 0 0;
-      max-width: 70ch;
-    }
-
-    /* ---------- Hero ---------- */
     .hero-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-      gap: 56px;
-      align-items: start;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 52px; align-items: start;
     }
-    .hero-meta {
-      border-top: 1px solid var(--hairline);
-      padding-top: 16px;
-      display: grid;
-      gap: 12px;
-    }
+    .hero-meta { border-top: 1px solid var(--border); padding-top: 18px; }
     .hero-meta dl {
       margin: 0;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px 32px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px;
     }
     .hero-meta dt {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--ink-mute);
-      margin-bottom: 2px;
+      font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--ink-3);
+      margin-bottom: 2px; font-weight: 500;
     }
-    .hero-meta dd {
-      margin: 0;
-      font-size: 14px;
-      color: var(--ink);
-      font-family: var(--mono);
-    }
+    .hero-meta dd { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--ink); }
     .hero-meta dd.big {
-      font-family: var(--serif);
-      font-size: 22px;
-      line-height: 1.1;
+      font-family: var(--serif); font-size: 24px;
+      line-height: 1.1; letter-spacing: -0.02em;
     }
     .hero-meta dd.big.loss { color: var(--loss); }
 
-    /* ---------- KPI strip ---------- */
+    /* ── KPI strip ──────────────────────────────────────── */
     .kpi-row {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 1px;
-      background: var(--hairline);
-      border: 1px solid var(--hairline);
-      border-radius: 10px;
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px; background: var(--border);
+      border: 1px solid var(--border); border-radius: var(--radius);
       overflow: hidden;
     }
     .kpi {
-      background: var(--surface);
-      padding: 22px 22px 20px;
-      display: grid;
-      gap: 8px;
+      background: var(--surface); padding: 20px 20px 16px; display: grid; gap: 6px;
     }
     .kpi-label {
-      font-size: 12px;
-      color: var(--ink-mute);
-      letter-spacing: 0.02em;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-size: 11px; color: var(--ink-3); letter-spacing: 0.05em;
+      text-transform: uppercase; font-weight: 500;
     }
     .kpi-value {
-      font-family: var(--serif);
-      font-size: 38px;
-      line-height: 1;
-      letter-spacing: -0.02em;
-      color: var(--ink);
-      font-feature-settings: "tnum" 1;
+      font-family: var(--serif); font-size: 34px;
+      line-height: 1; letter-spacing: -0.024em;
+      color: var(--ink); font-feature-settings: "tnum" 1;
     }
     .kpi-value.loss { color: var(--loss); }
     .kpi-foot {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 12px;
-      font-size: 12px;
-      color: var(--ink-mute);
+      display: flex; justify-content: space-between;
+      align-items: baseline; gap: 8px;
+      font-size: 12px; color: var(--ink-3);
     }
-    .kpi-foot .delta {
-      font-family: var(--mono);
-      font-size: 11px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: var(--surface-tint);
-      color: var(--ink-soft);
+    .delta {
+      font-family: var(--mono); font-size: 11px;
+      padding: 2px 5px; border-radius: 2px;
+      background: var(--surface-2); color: var(--ink-3); white-space: nowrap;
     }
-    .kpi-foot .delta.up { color: var(--loss); background: var(--loss-soft); }
-    .kpi-foot .delta.down { color: var(--gain); background: var(--gain-soft); }
-    .kpi-foot .delta.flat { color: var(--ink-mute); }
+    .delta.up   { color: var(--loss); background: var(--loss-bg); }
+    .delta.down { color: var(--gain); background: var(--gain-bg); }
+    .delta.flat { color: var(--ink-3); }
 
-    /* ---------- Chart card ---------- */
+    /* ── Section titles ─────────────────────────────────── */
+    .h2 {
+      font-family: var(--serif); font-weight: 400;
+      font-size: 24px; line-height: 1.2;
+      letter-spacing: -0.015em; margin: 0;
+    }
+    .section-sub { font-size: 13px; color: var(--ink-3); margin: 4px 0 0; max-width: 68ch; }
+
+    /* ── Cards ──────────────────────────────────────────── */
     .card {
-      background: var(--surface);
-      border: 1px solid var(--hairline);
-      border-radius: 10px;
-      padding: 24px 24px 20px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 20px 16px;
+      box-shadow: var(--card-shadow);
     }
     .card-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 16px 24px;
-      flex-wrap: wrap;
-      margin-bottom: 18px;
+      display: flex; align-items: baseline;
+      justify-content: space-between; gap: 12px 20px;
+      flex-wrap: wrap; margin-bottom: 14px;
     }
     .card-head h3 {
-      font-family: var(--serif);
-      font-weight: 400;
-      font-size: 20px;
-      letter-spacing: -0.01em;
-      margin: 0;
+      font-family: var(--serif); font-weight: 400;
+      font-size: 17px; letter-spacing: -0.01em; margin: 0; color: var(--ink);
     }
-    .card-note {
-      font-size: 12px;
-      color: var(--ink-mute);
-      font-family: var(--mono);
-      max-width: 56ch;
-      text-align: right;
-    }
-    .canvas-wrap {
-      position: relative;
-      height: 320px;
-    }
-    .canvas-wrap.tall { height: 360px; }
-    .canvas-wrap.short { height: 240px; }
+    .card-note { font-size: 12px; color: var(--ink-3); font-family: var(--mono); text-align: right; max-width: 52ch; }
+    .canvas-wrap { position: relative; height: 292px; }
+    .canvas-wrap.tall { height: 332px; }
 
-    /* Single-chart trend with side rail */
+    /* Trend layout */
     .trend-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1.6fr) minmax(220px, 1fr);
-      gap: 24px;
+      grid-template-columns: minmax(0, 1.6fr) minmax(196px, 1fr);
+      gap: 22px;
     }
-    .trend-stats {
-      display: grid;
-      gap: 14px;
-      align-content: start;
-      padding-top: 6px;
-    }
-    .trend-stat {
-      border-top: 1px solid var(--hairline);
-      padding-top: 12px;
-    }
+    .trend-stats { display: grid; gap: 12px; align-content: start; padding-top: 2px; }
+    .trend-stat { border-top: 1px solid var(--border); padding-top: 11px; }
     .trend-stat-label {
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--ink-mute);
+      font-size: 11px; letter-spacing: 0.07em;
+      text-transform: uppercase; color: var(--ink-3); font-weight: 500;
     }
     .trend-stat-value {
-      font-family: var(--serif);
-      font-size: 24px;
-      letter-spacing: -0.01em;
-      color: var(--ink);
-      margin-top: 4px;
+      font-family: var(--serif); font-size: 21px;
+      letter-spacing: -0.01em; color: var(--ink); margin-top: 3px;
     }
     .trend-stat-value.loss { color: var(--loss); }
-    .trend-stat-note {
-      font-size: 12px;
-      color: var(--ink-soft);
-      margin-top: 4px;
-    }
+    .trend-stat-note { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
 
-    /* Concentration: two charts side by side */
-    .two-col {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 24px;
-    }
+    /* Two-column grid */
+    .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 
-    /* Driver gap strip */
+    /* Behavioral gap strip */
     .gap-strip {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 1px;
-      background: var(--hairline);
-      border: 1px solid var(--hairline);
-      border-radius: 10px;
-      overflow: hidden;
-      margin-top: 24px;
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px; background: var(--border); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden; margin-top: 18px;
     }
-    .gap {
-      background: var(--surface);
-      padding: 16px 18px;
-      display: grid;
-      gap: 4px;
-    }
+    .gap { background: var(--surface-2); padding: 13px 15px; display: grid; gap: 3px; }
     .gap-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--ink-mute);
+      font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--ink-3); font-weight: 500;
     }
-    .gap-value {
-      font-family: var(--serif);
-      font-size: 20px;
-      color: var(--ink);
-    }
-    .gap-note {
-      font-size: 12px;
-      color: var(--ink-soft);
-      font-family: var(--mono);
-    }
+    .gap-value { font-family: var(--serif); font-size: 17px; color: var(--ink); letter-spacing: -0.01em; }
+    .gap-note { font-size: 11px; color: var(--ink-3); font-family: var(--mono); }
 
-    /* ---------- Queue / table ---------- */
+    /* ── Queue ──────────────────────────────────────────── */
     .queue-card { padding: 0; overflow: hidden; }
     .queue-head {
-      padding: 22px 24px 18px;
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 24px;
-      border-bottom: 1px solid var(--hairline);
+      padding: 18px 20px 15px;
+      display: flex; align-items: baseline;
+      justify-content: space-between; gap: 20px;
+      border-bottom: 1px solid var(--border);
     }
     .queue-head h3 {
-      font-family: var(--serif);
-      font-weight: 400;
-      font-size: 20px;
-      letter-spacing: -0.01em;
-      margin: 0;
+      font-family: var(--serif); font-weight: 400;
+      font-size: 17px; letter-spacing: -0.01em; margin: 0;
     }
 
     .tier-distribution {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 16px 24px;
-      border-bottom: 1px solid var(--hairline);
-      background: var(--surface-tint);
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 20px; border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
     }
-    .tier-bar {
-      flex: 1;
-      height: 6px;
-      border-radius: 3px;
-      overflow: hidden;
-      display: flex;
-      background: var(--hairline);
-    }
+    .tier-bar { flex: 1; height: 4px; overflow: hidden; display: flex; background: var(--border); }
     .tier-bar > span { display: block; height: 100%; }
-    .tier-legend {
-      display: flex;
-      gap: 14px;
-      font-size: 12px;
-      color: var(--ink-soft);
-      font-family: var(--mono);
-    }
+    .tier-legend { display: flex; gap: 12px; font-size: 11px; color: var(--ink-3); font-family: var(--mono); }
     .tier-legend span.dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 2px;
-      margin-right: 6px;
-      vertical-align: middle;
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 1px; margin-right: 5px; vertical-align: middle;
     }
 
-    .table-scroll {
-      max-height: 540px;
-      overflow: auto;
-      border-bottom: 1px solid var(--hairline);
-    }
-    table.queue {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
+    .table-scroll { max-height: 520px; overflow: auto; border-bottom: 1px solid var(--border); }
+    table.queue { width: 100%; border-collapse: collapse; font-size: 13px; }
     table.queue thead th {
-      position: sticky;
-      top: 0;
-      background: var(--surface);
-      border-bottom: 1px solid var(--hairline);
-      text-align: left;
-      padding: 10px 16px;
-      font-weight: 500;
-      font-size: 11px;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--ink-mute);
-      cursor: pointer;
-      user-select: none;
-      white-space: nowrap;
+      position: sticky; top: 0;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      text-align: left; padding: 9px 13px;
+      font-weight: 500; font-size: 11px; letter-spacing: 0.05em;
+      text-transform: uppercase; color: var(--ink-3);
+      cursor: pointer; user-select: none; white-space: nowrap;
+      transition: color 0.1s;
     }
     table.queue thead th:hover { color: var(--ink); }
-    table.queue thead th.sort-asc::after { content: " ↑"; color: var(--ink); }
+    table.queue thead th.sort-asc::after  { content: " ↑"; color: var(--ink); }
     table.queue thead th.sort-desc::after { content: " ↓"; color: var(--ink); }
     table.queue td {
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--hairline);
-      color: var(--ink);
-      white-space: nowrap;
+      padding: 9px 13px; border-bottom: 1px solid var(--border);
+      color: var(--ink); white-space: nowrap;
     }
     table.queue tbody tr:last-child td { border-bottom: 0; }
-    table.queue tbody tr:hover td { background: var(--surface-tint); }
+    table.queue tbody tr:hover td { background: var(--surface-2); }
     table.queue .num {
-      font-family: var(--mono);
-      font-size: 12px;
-      font-feature-settings: "tnum" 1;
-      text-align: right;
+      font-family: var(--mono); font-size: 12px;
+      font-feature-settings: "tnum" 1; text-align: right;
     }
-    .tier-chip {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-family: var(--mono);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      font-weight: 500;
-      border: 1px solid transparent;
+    /* Critical row — left accent bar */
+    table.queue tbody tr:has(.tier-chip.critical) td:first-child {
+      border-left: 2px solid var(--loss); padding-left: 11px;
     }
-    .tier-chip.critical { background: var(--loss); color: var(--surface); }
-    .tier-chip.high { background: var(--loss-soft); color: var(--loss); border-color: var(--loss); }
-    .tier-chip.medium { background: var(--surface-tint); color: var(--caution); border-color: var(--hairline-strong); }
-    .tier-chip.low { background: var(--surface-tint); color: var(--ink-soft); border-color: var(--hairline-strong); }
 
-    /* ---------- Footer ---------- */
+    .tier-chip {
+      display: inline-block; padding: 2px 7px;
+      border-radius: 2px; font-size: 11px;
+      font-family: var(--mono); letter-spacing: 0.04em;
+      text-transform: uppercase; font-weight: 500; border: 1px solid transparent;
+    }
+    .tier-chip.critical { background: var(--loss); color: #fff; border-color: var(--loss); }
+    .tier-chip.high     { background: var(--loss-bg); color: var(--loss); border-color: var(--loss); }
+    .tier-chip.medium   { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); }
+    .tier-chip.low      { background: var(--surface-2); color: var(--ink-3); border-color: var(--border-2); }
+
+    /* ── Footer ─────────────────────────────────────────── */
     footer {
-      margin-top: 64px;
-      border-top: 1px solid var(--hairline);
-      padding: 24px 0 40px;
-      font-size: 12px;
-      color: var(--ink-mute);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 24px;
-      justify-content: space-between;
+      margin-top: 52px; border-top: 1px solid var(--border);
+      padding: 18px 0 40px; font-size: 12px; color: var(--ink-3);
+      display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between;
     }
     footer .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--hairline-strong);
-      background: var(--surface);
-      color: var(--ink-soft);
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: 0.02em;
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 3px 9px; border-radius: 3px;
+      border: 1px solid var(--border-2); background: var(--surface);
+      color: var(--ink-3); font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em;
     }
-    footer .badge .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--gain);
-    }
-    footer .badge.warn .dot { background: var(--caution); }
+    footer .badge .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--gain); }
+    footer .badge.warn .dot { background: var(--warn); }
     footer .badge.fail .dot { background: var(--loss); }
-    footer code {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--ink-soft);
-    }
+    footer code { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
 
-    /* Print */
+    /* ── Print ──────────────────────────────────────────── */
     @media print {
+      :root[data-theme="dark"] {
+        --bg: #fff; --surface: #fff; --surface-2: #f4f4f2;
+        --ink: #000; --ink-2: #333; --ink-3: #666; --ink-4: #999;
+        --border: #ddd; --border-2: #ccc;
+        --loss: #b83530; --loss-bg: rgba(184,53,48,.07);
+        --gain: #1b6640; --gain-bg: rgba(27,102,64,.07);
+        --warn: #9e6010; --card-shadow: none;
+      }
       .topbar { position: static; }
-      .topbar .control, .topbar .btn-ghost { display: none; }
+      .topbar .control, .topbar .btn-ghost, .topbar .btn-icon { display: none; }
       main { padding: 0; }
       section { break-inside: avoid; }
     }
 
-    /* Responsive */
+    /* ── Responsive ─────────────────────────────────────── */
     @media (max-width: 960px) {
-      .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+      :root { --gutter: 20px; }
+      .hero-grid { grid-template-columns: 1fr; gap: 26px; }
       .kpi-row { grid-template-columns: repeat(2, 1fr); }
       .trend-layout { grid-template-columns: 1fr; }
       .two-col { grid-template-columns: 1fr; }
       .gap-strip { grid-template-columns: repeat(2, 1fr); }
-      .topbar-inner { flex-wrap: wrap; gap: 12px; }
-      main { padding: 32px var(--gutter) 48px; }
-    }
-
-    .sr-only {
-      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
-      clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      .topbar-inner { flex-wrap: wrap; gap: 10px; }
+      main { padding: 28px var(--gutter) 48px; }
     }
   </style>
 </head>
@@ -640,9 +472,28 @@
         <select class="control" id="filterChannel"></select>
       </div>
 
+      <button class="btn-icon" id="themeToggle" type="button" aria-label="Switch to dark mode">
+        <!-- Moon: visible in light mode -->
+        <svg class="icon-moon" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M13.5 9.8A6 6 0 0 1 6.2 2.5a6.2 6.2 0 1 0 7.3 7.3z" stroke-width="1.5"/>
+        </svg>
+        <!-- Sun: visible in dark mode -->
+        <svg class="icon-sun" viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="8" cy="8" r="2.8"/>
+          <line x1="8" y1="1.2" x2="8" y2="2.8"/>
+          <line x1="8" y1="13.2" x2="8" y2="14.8"/>
+          <line x1="1.2" y1="8" x2="2.8" y2="8"/>
+          <line x1="13.2" y1="8" x2="14.8" y2="8"/>
+          <line x1="3.15" y1="3.15" x2="4.27" y2="4.27"/>
+          <line x1="11.73" y1="11.73" x2="12.85" y2="12.85"/>
+          <line x1="3.15" y1="12.85" x2="4.27" y2="11.73"/>
+          <line x1="11.73" y1="4.27" x2="12.85" y2="3.15"/>
+        </svg>
+      </button>
+
       <button class="btn-ghost" id="printBtn" type="button">Print</button>
     </div>
-    <!-- Hidden controls retained for shared date logic -->
+    <!-- Hidden controls retained for date logic and extended filters -->
     <div class="sr-only">
       <input type="date" id="filterStartMonth" />
       <input type="date" id="filterEndMonth" />
@@ -711,7 +562,7 @@
       </div>
     </section>
 
-    <!-- Trend -->
+    <!-- 01 Trend -->
     <section aria-labelledby="trendTitle">
       <div class="eyebrow-bar">
         <p class="eyebrow">01 · Trend</p>
@@ -724,21 +575,23 @@
         </div>
         <div class="trend-layout">
           <div>
-            <div class="canvas-wrap"><canvas id="chartTrend" role="img" aria-label="Monthly customer and revenue churn"></canvas></div>
+            <div class="canvas-wrap">
+              <canvas id="chartTrend" role="img" aria-label="Monthly customer and revenue churn"></canvas>
+            </div>
           </div>
           <div class="trend-stats">
             <div class="trend-stat">
-              <div class="trend-stat-label">Latest month — customer</div>
+              <div class="trend-stat-label">Latest — customer</div>
               <div class="trend-stat-value loss" id="trendLastCust">—</div>
               <div class="trend-stat-note" id="trendLastCustNote">—</div>
             </div>
             <div class="trend-stat">
-              <div class="trend-stat-label">Latest month — revenue</div>
+              <div class="trend-stat-label">Latest — revenue</div>
               <div class="trend-stat-value" id="trendLastRev">—</div>
               <div class="trend-stat-note" id="trendLastRevNote">—</div>
             </div>
             <div class="trend-stat">
-              <div class="trend-stat-label">Spread vs first selected month</div>
+              <div class="trend-stat-label">Spread, first → last</div>
               <div class="trend-stat-value" id="trendSpread">—</div>
               <div class="trend-stat-note" id="trendSpreadNote">—</div>
             </div>
@@ -747,29 +600,33 @@
       </div>
     </section>
 
-    <!-- Concentration -->
+    <!-- 02 Concentration -->
     <section aria-labelledby="concentrationTitle">
       <div class="eyebrow-bar">
         <p class="eyebrow">02 · Concentration</p>
-        <span class="eyebrow-note">where churn lives</span>
+        <span class="eyebrow-note">churn rate per cut · active base</span>
       </div>
       <h2 class="h2" id="concentrationTitle">Where the losses concentrate</h2>
-      <p class="section-sub">Churn rate is shown against the active base of each cut, not as a share of total churn.</p>
+      <p class="section-sub">Churn rate shown against each cut's active base, not as a share of total churn.</p>
 
-      <div class="two-col" style="margin-top: 20px;">
+      <div class="two-col" style="margin-top: 16px;">
         <div class="card">
           <div class="card-head">
             <h3>By segment</h3>
             <span class="card-note" id="segHotspot">—</span>
           </div>
-          <div class="canvas-wrap"><canvas id="chartChurnSegment" role="img" aria-label="Churn rate by segment"></canvas></div>
+          <div class="canvas-wrap">
+            <canvas id="chartChurnSegment" role="img" aria-label="Churn rate by segment"></canvas>
+          </div>
         </div>
         <div class="card">
           <div class="card-head">
             <h3>By acquisition channel</h3>
             <span class="card-note" id="chnHotspot">—</span>
           </div>
-          <div class="canvas-wrap"><canvas id="chartChurnChannel" role="img" aria-label="Churn rate by acquisition channel"></canvas></div>
+          <div class="canvas-wrap">
+            <canvas id="chartChurnChannel" role="img" aria-label="Churn rate by acquisition channel"></canvas>
+          </div>
         </div>
       </div>
 
@@ -777,51 +634,53 @@
         <div class="gap">
           <div class="gap-label">Usage trend</div>
           <div class="gap-value" id="diagUsage">—</div>
-          <div class="gap-note">retained vs churned, avg sessions Δ30d</div>
+          <div class="gap-note">retained vs churned · sessions Δ30d</div>
         </div>
         <div class="gap">
-          <div class="gap-label">Support tickets</div>
+          <div class="gap-label">Support load</div>
           <div class="gap-value" id="diagSupport">—</div>
-          <div class="gap-note">retained vs churned, 90-day count</div>
+          <div class="gap-note">retained vs churned · tickets 90d</div>
         </div>
         <div class="gap">
           <div class="gap-label">Failed payments</div>
           <div class="gap-value" id="diagFailed">—</div>
-          <div class="gap-note">incidence over 90 days</div>
+          <div class="gap-note">retained vs churned · 90-day rate</div>
         </div>
         <div class="gap">
-          <div class="gap-label">NPS</div>
+          <div class="gap-label">NPS score</div>
           <div class="gap-value" id="diagNps">—</div>
-          <div class="gap-note">retained vs churned, recent mean</div>
+          <div class="gap-note">retained vs churned · recent mean</div>
         </div>
       </div>
     </section>
 
-    <!-- Cohort -->
+    <!-- 03 Cohorts -->
     <section aria-labelledby="cohortTitle">
       <div class="eyebrow-bar">
         <p class="eyebrow">03 · Cohorts</p>
-        <span class="eyebrow-note">last 8 visible cohorts</span>
+        <span class="eyebrow-note">8 most recent cohorts</span>
       </div>
       <div class="card">
         <div class="card-head">
           <h3 id="cohortTitle">Retention by cohort age</h3>
-          <span class="card-note" id="cohortNote">Each line is a starting cohort; X axis is age in months since acquisition.</span>
+          <span class="card-note" id="cohortNote">Each line is a starting cohort; X axis is months since acquisition.</span>
         </div>
-        <div class="canvas-wrap tall"><canvas id="chartCohort" role="img" aria-label="Cohort retention curves by age in months"></canvas></div>
+        <div class="canvas-wrap tall">
+          <canvas id="chartCohort" role="img" aria-label="Cohort retention curves by age in months"></canvas>
+        </div>
       </div>
     </section>
 
-    <!-- Priority queue -->
+    <!-- 04 Action queue -->
     <section aria-labelledby="queueTitle">
       <div class="eyebrow-bar">
         <p class="eyebrow">04 · Action queue</p>
-        <span class="eyebrow-note">top 300 in current scope</span>
+        <span class="eyebrow-note">top 300 in scope · sorted by priority</span>
       </div>
       <div class="card queue-card">
         <div class="queue-head">
           <h3 id="queueTitle">Accounts to save first</h3>
-          <span class="card-note">Sorted by retention priority. Click a header to re-sort.</span>
+          <span class="card-note">Click a column header to re-sort.</span>
         </div>
 
         <div class="tier-distribution" role="img" aria-label="Risk tier distribution">
@@ -839,7 +698,7 @@
                 <th data-sort="segment">Segment</th>
                 <th data-sort="current_mrr" class="num">MRR</th>
                 <th data-sort="churn_risk_score" class="num">Churn risk</th>
-                <th data-sort="revenue_risk_score" class="num">Revenue risk</th>
+                <th data-sort="revenue_risk_score" class="num">Rev risk</th>
                 <th data-sort="retention_priority_score" class="num sort-desc">Priority</th>
                 <th data-sort="main_risk_driver">Driver</th>
                 <th data-sort="recommended_action">Play</th>
@@ -871,54 +730,93 @@ const ALL = '__all__';
 const charts = {};
 const MONTHS = DATA.months || [];
 const DIM_INDEX = {
-  segment: new Map((DATA.domains.segment || []).map((v, i) => [v, i])),
-  region: new Map((DATA.domains.region || []).map((v, i) => [v, i])),
+  segment:             new Map((DATA.domains.segment || []).map((v, i) => [v, i])),
+  region:              new Map((DATA.domains.region || []).map((v, i) => [v, i])),
   acquisition_channel: new Map((DATA.domains.acquisition_channel || []).map((v, i) => [v, i])),
-  plan_type: new Map((DATA.domains.plan_type || []).map((v, i) => [v, i])),
+  plan_type:           new Map((DATA.domains.plan_type || []).map((v, i) => [v, i])),
 };
 const tableSort = { key: 'retention_priority_score', dir: 'desc' };
 
-const nfInt = new Intl.NumberFormat('en-US');
-const nfUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const nfInt  = new Intl.NumberFormat('en-US');
+const nfUsd  = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const nfUsd2 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const nfPct1 = new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-const pct = (v) => Number.isFinite(v) ? nfPct1.format(v) : '—';
-const money = (v) => Number.isFinite(v) ? nfUsd.format(v) : '—';
+const pct   = (v) => Number.isFinite(v) ? nfPct1.format(v) : '—';
+const money  = (v) => Number.isFinite(v) ? nfUsd.format(v) : '—';
 const money2 = (v) => Number.isFinite(v) ? nfUsd2.format(v) : '—';
-const num = (v, d = 1) => Number.isFinite(v) ? Number(v).toFixed(d) : '—';
-const intf = (v) => Number.isFinite(v) ? nfInt.format(v) : '—';
+const num    = (v, d = 1) => Number.isFinite(v) ? Number(v).toFixed(d) : '—';
+const intf   = (v) => Number.isFinite(v) ? nfInt.format(v) : '—';
 
 function esc(value) {
-  return String(value ?? '').replace(/[&<>"']/g, ch => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[ch]));
+  return String(value ?? '').replace(/[&<>"']/g, ch => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+  ));
 }
 function setText(id, value) {
   const el = document.getElementById(id);
   if (el) el.textContent = value;
 }
 
-const palette = {
-  ink: '#0E0E0C',
-  inkSoft: '#4D4D49',
-  inkMute: '#908E87',
-  grid: 'rgba(14, 14, 12, 0.08)',
-  gridAxis: 'rgba(14, 14, 12, 0.18)',
-  loss: '#B0382B',
-  lossSoft: 'rgba(176, 56, 43, 0.10)',
-  neutral: '#1B1B19',
-  neutralSoft: 'rgba(27, 27, 25, 0.85)',
-  cohort: ['#0E0E0C', '#3A3A36', '#5B5B57', '#7A7A75', '#9B9994', '#B5B2AB', '#C9C5BB', '#DCD8CD'],
-};
+/* ── Theme ────────────────────────────────────────────── */
 
-if (window.Chart) {
-  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', Roboto, Arial, sans-serif";
-  Chart.defaults.font.size = 12;
-  Chart.defaults.color = palette.inkSoft;
+function isDark() {
+  return document.documentElement.getAttribute('data-theme') === 'dark';
 }
 
-/* ---------- Filters ---------- */
+function getPalette() {
+  const cs = getComputedStyle(document.documentElement);
+  const g  = (v) => cs.getPropertyValue(v).trim();
+  const dark = isDark();
+  return {
+    ink:         g('--ink'),
+    inkSoft:     g('--ink-2'),
+    inkMute:     g('--ink-3'),
+    surface:     g('--surface'),
+    grid:        g('--grid-line'),
+    gridAxis:    g('--grid-axis'),
+    loss:        g('--loss'),
+    lossSoft:    dark ? 'rgba(220, 82, 69, 0.15)'  : 'rgba(184, 53, 48, 0.09)',
+    neutral:     dark ? 'rgba(236, 234, 226, 0.80)' : 'rgba(17, 17, 16, 0.80)',
+    neutralSoft: dark ? 'rgba(236, 234, 226, 0.14)' : 'rgba(17, 17, 16, 0.11)',
+    cohort: dark
+      ? ['#ECEAE2', '#C4C0B8', '#9C9890', '#747270', '#4E4C49', '#363430', '#222120', '#181614']
+      : ['#111110', '#3A3A36', '#5B5B57', '#7A7A75', '#9B9994', '#B5B2AB', '#C9C5BB', '#DCD8CD'],
+    tierColors: dark
+      ? { critical: '#DC5245', high: '#E0826E', medium: '#CE9035', low: '#686562' }
+      : { critical: '#B83530', high: '#D87060', medium: '#A87028', low: '#8A8880' },
+  };
+}
+
+function initTheme() {
+  // Attribute already set by the no-flash head script; just sync the icon.
+  updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
+}
+
+function toggleTheme() {
+  const next = isDark() ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('cri-theme', next);
+  updateThemeIcon(next);
+  renderDashboard();
+}
+
+function updateThemeIcon(theme) {
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+}
+
+/* ── Chart defaults ───────────────────────────────────── */
+
+function applyChartDefaults() {
+  if (!window.Chart) return;
+  const p = getPalette();
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', Roboto, Arial, sans-serif";
+  Chart.defaults.font.size   = 12;
+  Chart.defaults.color       = p.inkSoft;
+}
+
+/* ── Filters ──────────────────────────────────────────── */
 
 function monthToStart(m) { return `${m}-01`; }
 function monthToEnd(m) {
@@ -929,23 +827,19 @@ function dateToMonth(d, fallback) {
   if (!d || d.length < 7) return fallback;
   return d.slice(0, 7);
 }
-
 function addOption(select, value, label) {
   const opt = document.createElement('option');
-  opt.value = value;
-  opt.textContent = label;
-  select.appendChild(opt);
+  opt.value = value; opt.textContent = label; select.appendChild(opt);
 }
 
 function populateFilters() {
-  const map = [
-    ['filterSegment', DATA.domains.segment],
-    ['filterRegion', DATA.domains.region],
-    ['filterChannel', DATA.domains.acquisition_channel],
-    ['filterPlan', DATA.domains.plan_type],
+  [
+    ['filterSegment',  DATA.domains.segment],
+    ['filterRegion',   DATA.domains.region],
+    ['filterChannel',  DATA.domains.acquisition_channel],
+    ['filterPlan',     DATA.domains.plan_type],
     ['filterRiskTier', DATA.domains.risk_tier],
-  ];
-  map.forEach(([id, values]) => {
+  ].forEach(([id, values]) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.innerHTML = '';
@@ -954,30 +848,34 @@ function populateFilters() {
   });
 
   const start = DATA.meta.coverage_start_month;
-  const end = DATA.meta.coverage_end_month;
-  document.getElementById('filterStartMonth').value = monthToStart(start);
-  document.getElementById('filterEndMonth').value = monthToEnd(end);
-  document.getElementById('filterStartMonth').min = monthToStart(start);
-  document.getElementById('filterStartMonth').max = monthToEnd(end);
-  document.getElementById('filterEndMonth').min = monthToStart(start);
-  document.getElementById('filterEndMonth').max = monthToEnd(end);
+  const end   = DATA.meta.coverage_end_month;
+  const sEl   = document.getElementById('filterStartMonth');
+  const eEl   = document.getElementById('filterEndMonth');
+  sEl.value = monthToStart(start); sEl.min = monthToStart(start); sEl.max = monthToEnd(end);
+  eEl.value = monthToEnd(end);     eEl.min = monthToStart(start); eEl.max = monthToEnd(end);
   document.getElementById('filterPeriodPreset').value = 'all';
 
   ['filterSegment', 'filterChannel', 'filterRegion', 'filterPlan', 'filterRiskTier'].forEach(id => {
-    document.getElementById(id).addEventListener('change', renderDashboard);
+    document.getElementById(id)?.addEventListener('change', renderDashboard);
   });
   document.getElementById('filterPeriodPreset').addEventListener('change', (e) => {
     applyPeriodPreset(e.target.value);
     renderDashboard();
   });
-  document.getElementById('printBtn').addEventListener('click', () => window.print());
+  document.getElementById('printBtn')?.addEventListener('click', () => window.print());
+  document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
 
   document.querySelectorAll('#queueTable thead th').forEach(th => {
     th.addEventListener('click', () => {
       const key = th.getAttribute('data-sort');
       if (!key) return;
-      if (tableSort.key === key) tableSort.dir = tableSort.dir === 'asc' ? 'desc' : 'asc';
-      else { tableSort.key = key; tableSort.dir = ['current_mrr', 'churn_risk_score', 'revenue_risk_score', 'retention_priority_score'].includes(key) ? 'desc' : 'asc'; }
+      if (tableSort.key === key) {
+        tableSort.dir = tableSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        tableSort.key = key;
+        tableSort.dir = ['current_mrr', 'churn_risk_score', 'revenue_risk_score', 'retention_priority_score'].includes(key)
+          ? 'desc' : 'asc';
+      }
       renderDashboard();
     });
   });
@@ -985,50 +883,50 @@ function populateFilters() {
 
 function applyPeriodPreset(preset) {
   const startEl = document.getElementById('filterStartMonth');
-  const endEl = document.getElementById('filterEndMonth');
-  const end = DATA.meta.coverage_end_month;
-  const endIdx = Math.max(0, MONTHS.indexOf(end));
-  let start = DATA.meta.coverage_start_month;
-  if (preset === '12m') start = MONTHS[Math.max(0, endIdx - 11)] || start;
-  else if (preset === '6m') start = MONTHS[Math.max(0, endIdx - 5)] || start;
-  else if (preset === '3m') start = MONTHS[Math.max(0, endIdx - 2)] || start;
+  const endEl   = document.getElementById('filterEndMonth');
+  const end     = DATA.meta.coverage_end_month;
+  const endIdx  = Math.max(0, MONTHS.indexOf(end));
+  let start     = DATA.meta.coverage_start_month;
+  if      (preset === '12m')    start = MONTHS[Math.max(0, endIdx - 11)] || start;
+  else if (preset === '6m')     start = MONTHS[Math.max(0, endIdx - 5)]  || start;
+  else if (preset === '3m')     start = MONTHS[Math.max(0, endIdx - 2)]  || start;
   else if (preset === 'custom') return;
   startEl.value = monthToStart(start);
-  endEl.value = monthToEnd(end);
+  endEl.value   = monthToEnd(end);
 }
 
 function getFilters() {
   const startDate = document.getElementById('filterStartMonth').value;
-  const endDate = document.getElementById('filterEndMonth').value;
-  const startMonth = dateToMonth(startDate, DATA.meta.coverage_start_month);
-  const endMonth = dateToMonth(endDate, DATA.meta.coverage_end_month);
+  const endDate   = document.getElementById('filterEndMonth').value;
   return {
-    startDate, endDate, startMonth, endMonth,
-    segment: document.getElementById('filterSegment').value,
-    region: document.getElementById('filterRegion').value,
-    channel: document.getElementById('filterChannel').value,
-    plan: document.getElementById('filterPlan').value,
-    riskTier: document.getElementById('filterRiskTier').value,
+    startDate, endDate,
+    startMonth: dateToMonth(startDate, DATA.meta.coverage_start_month),
+    endMonth:   dateToMonth(endDate,   DATA.meta.coverage_end_month),
+    segment:    document.getElementById('filterSegment').value,
+    region:     document.getElementById('filterRegion').value,
+    channel:    document.getElementById('filterChannel').value,
+    plan:       document.getElementById('filterPlan').value,
+    riskTier:   document.getElementById('filterRiskTier').value,
   };
 }
 
-/* ---------- Data slicing ---------- */
+/* ── Data slicing ─────────────────────────────────────── */
 
 function inRange(month, s, e) { return month >= s && month <= e; }
+
 function dimsMatch(row, f) {
-  if (f.segment !== 'all' && row.segment !== f.segment) return false;
-  if (f.region !== 'all' && row.region !== f.region) return false;
-  if (f.channel !== 'all' && row.acquisition_channel !== f.channel) return false;
-  if (f.plan !== 'all' && row.plan_type !== f.plan) return false;
+  if (f.segment !== 'all' && row.segment              !== f.segment)  return false;
+  if (f.region  !== 'all' && row.region               !== f.region)   return false;
+  if (f.channel !== 'all' && row.acquisition_channel  !== f.channel)  return false;
+  if (f.plan    !== 'all' && row.plan_type             !== f.plan)     return false;
   return true;
 }
 
 function getTrendRows(f) {
   const seg = f.segment === 'all' ? null : DIM_INDEX.segment.get(f.segment);
-  const reg = f.region === 'all' ? null : DIM_INDEX.region.get(f.region);
+  const reg = f.region  === 'all' ? null : DIM_INDEX.region.get(f.region);
   const chn = f.channel === 'all' ? null : DIM_INDEX.acquisition_channel.get(f.channel);
-  const pln = f.plan === 'all' ? null : DIM_INDEX.plan_type.get(f.plan);
-
+  const pln = f.plan    === 'all' ? null : DIM_INDEX.plan_type.get(f.plan);
   const agg = new Map();
   (DATA.monthly_fact_rows || []).forEach(row => {
     const m = MONTHS[Number(row[0])];
@@ -1037,44 +935,44 @@ function getTrendRows(f) {
     if (reg !== null && Number(row[2]) !== reg) return;
     if (chn !== null && Number(row[3]) !== chn) return;
     if (pln !== null && Number(row[4]) !== pln) return;
-
     if (!agg.has(m)) agg.set(m, { month: m, cust_start: 0, mrr_start: 0, cust_lost: 0, mrr_lost: 0 });
     const c = agg.get(m);
     c.cust_start += Number(row[5] || 0);
-    c.mrr_start += Number(row[6] || 0);
-    c.cust_lost += Number(row[7] || 0);
-    c.mrr_lost += Number(row[8] || 0);
+    c.mrr_start  += Number(row[6] || 0);
+    c.cust_lost  += Number(row[7] || 0);
+    c.mrr_lost   += Number(row[8] || 0);
   });
-
-  return Array.from(agg.values()).sort((a, b) => a.month.localeCompare(b.month)).map(r => ({
-    ...r,
-    cust_rate: r.cust_start > 0 ? r.cust_lost / r.cust_start : 0,
-    rev_rate: r.mrr_start > 0 ? r.mrr_lost / r.mrr_start : 0,
-  }));
+  return Array.from(agg.values())
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map(r => ({
+      ...r,
+      cust_rate: r.cust_start > 0 ? r.cust_lost / r.cust_start : 0,
+      rev_rate:  r.mrr_start  > 0 ? r.mrr_lost  / r.mrr_start  : 0,
+    }));
 }
 
 function aggregateTrend(rows) {
   const t = rows.reduce((a, r) => ({
     cust_start: a.cust_start + r.cust_start,
-    mrr_start: a.mrr_start + r.mrr_start,
-    cust_lost: a.cust_lost + r.cust_lost,
-    mrr_lost: a.mrr_lost + r.mrr_lost,
+    mrr_start:  a.mrr_start  + r.mrr_start,
+    cust_lost:  a.cust_lost  + r.cust_lost,
+    mrr_lost:   a.mrr_lost   + r.mrr_lost,
   }), { cust_start: 0, mrr_start: 0, cust_lost: 0, mrr_lost: 0 });
   return {
     ...t,
     cust_rate: t.cust_start > 0 ? t.cust_lost / t.cust_start : 0,
-    rev_rate: t.mrr_start > 0 ? t.mrr_lost / t.mrr_start : 0,
+    rev_rate:  t.mrr_start  > 0 ? t.mrr_lost  / t.mrr_start  : 0,
   };
 }
 
 function getRiskKpi(f) {
   const cube = DATA.risk_kpi_cube || [];
   return cube.find(r =>
-    r.segment === (f.segment === 'all' ? ALL : f.segment) &&
-    r.region === (f.region === 'all' ? ALL : f.region) &&
-    r.acquisition_channel === (f.channel === 'all' ? ALL : f.channel) &&
-    r.plan_type === (f.plan === 'all' ? ALL : f.plan) &&
-    r.risk_tier_filter === (f.riskTier === 'all' ? ALL : f.riskTier)
+    r.segment            === (f.segment  === 'all' ? ALL : f.segment)  &&
+    r.region             === (f.region   === 'all' ? ALL : f.region)   &&
+    r.acquisition_channel === (f.channel === 'all' ? ALL : f.channel)  &&
+    r.plan_type          === (f.plan     === 'all' ? ALL : f.plan)     &&
+    r.risk_tier_filter   === (f.riskTier === 'all' ? ALL : f.riskTier)
   ) || { scored_customers: 0, total_current_mrr: 0, revenue_at_risk: 0, high_risk_customers: 0, critical_customers: 0, avg_priority_score: 0 };
 }
 
@@ -1093,12 +991,14 @@ function getScored(f) {
   });
 }
 function getCohort(f) {
-  return (DATA.cohort_rows || []).filter(r => inRange(r.observation_month, f.startMonth, f.endMonth)).map(r => ({
-    cohort_month: r.cohort_month,
-    age: Number(r.cohort_age_months || 0),
-    retention: Number(r.retention_rate || 0),
-    observation_month: r.observation_month,
-  }));
+  return (DATA.cohort_rows || [])
+    .filter(r => inRange(r.observation_month, f.startMonth, f.endMonth))
+    .map(r => ({
+      cohort_month:      r.cohort_month,
+      age:               Number(r.cohort_age_months || 0),
+      retention:         Number(r.retention_rate || 0),
+      observation_month: r.observation_month,
+    }));
 }
 
 function groupByDim(snapshotRows, dim) {
@@ -1116,69 +1016,70 @@ function groupByDim(snapshotRows, dim) {
     .sort((a, b) => b.churnRate - a.churnRate);
 }
 
-/* ---------- Renderers ---------- */
+/* ── Renderers ────────────────────────────────────────── */
 
 function setDelta(id, pp) {
   const el = document.getElementById(id);
   if (!el) return;
   if (!Number.isFinite(pp) || Math.abs(pp) < 1e-9) {
-    el.textContent = '— pp MoM';
-    el.className = 'delta flat';
-    return;
+    el.textContent = '— pp MoM'; el.className = 'delta flat'; return;
   }
-  const sign = pp > 0 ? '+' : '−';
-  el.textContent = `${sign}${Math.abs(pp * 100).toFixed(1)} pp MoM`;
+  el.textContent = `${pp > 0 ? '+' : '−'}${Math.abs(pp * 100).toFixed(1)} pp MoM`;
   el.className = `delta ${pp > 0 ? 'up' : 'down'}`;
 }
 
 function renderHero(f, trendRows, riskKpi) {
-  const period = aggregateTrend(trendRows);
+  const period   = aggregateTrend(trendRows);
   const critical = Number(riskKpi.critical_customers || 0);
-  const high = Number(riskKpi.high_risk_customers || 0);
-  const exposed = Number(riskKpi.revenue_at_risk || 0);
-  const scored = Number(riskKpi.scored_customers || 0);
+  const high     = Number(riskKpi.high_risk_customers || 0);
+  const exposed  = Number(riskKpi.revenue_at_risk || 0);
+  const scored   = Number(riskKpi.scored_customers || 0);
 
   setText('periodLabel', `${f.startMonth} → ${f.endMonth}`);
 
-  // Editorial headline
-  const headline = `<span class="h1-accent">${money(exposed)}</span> of MRR exposed across <span>${intf(critical + high)}</span> accounts that need a save motion.`;
-  document.getElementById('heroHeadline').innerHTML = headline;
+  document.getElementById('heroHeadline').innerHTML =
+    `<span class="h1-accent">${money(exposed)}</span> of MRR exposed across `
+    + `<span>${intf(critical + high)}</span> accounts that need a save motion.`;
 
-  const segDirection = period.cust_rate > 0.20 ? 'elevated' : period.cust_rate > 0.10 ? 'manageable' : 'contained';
+  const level = period.cust_rate > 0.20 ? 'elevated' : period.cust_rate > 0.10 ? 'manageable' : 'contained';
   document.getElementById('heroLede').innerHTML =
-    `Customer churn averaged <strong>${pct(period.cust_rate)}</strong> over the selected window, against revenue churn of <strong>${pct(period.rev_rate)}</strong>. ` +
-    `The spread is ${period.cust_rate > period.rev_rate ? 'favourable — low-value accounts lead the losses' : 'unfavourable — losses are tilted toward higher-MRR accounts'}. ` +
-    `Overall exposure looks <strong>${segDirection}</strong>; the queue below identifies where to act first.`;
+    `Customer churn averaged <strong>${pct(period.cust_rate)}</strong> over the selected window, `
+    + `against revenue churn of <strong>${pct(period.rev_rate)}</strong>. `
+    + `The spread is ${period.cust_rate > period.rev_rate
+        ? 'favourable — low-value accounts lead the losses'
+        : 'unfavourable — losses are tilted toward higher-MRR accounts'}. `
+    + `Overall exposure looks <strong>${level}</strong>; the queue below identifies where to act first.`;
 
   setText('heroCritical', intf(critical));
-  setText('heroHigh', intf(high));
-  setText('heroScored', intf(scored));
+  setText('heroHigh',     intf(high));
+  setText('heroScored',   intf(scored));
   setText('heroCoverage', `${DATA.meta.coverage_start_month} – ${DATA.meta.coverage_end_month}`);
 }
 
 function renderKpis(trendRows, riskKpi) {
   const period = aggregateTrend(trendRows);
-  const last = trendRows[trendRows.length - 1];
-  const prev = trendRows.length > 1 ? trendRows[trendRows.length - 2] : null;
+  const last   = trendRows[trendRows.length - 1];
+  const prev   = trendRows.length > 1 ? trendRows[trendRows.length - 2] : null;
 
-  setText('kpiCustChurn', pct(period.cust_rate));
-  setText('kpiCustChurnNote', `${intf(period.cust_lost)} lost / ${intf(period.cust_start)} active-start`);
-  setDelta('kpiCustChurnDelta', last && prev ? (last.cust_rate - prev.cust_rate) : NaN);
+  setText('kpiCustChurn',     pct(period.cust_rate));
+  setText('kpiCustChurnNote', `${intf(period.cust_lost)} lost / ${intf(period.cust_start)} base`);
+  setDelta('kpiCustChurnDelta', last && prev ? last.cust_rate - prev.cust_rate : NaN);
 
-  setText('kpiRevChurn', pct(period.rev_rate));
-  setText('kpiRevChurnNote', `${money(period.mrr_lost)} lost / ${money(period.mrr_start)} base`);
-  setDelta('kpiRevChurnDelta', last && prev ? (last.rev_rate - prev.rev_rate) : NaN);
+  setText('kpiRevChurn',      pct(period.rev_rate));
+  setText('kpiRevChurnNote',  `${money(period.mrr_lost)} lost / ${money(period.mrr_start)} base`);
+  setDelta('kpiRevChurnDelta', last && prev ? last.rev_rate - prev.rev_rate : NaN);
 
-  const rev = Number(riskKpi.revenue_at_risk || 0);
+  const rev      = Number(riskKpi.revenue_at_risk || 0);
   const totalMrr = Number(riskKpi.total_current_mrr || 0);
-  setText('kpiRevRisk', money(rev));
+  setText('kpiRevRisk',     money(rev));
   setText('kpiRevRiskNote', `${pct(totalMrr > 0 ? rev / totalMrr : 0)} of scoped MRR`);
   document.getElementById('kpiRevRiskDelta').className = 'delta flat';
-  setText('kpiRevRiskDelta', `${intf(Number(riskKpi.high_risk_customers || 0) + Number(riskKpi.critical_customers || 0))} at risk`);
+  setText('kpiRevRiskDelta',
+    `${intf(Number(riskKpi.high_risk_customers || 0) + Number(riskKpi.critical_customers || 0))} at risk`);
 
   const scored = Number(riskKpi.scored_customers || 0);
-  setText('kpiActive', intf(scored));
-  setText('kpiActiveNote', `avg priority ${num(Number(riskKpi.avg_priority_score || 0), 1)}`);
+  setText('kpiActive',      intf(scored));
+  setText('kpiActiveNote',  `avg priority ${num(Number(riskKpi.avg_priority_score || 0), 1)}`);
   document.getElementById('kpiActiveDelta').className = 'delta flat';
   setText('kpiActiveDelta', `${intf(Number(riskKpi.critical_customers || 0))} critical`);
 }
@@ -1190,54 +1091,75 @@ function upsertChart(id, config) {
   charts[id] = new Chart(el, config);
 }
 
-function chartTrendOpts() {
+function trendChartOpts(p) {
   return {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
+    responsive: true, maintainAspectRatio: false, animation: false,
     interaction: { mode: 'index', intersect: false },
     plugins: {
       legend: {
-        position: 'top',
-        align: 'end',
-        labels: { boxWidth: 8, boxHeight: 8, padding: 14, usePointStyle: true, pointStyle: 'rectRounded', color: palette.inkSoft, font: { size: 12 } },
+        position: 'top', align: 'end',
+        labels: {
+          boxWidth: 8, boxHeight: 8, padding: 12,
+          usePointStyle: true, pointStyle: 'rectRounded',
+          color: p.inkSoft, font: { size: 12 },
+        },
       },
       tooltip: {
-        backgroundColor: palette.ink, titleColor: '#fff', bodyColor: '#fff', borderColor: palette.ink, borderWidth: 0, padding: 10, cornerRadius: 6,
-        callbacks: {
-          label: (ctx) => ` ${ctx.dataset.label}: ${nfPct1.format(ctx.parsed.y)}`,
-        },
+        backgroundColor: p.ink, titleColor: p.surface, bodyColor: p.surface,
+        borderColor: p.ink, borderWidth: 0, padding: 10, cornerRadius: 3,
+        callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${nfPct1.format(ctx.parsed.y)}` },
       },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { autoSkip: true, maxTicksLimit: 12, color: palette.inkMute } , border: { color: palette.gridAxis } },
-      y: { beginAtZero: true, grid: { color: palette.grid, drawTicks: false }, ticks: { maxTicksLimit: 6, color: palette.inkMute, callback: v => `${(Number(v) * 100).toFixed(0)}%` }, border: { display: false } },
+      x: {
+        grid: { display: false },
+        ticks: { autoSkip: true, maxTicksLimit: 12, color: p.inkMute },
+        border: { color: p.gridAxis },
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: p.grid, drawTicks: false },
+        ticks: { maxTicksLimit: 6, color: p.inkMute, callback: v => `${(Number(v) * 100).toFixed(0)}%` },
+        border: { display: false },
+      },
     },
   };
 }
 
-function chartBarOpts(maxTicks = 8, yPercent = true) {
+function barChartOpts(p, maxTicks = 8, yPercent = true) {
   return {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
+    responsive: true, maintainAspectRatio: false, animation: false,
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: palette.ink, titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 6, displayColors: false,
+        backgroundColor: p.ink, titleColor: p.surface, bodyColor: p.surface,
+        padding: 10, cornerRadius: 3, displayColors: false,
         callbacks: {
           label: (ctx) => yPercent ? ` ${nfPct1.format(ctx.parsed.y)}` : ` ${intf(ctx.parsed.y)}`,
         },
       },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { color: palette.inkSoft, maxRotation: 0, autoSkip: true, maxTicksLimit: maxTicks }, border: { color: palette.gridAxis } },
-      y: { beginAtZero: true, grid: { color: palette.grid }, ticks: { color: palette.inkMute, maxTicksLimit: 5, callback: yPercent ? (v => `${(Number(v) * 100).toFixed(0)}%`) : (v => intf(v)) }, border: { display: false } },
+      x: {
+        grid: { display: false },
+        ticks: { color: p.inkSoft, maxRotation: 0, autoSkip: true, maxTicksLimit: maxTicks },
+        border: { color: p.gridAxis },
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: p.grid },
+        ticks: {
+          color: p.inkMute, maxTicksLimit: 5,
+          callback: yPercent ? (v => `${(Number(v) * 100).toFixed(0)}%`) : (v => intf(v)),
+        },
+        border: { display: false },
+      },
     },
   };
 }
 
 function renderTrend(trendRows) {
+  const p      = getPalette();
   const labels = trendRows.map(r => r.month);
   upsertChart('chartTrend', {
     type: 'line',
@@ -1247,55 +1169,51 @@ function renderTrend(trendRows) {
         {
           label: 'Customer churn',
           data: trendRows.map(r => r.cust_rate),
-          borderColor: palette.loss,
-          backgroundColor: palette.lossSoft,
+          borderColor: p.loss, backgroundColor: p.lossSoft,
           borderWidth: 1.8,
-          pointRadius: labels.length > 24 ? 0 : 2.5,
-          pointBackgroundColor: palette.loss,
-          tension: 0.18,
-          fill: true,
+          pointRadius: labels.length > 24 ? 0 : 2.5, pointBackgroundColor: p.loss,
+          tension: 0.18, fill: true,
         },
         {
           label: 'Revenue churn',
           data: trendRows.map(r => r.rev_rate),
-          borderColor: palette.ink,
-          backgroundColor: 'transparent',
-          borderWidth: 1.4,
-          borderDash: [4, 3],
-          pointRadius: labels.length > 24 ? 0 : 2,
-          pointBackgroundColor: palette.ink,
-          tension: 0.18,
-          fill: false,
+          borderColor: p.ink, backgroundColor: 'transparent',
+          borderWidth: 1.4, borderDash: [4, 3],
+          pointRadius: labels.length > 24 ? 0 : 2, pointBackgroundColor: p.ink,
+          tension: 0.18, fill: false,
         },
       ],
     },
-    options: chartTrendOpts(),
+    options: trendChartOpts(p),
   });
 
-  const last = trendRows[trendRows.length - 1];
+  const last  = trendRows[trendRows.length - 1];
   const first = trendRows[0];
   if (last) {
-    setText('trendLastCust', pct(last.cust_rate));
+    setText('trendLastCust',     pct(last.cust_rate));
     setText('trendLastCustNote', `${intf(last.cust_lost)} accounts lost in ${last.month}`);
-    setText('trendLastRev', pct(last.rev_rate));
-    setText('trendLastRevNote', `${money(last.mrr_lost)} of MRR lost in ${last.month}`);
+    setText('trendLastRev',      pct(last.rev_rate));
+    setText('trendLastRevNote',  `${money(last.mrr_lost)} MRR lost in ${last.month}`);
   } else {
-    setText('trendLastCust', '—'); setText('trendLastCustNote', '—');
-    setText('trendLastRev', '—'); setText('trendLastRevNote', '—');
+    setText('trendLastCust', '—');     setText('trendLastCustNote', '—');
+    setText('trendLastRev',  '—');     setText('trendLastRevNote',  '—');
   }
   if (last && first && first !== last) {
-    const dCust = last.cust_rate - first.cust_rate;
-    const dRev = last.rev_rate - first.rev_rate;
-    setText('trendSpread', `${dCust >= 0 ? '+' : '−'}${Math.abs(dCust * 100).toFixed(1)} / ${dRev >= 0 ? '+' : '−'}${Math.abs(dRev * 100).toFixed(1)} pp`);
-    setText('trendSpreadNote', `Customer / revenue churn deltas, ${first.month} → ${last.month}`);
+    const dC = last.cust_rate - first.cust_rate;
+    const dR = last.rev_rate  - first.rev_rate;
+    setText('trendSpread',
+      `${dC >= 0 ? '+' : '−'}${Math.abs(dC * 100).toFixed(1)} / ${dR >= 0 ? '+' : '−'}${Math.abs(dR * 100).toFixed(1)} pp`);
+    setText('trendSpreadNote', `Customer / revenue churn delta, ${first.month} → ${last.month}`);
   } else {
-    setText('trendSpread', '—');
+    setText('trendSpread',     '—');
     setText('trendSpreadNote', 'Need at least two months in scope');
   }
 }
 
 function renderConcentration(snapshotRows) {
-  const drawBar = (canvasId, hotspotId, dim, label) => {
+  const p = getPalette();
+
+  const drawBar = (canvasId, hotspotId, dim) => {
     const rows = groupByDim(snapshotRows, dim).slice(0, 8);
     upsertChart(canvasId, {
       type: 'bar',
@@ -1304,62 +1222,55 @@ function renderConcentration(snapshotRows) {
         datasets: [{
           label: 'Churn rate',
           data: rows.map(r => r.churnRate),
-          backgroundColor: rows.map((_, i) => i === 0 ? palette.loss : palette.neutralSoft),
-          borderRadius: 4,
-          borderSkipped: false,
-          maxBarThickness: 36,
+          backgroundColor: rows.map((_, i) => i === 0 ? p.loss : p.neutralSoft),
+          borderRadius: 2, borderSkipped: false, maxBarThickness: 36,
         }],
       },
-      options: chartBarOpts(8, true),
+      options: barChartOpts(p, 8, true),
     });
     const top = rows[0];
     setText(hotspotId, top ? `Top: ${top.label} · ${pct(top.churnRate)} · ${intf(top.count)} accts` : '—');
   };
 
-  drawBar('chartChurnSegment', 'segHotspot', 'segment', 'segment');
-  drawBar('chartChurnChannel', 'chnHotspot', 'acquisition_channel', 'channel');
+  drawBar('chartChurnSegment', 'segHotspot', 'segment');
+  drawBar('chartChurnChannel', 'chnHotspot', 'acquisition_channel');
 
-  const retained = { count: 0, usage: 0, support: 0, nps: 0, failed: 0 };
-  const churned = { count: 0, usage: 0, support: 0, nps: 0, failed: 0 };
+  const ret = { count: 0, usage: 0, support: 0, nps: 0, failed: 0 };
+  const chu = { count: 0, usage: 0, support: 0, nps: 0, failed: 0 };
   snapshotRows.forEach(r => {
-    const t = Number(r.churn_flag) === 1 ? churned : retained;
+    const t = Number(r.churn_flag) === 1 ? chu : ret;
     const c = Number(r.customer_count || 0);
-    t.count += c;
-    t.usage += Number(r.usage_sum || 0);
+    t.count   += c;
+    t.usage   += Number(r.usage_sum || 0);
     t.support += Number(r.support_sum || 0);
-    t.nps += Number(r.nps_sum || 0);
-    t.failed += Number(r.payment_failure_sum || 0);
+    t.nps     += Number(r.nps_sum || 0);
+    t.failed  += Number(r.payment_failure_sum || 0);
   });
 
-  const safeDiv = (a, b) => b > 0 ? a / b : 0;
-  const rU = safeDiv(retained.usage, retained.count), cU = safeDiv(churned.usage, churned.count);
-  const rS = safeDiv(retained.support, retained.count), cS = safeDiv(churned.support, churned.count);
-  const rN = safeDiv(retained.nps, retained.count), cN = safeDiv(churned.nps, churned.count);
-  const rF = safeDiv(retained.failed, retained.count), cF = safeDiv(churned.failed, churned.count);
-
-  setText('diagUsage', `${num(rU, 2)} vs ${num(cU, 2)}`);
-  setText('diagSupport', `${num(rS, 2)} vs ${num(cS, 2)}`);
-  setText('diagFailed', `${pct(rF)} vs ${pct(cF)}`);
-  setText('diagNps', `${num(rN, 1)} vs ${num(cN, 1)}`);
+  const sd = (a, b) => b > 0 ? a / b : 0;
+  setText('diagUsage',   `${num(sd(ret.usage,   ret.count), 2)} vs ${num(sd(chu.usage,   chu.count), 2)}`);
+  setText('diagSupport', `${num(sd(ret.support, ret.count), 2)} vs ${num(sd(chu.support, chu.count), 2)}`);
+  setText('diagFailed',  `${pct(sd(ret.failed,  ret.count))} vs ${pct(sd(chu.failed,  chu.count))}`);
+  setText('diagNps',     `${num(sd(ret.nps,     ret.count), 1)} vs ${num(sd(chu.nps,     chu.count), 1)}`);
 }
 
 function renderCohort(cohortRows) {
+  const p   = getPalette();
   const map = new Map();
   cohortRows.forEach(r => {
     if (!map.has(r.cohort_month)) map.set(r.cohort_month, []);
     map.get(r.cohort_month).push(r);
   });
-  const months = Array.from(map.keys()).sort().slice(-8);
+  const months   = Array.from(map.keys()).sort().slice(-8);
   const datasets = months.map((cohort, idx) => {
     const rows = (map.get(cohort) || []).slice().sort((a, b) => a.age - b.age);
     return {
-      label: cohort,
-      data: rows.map(r => ({ x: r.age, y: r.retention })),
-      borderColor: palette.cohort[idx % palette.cohort.length],
-      backgroundColor: palette.cohort[idx % palette.cohort.length],
-      borderWidth: idx >= months.length - 2 ? 2 : 1.2,
-      pointRadius: 1.5,
-      tension: 0.15,
+      label:           cohort,
+      data:            rows.map(r => ({ x: r.age, y: r.retention })),
+      borderColor:     p.cohort[idx % p.cohort.length],
+      backgroundColor: p.cohort[idx % p.cohort.length],
+      borderWidth:     idx >= months.length - 2 ? 2 : 1.2,
+      pointRadius:     1.5, tension: 0.15,
     };
   });
 
@@ -1367,35 +1278,38 @@ function renderCohort(cohortRows) {
     type: 'line',
     data: { datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
+      responsive: true, maintainAspectRatio: false, animation: false,
       parsing: false,
       interaction: { mode: 'nearest', intersect: false },
       plugins: {
-        legend: { position: 'bottom', align: 'start', labels: { boxWidth: 8, boxHeight: 8, padding: 12, usePointStyle: true, pointStyle: 'rectRounded', color: palette.inkSoft, font: { size: 11 } } },
+        legend: {
+          position: 'bottom', align: 'start',
+          labels: {
+            boxWidth: 8, boxHeight: 8, padding: 10,
+            usePointStyle: true, pointStyle: 'rectRounded',
+            color: p.inkSoft, font: { size: 11 },
+          },
+        },
         tooltip: {
-          backgroundColor: palette.ink, titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 6,
+          backgroundColor: p.ink, titleColor: p.surface, bodyColor: p.surface,
+          padding: 10, cornerRadius: 3,
           callbacks: {
             title: (items) => `Cohort ${items[0].dataset.label} · age ${items[0].parsed.x} mo`,
-            label: (ctx) => ` Retention: ${nfPct1.format(ctx.parsed.y)}`,
+            label: (ctx)   => ` Retention: ${nfPct1.format(ctx.parsed.y)}`,
           },
         },
       },
       scales: {
         x: {
           type: 'linear',
-          title: { display: true, text: 'Cohort age (months)', color: palette.inkMute, font: { size: 11 } },
-          ticks: { color: palette.inkMute, maxTicksLimit: 10 },
-          grid: { display: false },
-          border: { color: palette.gridAxis },
+          title: { display: true, text: 'Cohort age (months)', color: p.inkMute, font: { size: 11 } },
+          ticks: { color: p.inkMute, maxTicksLimit: 10 },
+          grid: { display: false }, border: { color: p.gridAxis },
         },
         y: {
-          beginAtZero: true,
-          max: 1.0,
-          ticks: { color: palette.inkMute, maxTicksLimit: 6, callback: v => `${(Number(v) * 100).toFixed(0)}%` },
-          grid: { color: palette.grid },
-          border: { display: false },
+          beginAtZero: true, max: 1.0,
+          ticks: { color: p.inkMute, maxTicksLimit: 6, callback: v => `${(Number(v) * 100).toFixed(0)}%` },
+          grid: { color: p.grid }, border: { display: false },
         },
       },
     },
@@ -1404,20 +1318,20 @@ function renderCohort(cohortRows) {
 
 function renderQueue(scoredRows) {
   const sorted = scoredRows.slice().sort((a, b) => {
-    const av = a[tableSort.key];
-    const bv = b[tableSort.key];
+    const av = a[tableSort.key], bv = b[tableSort.key];
     let cmp = 0;
-    if (typeof av === 'number' || typeof bv === 'number') cmp = Number(av || 0) - Number(bv || 0);
-    else cmp = String(av ?? '').localeCompare(String(bv ?? ''));
+    if (typeof av === 'number' || typeof bv === 'number')
+      cmp = Number(av || 0) - Number(bv || 0);
+    else
+      cmp = String(av ?? '').localeCompare(String(bv ?? ''));
     return tableSort.dir === 'asc' ? cmp : -cmp;
   });
   const top = sorted.slice(0, 300);
 
   document.querySelectorAll('#queueTable thead th').forEach(th => {
     th.classList.remove('sort-asc', 'sort-desc');
-    if (th.getAttribute('data-sort') === tableSort.key) {
+    if (th.getAttribute('data-sort') === tableSort.key)
       th.classList.add(tableSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
-    }
   });
 
   document.getElementById('queueBody').innerHTML = top.map(r => `
@@ -1435,42 +1349,42 @@ function renderQueue(scoredRows) {
   `).join('');
 
   const tierOrder = ['critical', 'high', 'medium', 'low'];
-  const tierColors = { critical: '#B0382B', high: '#D87262', medium: '#C4A461', low: '#B5B2AB' };
+  const p = getPalette();
   const counts = new Map();
   scoredRows.forEach(r => counts.set(r.risk_tier, (counts.get(r.risk_tier) || 0) + 1));
   const total = scoredRows.length || 1;
 
   document.getElementById('tierBar').innerHTML = tierOrder
     .filter(t => (counts.get(t) || 0) > 0)
-    .map(t => `<span title="${t}: ${counts.get(t)}" style="background:${tierColors[t]};flex:${(counts.get(t) || 0) / total}"></span>`)
+    .map(t => `<span title="${t}: ${counts.get(t)}" style="background:${p.tierColors[t]};flex:${(counts.get(t) || 0) / total}"></span>`)
     .join('');
-
   document.getElementById('tierLegend').innerHTML = tierOrder
     .filter(t => (counts.get(t) || 0) > 0)
-    .map(t => `<span><span class="dot" style="background:${tierColors[t]}"></span>${t} · ${intf(counts.get(t) || 0)}</span>`)
+    .map(t => `<span><span class="dot" style="background:${p.tierColors[t]}"></span>${t} · ${intf(counts.get(t) || 0)}</span>`)
     .join('');
 }
 
 function renderFooter() {
-  const v = DATA.validation_summary || {};
+  const v     = DATA.validation_summary || {};
   const fails = Number(v.fail_checks || 0);
   const warns = Number(v.warn_checks || 0);
   const badge = document.getElementById('validationBadge');
   badge.className = `badge ${fails > 0 ? 'fail' : warns > 0 ? 'warn' : ''}`;
   setText('validationText', `${Number(v.pass_checks || 0)} / ${Number(v.total_checks || 0)} checks passing`);
-  setText('versionTag', `v${DATA.meta.builder_version} · ${DATA.meta.dashboard_version}`);
-  setText('generatedAt', DATA.meta.generated_at_utc);
+  setText('versionTag',     `v${DATA.meta.builder_version} · ${DATA.meta.dashboard_version}`);
+  setText('generatedAt',    DATA.meta.generated_at_utc);
 }
 
-/* ---------- Main render ---------- */
+/* ── Main render ──────────────────────────────────────── */
 
 function renderDashboard() {
-  const f = getFilters();
-  const trendRows = getTrendRows(f);
-  const riskKpi = getRiskKpi(f);
+  applyChartDefaults();
+  const f           = getFilters();
+  const trendRows   = getTrendRows(f);
+  const riskKpi     = getRiskKpi(f);
   const snapshotRows = getSnapshot(f);
-  const scoredRows = getScored(f);
-  const cohortRows = getCohort(f);
+  const scoredRows  = getScored(f);
+  const cohortRows  = getCohort(f);
 
   renderHero(f, trendRows, riskKpi);
   renderKpis(trendRows, riskKpi);
@@ -1481,6 +1395,7 @@ function renderDashboard() {
   renderFooter();
 }
 
+initTheme();
 populateFilters();
 renderDashboard();
   </script>
