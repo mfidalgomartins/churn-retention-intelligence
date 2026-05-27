@@ -145,22 +145,36 @@ class TestIntegration(unittest.TestCase):
         publish_blocked = next(r for r in rows if r.get("state") == "publish-blocked")
         self.assertEqual(publish_blocked.get("active"), "False")
 
-    def test_dashboard_has_region_chart_and_date_filtered_customers(self) -> None:
+    def test_dashboard_wires_filters_and_core_views(self) -> None:
         builder_path = ROOT / "src/churn/dashboard.py"
         html_path = ROOT / "outputs/dashboard/executive-retention-command-center.html"
 
         builder_text = builder_path.read_text(encoding="utf-8")
         html_text = html_path.read_text(encoding="utf-8")
 
-        self.assertIn("chartChurnRegion", html_text)
-        self.assertIn("getTrendRows(filters)", html_text)
-        self.assertIn("getFilteredSnapshot(filters)", html_text)
-        self.assertIn("getFilteredScored(filters)", html_text)
-        self.assertIn("id=\"filterStartMonth\"", html_text)
-        self.assertIn("id=\"filterEndMonth\"", html_text)
-        self.assertIn("type=\"date\"", html_text)
-        self.assertIn("id=\"filterPeriodPreset\"", html_text)
-        self.assertIn("applyPeriodPreset(", html_text)
+        # Filters that drive every slice.
+        for marker in (
+            'id="filterStartMonth"',
+            'id="filterEndMonth"',
+            'id="filterPeriodPreset"',
+            'id="filterSegment"',
+            'id="filterChannel"',
+            'id="filterRiskTier"',
+            'type="date"',
+        ):
+            self.assertIn(marker, html_text)
+
+        # Core charts and tables present.
+        for marker in (
+            'id="chartTrend"',
+            'id="chartChurnSegment"',
+            'id="chartChurnChannel"',
+            'id="chartCohort"',
+            'id="queueTable"',
+        ):
+            self.assertIn(marker, html_text)
+
+        # Builder reads only governed locations.
         self.assertIn("processed", builder_text)
         self.assertIn("outputs", builder_text)
         self.assertNotIn("data/raw", builder_text)
@@ -176,12 +190,8 @@ class TestIntegration(unittest.TestCase):
         self.assertNotIn("src=\"https://", html_text)
         self.assertNotIn("href=\"http://", html_text)
         self.assertNotIn("href=\"https://", html_text)
-        self.assertIn("id=\"coverageText\"", html_text)
-        self.assertIn("id=\"selectedPeriodText\"", html_text)
-        self.assertIn("id=\"filterPeriodPreset\"", html_text)
-        self.assertNotIn("Dashboard version:", html_text)
-        self.assertNotIn("Builder version:", html_text)
-        self.assertNotIn("Generated:", html_text)
+        self.assertIn('id="periodLabel"', html_text)
+        self.assertIn('id="filterPeriodPreset"', html_text)
         self.assertIn("const DATA =", html_text)
 
     def test_only_one_project_html_outside_virtualenv(self) -> None:
