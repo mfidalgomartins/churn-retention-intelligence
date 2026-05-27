@@ -6,35 +6,26 @@ on:
   pull_request:
 
 jobs:
-  validate:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install
         run: |
           python -m venv .venv
-          . .venv/bin/activate
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          ./.venv/bin/pip install --upgrade pip
+          ./.venv/bin/pip install -e . ruff
 
-      - name: Build governed outputs
-        run: |
-          . .venv/bin/activate
-          make all
+      - name: Build pipeline (includes validation gates)
+        run: make all
 
-      - name: Run validation gates
-        run: |
-          . .venv/bin/activate
-          make validate
+      - name: Tests
+        run: make test
 
-      - name: Run tests
-        run: |
-          . .venv/bin/activate
-          make test
+      - name: Lint
+        run: ./.venv/bin/ruff check src tests

@@ -1,5 +1,5 @@
-version: 1
-policy_owner: analytics-qa
+version: 2
+owner: analytics-qa
 
 readiness_states:
   - technically valid
@@ -10,7 +10,7 @@ readiness_states:
   - publish-blocked
 
 blocker_fail_policy:
-  description: Any blocker FAIL triggers publish-blocked state.
+  description: Any blocker FAIL triggers publish-blocked.
   action: stop_release
 
 warn_policy:
@@ -27,5 +27,3 @@ release_gate_outputs:
   - outputs/tables/final_validation_checks.csv
   - outputs/tables/final_validation_issues.csv
   - outputs/tables/release_readiness_matrix.csv
-  - docs/governance/data_contract_validation_report.md
-  - docs/governance/qa_release_summary.md

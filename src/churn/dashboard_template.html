@@ -1,0 +1,2569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Churn & Retention Command Center</title>
+  <style>
+    :root {
+      --bg: #f2f6f9;
+      --bg-deep: #e4edf4;
+      --surface: #ffffff;
+      --surface-soft: #f7fafc;
+      --surface-strong: #edf3f8;
+      --surface-elev: #ffffff;
+      --ink: #0d1726;
+      --ink-soft: #536679;
+      --ink-subtle: #7a8b9d;
+      --brand: #153854;
+      --brand-2: #3a6d90;
+      --brand-3: #9dbbcc;
+      --danger: #b73a32;
+      --danger-soft: #f7d7d3;
+      --success: #0d7b70;
+      --warning: #9c6012;
+      --border: rgba(120, 142, 164, 0.24);
+      --border-strong: rgba(94, 118, 142, 0.32);
+      --shadow: 0 18px 44px rgba(15, 26, 44, 0.07);
+      --shadow-soft: 0 8px 20px rgba(15, 26, 44, 0.05);
+      --radius: 10px;
+      --space: 20px;
+      --font: "IBM Plex Sans", "Aptos", "Segoe UI Variable Text", "Avenir Next", sans-serif;
+      --font-strong: "Aptos Display", "Segoe UI Variable Display", "Avenir Next", "IBM Plex Sans", sans-serif;
+      --input-bg: rgba(255, 255, 255, 0.96);
+      --input-border: rgba(144, 170, 192, 0.48);
+      --input-ink: #18344f;
+      --thead-bg: #f3f7fa;
+      --row-alt: #fbfcfe;
+      --table-row-border: #e7eef5;
+      --stack-border: rgba(164, 182, 201, 0.42);
+      --header-grad-1: #0d2034;
+      --header-grad-2: #13324c;
+      --header-grad-3: #0f2439;
+      --header-ink: #eff6fd;
+      --header-soft: #ccdceb;
+      --header-soft-2: #a9c0d4;
+      --header-strong: #f7fbff;
+      --toggle-bg: rgba(255, 255, 255, 0.09);
+      --toggle-border: rgba(216, 232, 245, 0.18);
+      --toggle-ink: #ebf4fd;
+      --hero-border: rgba(229, 239, 247, 0.16);
+      --hero-panel: rgba(8, 18, 31, 0.22);
+    }
+
+    body[data-theme="dark"] {
+      --bg: #08111d;
+      --bg-deep: #050b14;
+      --surface: rgba(13, 22, 35, 0.9);
+      --surface-soft: #0c1522;
+      --surface-strong: #101b2a;
+      --surface-elev: #101b2a;
+      --ink: #e9f0f8;
+      --ink-soft: #a5b8cc;
+      --ink-subtle: #7f93aa;
+      --brand: #a9d0ec;
+      --brand-2: #6fb0d6;
+      --brand-3: #3e5d78;
+      --danger: #ef8a82;
+      --danger-soft: rgba(239, 138, 130, 0.16);
+      --success: #66d3c5;
+      --warning: #e7c777;
+      --border: rgba(90, 111, 133, 0.34);
+      --border-strong: rgba(119, 146, 170, 0.42);
+      --shadow: 0 20px 48px rgba(0, 0, 0, 0.30);
+      --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.18);
+      --input-bg: rgba(15, 27, 42, 0.96);
+      --input-border: rgba(101, 128, 153, 0.48);
+      --input-ink: #e9f0f8;
+      --thead-bg: #122033;
+      --row-alt: #101a29;
+      --table-row-border: #22364b;
+      --stack-border: rgba(79, 104, 129, 0.55);
+      --header-grad-1: #08111d;
+      --header-grad-2: #0e243a;
+      --header-grad-3: #0d1d2f;
+      --header-ink: #edf5fc;
+      --header-soft: #bfd2e3;
+      --header-soft-2: #96aec5;
+      --header-strong: #f7fbff;
+      --toggle-bg: rgba(168, 205, 233, 0.12);
+      --toggle-border: rgba(168, 205, 233, 0.26);
+      --toggle-ink: #eaf4ff;
+      --hero-border: rgba(208, 226, 242, 0.12);
+      --hero-panel: rgba(3, 10, 18, 0.36);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--font);
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+      line-height: 1.45;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: min(1700px, 100% - 40px);
+      margin: 18px auto 34px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .header {
+      position: relative;
+      background: linear-gradient(132deg, var(--header-grad-1) 0%, var(--header-grad-2) 42%, var(--header-grad-3) 100%);
+      color: var(--header-ink);
+      padding: 20px 22px 18px;
+    }
+
+    .header-shell {
+      display: grid;
+      gap: 14px;
+    }
+
+    .header-top {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.95fr);
+      gap: 14px;
+      align-items: start;
+      min-width: 0;
+    }
+
+    .header-intro {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--header-soft);
+    }
+
+    .title {
+      margin: 0;
+      font-size: 36px;
+      line-height: 1;
+      overflow-wrap: anywhere;
+      font-family: var(--font-strong);
+      letter-spacing: 0;
+      max-width: 820px;
+    }
+
+    .subtitle {
+      margin: 0;
+      max-width: 760px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--header-soft);
+      overflow-wrap: anywhere;
+    }
+
+    .meta-panel {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--hero-border);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), var(--hero-panel));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .meta-grid {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .meta-item {
+      display: grid;
+      gap: 3px;
+      padding: 10px 11px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      min-width: 0;
+    }
+
+    .meta-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--header-soft-2);
+    }
+
+    .meta-item strong {
+      color: var(--header-strong);
+      font-size: 13px;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+
+    .decision-box {
+      display: grid;
+      gap: 6px;
+    }
+
+    .decision-title {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--header-soft-2);
+    }
+
+    .decision-list {
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      list-style: none;
+      color: var(--header-soft);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .decision-list li {
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .filters-shell {
+      display: grid;
+      gap: 10px;
+      padding: 12px 14px 13px;
+      border-radius: 8px;
+      border: 1px solid var(--hero-border);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(5, 14, 26, 0.11));
+    }
+
+    .filters-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .filters-kicker {
+      margin: 0 0 5px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--header-soft-2);
+    }
+
+    .filters-title {
+      margin: 0;
+      font-size: 14px;
+      font-family: var(--font-strong);
+      color: var(--header-strong);
+      line-height: 1.35;
+      max-width: 620px;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .filter {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .filter label {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--header-soft);
+    }
+
+    .filter input,
+    .filter select {
+      min-height: 38px;
+      width: 100%;
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      background: var(--input-bg);
+      color: var(--input-ink);
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      min-width: 0;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    }
+
+    .filter input:focus,
+    .filter select:focus,
+    .action-btn:focus-visible {
+      outline: none;
+      border-color: color-mix(in srgb, var(--brand-3) 68%, white 32%);
+      box-shadow: 0 0 0 3px rgba(151, 191, 216, 0.20);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      min-height: 36px;
+      border-radius: 999px;
+      border: 1px solid var(--toggle-border);
+      background: var(--toggle-bg);
+      color: var(--toggle-ink);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 7px 13px;
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease, background 0.2s ease;
+    }
+
+    .action-btn:hover {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
+    }
+
+    .scope-note {
+      font-size: 11px;
+      color: var(--header-soft);
+      padding-top: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 20;
+      transform: translateY(-140%);
+      border-radius: 6px;
+      background: #ffffff;
+      color: #0d1726;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+      outline: 3px solid #7db9de;
+      outline-offset: 2px;
+    }
+
+    .command-center {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      gap: 0;
+      overflow: hidden;
+    }
+
+    .command-primary {
+      padding: 18px;
+      background: linear-gradient(180deg, var(--surface), var(--surface-soft));
+      display: grid;
+      gap: 14px;
+    }
+
+    .command-kicker,
+    .card-kicker {
+      margin: 0;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-subtle);
+    }
+
+    .command-title {
+      margin: 0;
+      font-family: var(--font-strong);
+      font-size: 28px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .command-copy {
+      margin: 0;
+      max-width: 880px;
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .command-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .decision-card,
+    .action-card,
+    .metric-card,
+    .summary-card,
+    .kpi-card,
+    .chart-card,
+    .table-card,
+    .mini-card {
+      border-radius: 8px;
+    }
+
+    .decision-card {
+      border: 1px solid var(--border);
+      background: var(--surface-elev);
+      padding: 13px;
+      min-width: 0;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .decision-card strong {
+      display: block;
+      margin-top: 6px;
+      color: var(--ink);
+      font-family: var(--font-strong);
+      font-size: 20px;
+      line-height: 1.05;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+
+    .decision-card span {
+      display: block;
+      margin-top: 7px;
+      color: var(--ink-soft);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      min-height: 26px;
+      border-radius: 999px;
+      padding: 4px 10px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface-strong);
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .status-chip.danger {
+      color: var(--danger);
+      background: var(--danger-soft);
+      border-color: rgba(183, 58, 50, 0.24);
+    }
+
+    .command-actions {
+      padding: 18px;
+      border-left: 1px solid var(--border);
+      background: var(--surface-strong);
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .priority-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 9px;
+    }
+
+    .priority-list li {
+      padding: 10px 11px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--brand-2);
+      border-radius: 8px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .priority-list strong {
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.25;
+    }
+
+    .priority-list span {
+      color: var(--ink-soft);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .summary-card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), var(--surface-elev) 100%);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--brand-2);
+      border-radius: 8px;
+      padding: 14px 15px;
+      min-height: 102px;
+      overflow: hidden;
+      box-shadow: var(--shadow-soft);
+    }
+    .summary-card.summary-card-1 { border-top-color: #184e77; }
+    .summary-card.summary-card-2 { border-top-color: #a33333; }
+    .summary-card.summary-card-3 { border-top-color: #0b7a70; }
+    .summary-card.summary-card-4 { border-top-color: #a46414; }
+
+    .summary-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .summary-index {
+      display: inline-grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      flex: 0 0 30px;
+      border-radius: 8px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      color: var(--brand);
+      font-family: var(--font-strong);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .summary-title {
+      margin: 0;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
+      font-weight: 700;
+    }
+
+    .summary-body {
+      margin: 10px 0 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--ink);
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .section-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+      align-items: flex-end;
+      gap: 14px;
+      background: linear-gradient(180deg, var(--surface-strong), var(--surface-soft) 100%);
+      padding: 15px 18px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-heading {
+      display: grid;
+      gap: 4px;
+    }
+
+    .section-kicker {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-subtle);
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.08;
+      font-family: var(--font-strong);
+    }
+
+    .section-subtitle {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--ink-soft);
+      max-width: 600px;
+      overflow-wrap: anywhere;
+      justify-self: end;
+    }
+
+    .kpi-grid {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .kpi-card {
+      grid-column: span 3;
+      border: 1px solid var(--border);
+      border-top: 3px solid transparent;
+      border-radius: 8px;
+      padding: 14px 15px 13px;
+      min-height: 132px;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), var(--surface-elev) 100%);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .kpi-grid .kpi-card:nth-child(n + 5) { grid-column: span 4; }
+    .kpi-card.kpi-primary { border-top-color: #133e64; }
+    .kpi-card.kpi-danger { border-top-color: #b53a32; }
+    .kpi-card.kpi-warning { border-top-color: #aa6a12; }
+    .kpi-card.kpi-success { border-top-color: #0c7d72; }
+
+    .kpi-label {
+      position: relative;
+      z-index: 1;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .kpi-value {
+      position: relative;
+      z-index: 1;
+      margin-top: 8px;
+      font-size: 32px;
+      line-height: 0.96;
+      color: var(--brand);
+      font-family: var(--font-strong);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+
+    .kpi-note {
+      position: relative;
+      z-index: 1;
+      margin-top: 8px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--ink-soft);
+      overflow-wrap: anywhere;
+    }
+
+    .kpi-delta {
+      position: relative;
+      z-index: 1;
+      margin-top: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      overflow-wrap: anywhere;
+    }
+
+    .kpi-interpretation,
+    .chart-insight {
+      margin-top: 9px;
+      padding-top: 9px;
+      border-top: 1px solid var(--border);
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .delta-up { color: #b91c1c; }
+    .delta-down { color: #166534; }
+    .delta-flat { color: #667085; }
+
+    .chart-grid-2,
+    .chart-grid-4,
+    .chart-grid-risk {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .chart-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .chart-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .chart-grid-risk { grid-template-columns: 1.1fr 0.9fr; }
+
+    .chart-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), var(--surface-elev) 100%);
+      min-width: 0;
+      overflow: hidden;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .chart-head {
+      display: grid;
+      gap: 4px;
+      margin-bottom: 10px;
+      min-width: 0;
+    }
+
+    .chart-kicker {
+      margin: 0;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
+      font-weight: 700;
+    }
+
+    .chart-title {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+      color: var(--ink);
+      font-family: var(--font-strong);
+      font-weight: 700;
+      overflow-wrap: anywhere;
+      letter-spacing: 0.01em;
+    }
+
+    .chart-note {
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--ink-soft);
+      overflow-wrap: anywhere;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      height: 286px;
+      min-width: 0;
+      min-height: 286px;
+    }
+
+    .canvas-wrap.tall {
+      height: 336px;
+      min-height: 336px;
+    }
+
+    .diagnostic-metrics {
+      padding: 0 18px 18px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 13px;
+      min-height: 92px;
+      overflow: hidden;
+      background: linear-gradient(180deg, var(--surface-soft), var(--surface-elev) 100%);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .metric-card h5 {
+      margin: 0;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
+    }
+
+    .metric-card p {
+      margin: 8px 0 0;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--ink);
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .risk-layout {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+      min-width: 0;
+    }
+
+    .table-card,
+    .mini-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), var(--surface-elev) 100%);
+      min-width: 0;
+      overflow: hidden;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .table-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 15px;
+      border-bottom: 1px solid var(--border);
+      color: var(--ink);
+      overflow-wrap: anywhere;
+      background: linear-gradient(180deg, var(--surface-strong), var(--surface-soft));
+    }
+
+    .table-head-block {
+      display: grid;
+      gap: 4px;
+    }
+
+    .table-overline {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
+      font-weight: 700;
+    }
+
+    .table-head-label {
+      font-size: 16px;
+      line-height: 1.2;
+      font-family: var(--font-strong);
+      font-weight: 700;
+    }
+
+    .table-head-note {
+      font-size: 12px;
+      color: var(--ink-soft);
+      text-align: right;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 460px;
+      width: 100%;
+      min-width: 0;
+      scrollbar-gutter: stable;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 860px;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--thead-bg);
+      border-bottom: 1px solid var(--border);
+      color: var(--ink-subtle);
+      text-align: left;
+      padding: 11px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+    }
+
+    tbody td {
+      border-bottom: 1px solid var(--table-row-border);
+      padding: 9px 10px;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    tbody tr:nth-child(even) { background: var(--row-alt); }
+    tbody tr:hover { background: rgba(58, 109, 144, 0.05); }
+
+    #priorityTable th:nth-child(3),
+    #priorityTable th:nth-child(4),
+    #priorityTable th:nth-child(5),
+    #priorityTable th:nth-child(6),
+    #priorityTable td:nth-child(3),
+    #priorityTable td:nth-child(4),
+    #priorityTable td:nth-child(5),
+    #priorityTable td:nth-child(6) {
+      text-align: right;
+    }
+
+    .risk-side {
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .mini-card-body {
+      padding: 13px 14px 14px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .mini-kicker {
+      margin: 0;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-subtle);
+    }
+
+    .mini-note {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--ink-soft);
+    }
+
+    .stacked-tier {
+      width: 100%;
+      height: 16px;
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+      border: 1px solid var(--stack-border);
+      margin-top: 2px;
+      background: var(--surface-soft);
+    }
+
+    .stacked-tier > div { height: 100%; min-width: 2px; }
+
+    .tier-legend {
+      margin-top: 4px;
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      font-size: 12px;
+      color: var(--ink-soft);
+    }
+
+    .pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      margin-right: 6px;
+    }
+
+    .tier-critical { background: #8e1b1b; }
+    .tier-high { background: #c0392b; }
+    .tier-medium { background: #d4a20f; color: #0f172a; }
+    .tier-low { background: #1f78b4; }
+    .tier-churned { background: #475467; }
+
+    .actions-grid {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .action-card {
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--brand-2);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 152px;
+      overflow: hidden;
+      background: linear-gradient(180deg, var(--surface-soft), var(--surface-elev) 100%);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .action-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .action-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .action-card h5 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.25;
+      color: var(--ink);
+      font-family: var(--font-strong);
+      text-transform: capitalize;
+      overflow-wrap: anywhere;
+    }
+
+    .action-primary {
+      font-family: var(--font-strong);
+      font-size: 26px;
+      line-height: 1;
+      color: var(--brand);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .action-primary-note {
+      margin-top: 5px;
+      font-size: 11px;
+      color: var(--ink-soft);
+    }
+
+    .action-card .meta {
+      margin-top: 10px;
+      text-align: left;
+      white-space: normal;
+      color: var(--ink-soft);
+      display: grid;
+      gap: 5px;
+      font-size: 11px;
+    }
+
+    .footer {
+      padding: 14px 16px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--ink-soft);
+      overflow-wrap: anywhere;
+      background: linear-gradient(180deg, var(--surface-strong), var(--surface-soft));
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
+      gap: 14px;
+    }
+
+    .footer strong {
+      color: var(--ink);
+    }
+
+    .footer-note {
+      padding-left: 14px;
+      border-left: 1px solid var(--border-strong);
+    }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    .sr-only {
+      position: fixed;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    @media (max-width: 1580px) {
+      .filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .kpi-grid {
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+      }
+      .kpi-card { grid-column: span 2; }
+      .kpi-grid .kpi-card:nth-child(n + 5) { grid-column: span 4; }
+      .chart-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .actions-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 1200px) {
+      .header-top { grid-template-columns: 1fr; }
+      .command-center { grid-template-columns: 1fr; }
+      .command-actions {
+        border-left: 0;
+        border-top: 1px solid var(--border);
+      }
+      .meta-panel { grid-template-columns: 1fr; }
+      .decision-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .filters-head { align-items: flex-start; }
+      .chart-grid-2 { grid-template-columns: 1fr; }
+      .chart-grid-risk { grid-template-columns: 1fr; }
+      .risk-layout { grid-template-columns: 1fr; }
+      .risk-side { grid-template-rows: auto; }
+      .actions-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .diagnostic-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .footer-grid { grid-template-columns: 1fr; }
+      .footer-note {
+        padding-left: 0;
+        border-left: 0;
+        padding-top: 10px;
+        border-top: 1px solid var(--border-strong);
+      }
+    }
+
+    @media (max-width: 760px) {
+      .container { width: calc(100% - 16px); margin: 10px auto 16px; }
+      .header { padding: 16px; }
+      .header-shell,
+      .header-top,
+      .header-intro,
+      .meta-panel,
+      .filters-shell,
+      .command-center {
+        max-width: calc(100vw - 48px);
+      }
+      .title { font-size: 25px; line-height: 1.08; }
+      .command-title { font-size: 22px; }
+      .command-grid { grid-template-columns: 1fr; }
+      .filters { grid-template-columns: 1fr; }
+      .filter input,
+      .filter select {
+        max-width: calc(100vw - 64px);
+      }
+      .meta-grid { grid-template-columns: 1fr; }
+      .decision-list { grid-template-columns: 1fr; }
+      .summary-strip,
+      .chart-grid-4,
+      .diagnostic-metrics,
+      .actions-grid { grid-template-columns: 1fr; }
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+      .kpi-card,
+      .kpi-grid .kpi-card:nth-child(n + 5) {
+        grid-column: auto;
+      }
+      .section-header {
+        grid-template-columns: 1fr;
+        align-items: flex-start;
+      }
+      .section-subtitle { justify-self: start; }
+      .canvas-wrap { height: 260px; min-height: 260px; }
+      .canvas-wrap.tall { height: 300px; min-height: 300px; }
+      table { min-width: 760px; }
+    }
+
+    @media (max-width: 520px) {
+      .container {
+        width: min(calc(100% - 16px), 374px);
+        max-width: 374px;
+        margin-left: 8px;
+        margin-right: 0;
+      }
+
+      .header-shell,
+      .header-top,
+      .header-intro,
+      .meta-panel,
+      .filters-shell,
+      .command-center {
+        max-width: 326px;
+      }
+
+      .filter input,
+      .filter select {
+        max-width: 310px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #0b1320;
+      }
+
+      .container {
+        width: 100%;
+        margin: 0;
+        gap: 12px;
+      }
+
+      .panel {
+        box-shadow: none;
+        border-color: #cbd5e1;
+        page-break-inside: avoid;
+      }
+
+      .filters,
+      .header-actions,
+      .scope-note { display: none !important; }
+
+      .header {
+        padding: 16px;
+        border: 1px solid #cbd5e1;
+      }
+
+      .summary-strip,
+      .kpi-grid,
+      .chart-grid-2,
+      .chart-grid-4,
+      .chart-grid-risk,
+      .risk-layout,
+      .actions-grid,
+      .diagnostic-metrics {
+        gap: 10px;
+      }
+
+      .chart-card,
+      .kpi-card,
+      .summary-card,
+      .metric-card,
+      .action-card,
+      .table-card,
+      .mini-card {
+        box-shadow: none;
+        border-color: #cbd5e1;
+      }
+
+      .canvas-wrap,
+      .canvas-wrap.tall {
+        height: 260px;
+        min-height: 260px;
+      }
+
+      table {
+        min-width: 0;
+        font-size: 10px;
+      }
+
+      thead th,
+      tbody td { padding: 6px; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to dashboard</a>
+  <main id="main-content" class="container">
+    <section class="panel header" aria-labelledby="dashboardTitle">
+      <div class="header-shell">
+        <div class="header-top">
+          <div class="header-intro">
+            <p class="eyebrow">Executive Retention System</p>
+            <h1 class="title" id="dashboardTitle">Churn & Retention Command Center</h1>
+            <p class="subtitle">A decision surface for revenue protection. Use it to pinpoint where churn is concentrating, how much MRR is exposed, and which accounts should move first into intervention.</p>
+          </div>
+          <aside class="meta-panel">
+            <div class="meta-grid">
+              <div class="meta-item"><span class="meta-label">Available period</span><strong id="coverageText"></strong></div>
+              <div class="meta-item"><span class="meta-label">Selected period</span><strong id="selectedPeriodText"></strong></div>
+            </div>
+            <div class="decision-box">
+              <p class="decision-title">Decision focus</p>
+              <ul class="decision-list">
+                <li>Locate the segments and channels where churn is accelerating.</li>
+                <li>Quantify revenue exposure before it becomes realized loss.</li>
+                <li>Translate diagnosis into a ranked intervention queue.</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+
+        <div class="filters-shell">
+          <div class="filters-head">
+            <div>
+              <p class="filters-kicker">Scope Controls</p>
+              <h2 class="filters-title">Re-cut the story by date, segment, region, channel, plan, and risk tier.</h2>
+            </div>
+            <div class="header-actions">
+              <button id="themeToggle" class="action-btn" type="button">Dark Mode</button>
+              <button id="printBtn" class="action-btn" type="button">Print</button>
+            </div>
+          </div>
+          <div class="filters">
+            <div class="filter"><label for="filterStartMonth">Date Start</label><input type="date" id="filterStartMonth" /></div>
+            <div class="filter"><label for="filterEndMonth">Date End</label><input type="date" id="filterEndMonth" /></div>
+            <div class="filter">
+              <label for="filterPeriodPreset">Period Preset</label>
+              <select id="filterPeriodPreset">
+                <option value="all">All period</option>
+                <option value="12m">Last 12 months</option>
+                <option value="6m">Last 6 months</option>
+                <option value="3m">Last 3 months</option>
+                <option value="custom">Custom range</option>
+              </select>
+            </div>
+            <div class="filter"><label for="filterSegment">Segment</label><select id="filterSegment"></select></div>
+            <div class="filter"><label for="filterRegion">Region</label><select id="filterRegion"></select></div>
+            <div class="filter"><label for="filterChannel">Acquisition Channel</label><select id="filterChannel"></select></div>
+            <div class="filter"><label for="filterPlan">Plan Type</label><select id="filterPlan"></select></div>
+            <div class="filter"><label for="filterRiskTier">Risk Tier</label><select id="filterRiskTier"></select></div>
+          </div>
+          <div class="scope-note" id="scopeNote"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel command-center" aria-labelledby="decisionTitle">
+      <div class="command-primary">
+        <div>
+          <p class="command-kicker">Decision first</p>
+          <h2 class="command-title" id="decisionTitle">What needs leadership attention now?</h2>
+          <p class="command-copy" id="decisionNarrative"></p>
+        </div>
+        <div class="command-grid" aria-label="Decision metrics">
+          <div class="decision-card">
+            <p class="card-kicker">Criticality</p>
+            <strong id="decisionCriticality"></strong>
+            <span id="decisionCriticalityNote"></span>
+          </div>
+          <div class="decision-card">
+            <p class="card-kicker">Revenue exposure</p>
+            <strong id="decisionExposure"></strong>
+            <span id="decisionExposureNote"></span>
+          </div>
+          <div class="decision-card">
+            <p class="card-kicker">Primary bottleneck</p>
+            <strong id="decisionBottleneck"></strong>
+            <span id="decisionBottleneckNote"></span>
+          </div>
+        </div>
+      </div>
+      <aside class="command-actions" aria-labelledby="actionRequiredTitle">
+        <span class="status-chip danger" id="validationBadge"></span>
+        <div>
+          <p class="command-kicker">Action required</p>
+          <h3 class="chart-title" id="actionRequiredTitle">Prioritize the highest recoverable MRR first</h3>
+        </div>
+        <ul class="priority-list" id="priorityActionList"></ul>
+      </aside>
+    </section>
+
+    <section class="summary-strip" id="summaryStrip"></section>
+
+    <section class="panel">
+      <div class="section-header">
+        <div class="section-heading">
+          <p class="section-kicker">Portfolio Pulse</p>
+          <h3 class="section-title">KPI Snapshot</h3>
+        </div>
+        <p class="section-subtitle">Official decision metrics for the selected date window and current commercial scope.</p>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card kpi-primary"><div class="kpi-label">Recoverable Accounts</div><div class="kpi-value" id="kpiActive"></div><div class="kpi-note" id="kpiActiveNote"></div><div class="kpi-delta" id="kpiActiveDelta"></div><div class="kpi-interpretation" id="kpiActiveInterpretation"></div></div>
+        <div class="kpi-card kpi-danger"><div class="kpi-label">Selected-Period Customer Churn</div><div class="kpi-value" id="kpiCustChurn"></div><div class="kpi-note" id="kpiCustChurnNote"></div><div class="kpi-delta" id="kpiCustChurnDelta"></div><div class="kpi-interpretation" id="kpiCustChurnInterpretation"></div></div>
+        <div class="kpi-card kpi-danger"><div class="kpi-label">Selected-Period Revenue Churn</div><div class="kpi-value" id="kpiRevChurn"></div><div class="kpi-note" id="kpiRevChurnNote"></div><div class="kpi-delta" id="kpiRevChurnDelta"></div><div class="kpi-interpretation" id="kpiRevChurnInterpretation"></div></div>
+        <div class="kpi-card kpi-warning"><div class="kpi-label">Revenue at Risk</div><div class="kpi-value" id="kpiRevRisk"></div><div class="kpi-note" id="kpiRevRiskNote"></div><div class="kpi-delta" id="kpiRevRiskDelta"></div><div class="kpi-interpretation" id="kpiRevRiskInterpretation"></div></div>
+        <div class="kpi-card kpi-warning"><div class="kpi-label">High-Risk Customers</div><div class="kpi-value" id="kpiHighRisk"></div><div class="kpi-note" id="kpiHighRiskNote"></div><div class="kpi-delta" id="kpiHighRiskDelta"></div><div class="kpi-interpretation" id="kpiHighRiskInterpretation"></div></div>
+        <div class="kpi-card kpi-danger"><div class="kpi-label">Critical-Risk Customers</div><div class="kpi-value" id="kpiCriticalRisk"></div><div class="kpi-note" id="kpiCriticalRiskNote"></div><div class="kpi-delta" id="kpiCriticalRiskDelta"></div><div class="kpi-interpretation" id="kpiCriticalRiskInterpretation"></div></div>
+        <div class="kpi-card kpi-primary"><div class="kpi-label">Avg Priority Score</div><div class="kpi-value" id="kpiAvgPriority"></div><div class="kpi-note" id="kpiAvgPriorityNote"></div><div class="kpi-delta" id="kpiAvgPriorityDelta"></div><div class="kpi-interpretation" id="kpiAvgPriorityInterpretation"></div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-header">
+        <div class="section-heading">
+          <p class="section-kicker">Executive Trendline</p>
+          <h3 class="section-title">Primary Retention</h3>
+        </div>
+        <p class="section-subtitle">Signals for volume loss, value loss, and cohort durability inside the selected time window.</p>
+      </div>
+      <div class="chart-grid-2">
+        <div class="chart-card">
+          <div class="chart-head">
+            <p class="chart-kicker">Trend signal</p>
+            <h4 class="chart-title">Is account churn accelerating inside the selected window?</h4>
+            <p class="chart-note">Monthly churn intensity on the customer base active at period start.</p>
+          </div>
+          <div class="canvas-wrap"><canvas id="chartCustomerChurnTrend" role="img" aria-label="Line chart of monthly customer churn rate"></canvas></div>
+          <p class="chart-insight" id="insightCustomerChurn"></p>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <p class="chart-kicker">Trend signal</p>
+            <h4 class="chart-title">Is value leakage moving differently from account churn?</h4>
+            <p class="chart-note">Value leakage rate across the selected monthly revenue base.</p>
+          </div>
+          <div class="canvas-wrap"><canvas id="chartRevenueChurnTrend" role="img" aria-label="Line chart of monthly revenue churn rate"></canvas></div>
+          <p class="chart-insight" id="insightRevenueChurn"></p>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <p class="chart-kicker">Cohort durability</p>
+            <h4 class="chart-title">Are recent cohorts retaining after first value?</h4>
+            <p class="chart-note">Recent cohorts tracked by age so you can separate fresh softness from structural deterioration.</p>
+          </div>
+          <div class="canvas-wrap tall"><canvas id="chartCohortRetention" role="img" aria-label="Line chart of customer retention curves by cohort age"></canvas></div>
+          <p class="chart-insight" id="insightCohortRetention"></p>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <p class="chart-kicker">Cohort durability</p>
+            <h4 class="chart-title">Which cohorts are preserving revenue least well?</h4>
+            <p class="chart-note">Latest observed revenue retention across the most recent cohort set.</p>
+          </div>
+          <div class="canvas-wrap tall"><canvas id="chartRevenueRetentionCohort" role="img" aria-label="Bar chart of revenue retention by cohort"></canvas></div>
+          <p class="chart-insight" id="insightRevenueRetentionCohort"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-header">
+        <div class="section-heading">
+          <p class="section-kicker">Driver Diagnosis</p>
+          <h3 class="section-title">Diagnostic View</h3>
+        </div>
+        <p class="section-subtitle">Commercial concentration, behavioral deterioration, and customer quality gaps that explain the headline churn picture.</p>
+      </div>
+      <div class="chart-grid-4">
+        <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Commercial mix</p><h4 class="chart-title">Which segment is the highest churn hotspot?</h4><p class="chart-note">Shows which customer segments are losing the most accounts relative to their own base.</p></div><div class="canvas-wrap"><canvas id="chartChurnSegment" role="img" aria-label="Bar chart of churn rate by segment"></canvas></div><p class="chart-insight" id="insightChurnSegment"></p></div>
+        <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Commercial mix</p><h4 class="chart-title">Which region needs operational escalation?</h4><p class="chart-note">Compares churn intensity across regional portfolios inside the current scope.</p></div><div class="canvas-wrap"><canvas id="chartChurnRegion" role="img" aria-label="Bar chart of churn rate by region"></canvas></div><p class="chart-insight" id="insightChurnRegion"></p></div>
+        <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Commercial mix</p><h4 class="chart-title">Which acquisition channel is creating retention debt?</h4><p class="chart-note">Highlights acquisition channels that are under-delivering on retention quality.</p></div><div class="canvas-wrap"><canvas id="chartChurnChannel" role="img" aria-label="Bar chart of churn rate by acquisition channel"></canvas></div><p class="chart-insight" id="insightChurnChannel"></p></div>
+        <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Commercial mix</p><h4 class="chart-title">Which plan type is most exposed?</h4><p class="chart-note">Shows whether pricing or packaging structure is associated with faster customer loss.</p></div><div class="canvas-wrap"><canvas id="chartChurnPlan" role="img" aria-label="Bar chart of churn rate by plan type"></canvas></div><p class="chart-insight" id="insightChurnPlan"></p></div>
+      </div>
+      <div class="diagnostic-metrics">
+        <div class="metric-card"><h5>Usage Trend</h5><p id="diagUsage"></p></div>
+        <div class="metric-card"><h5>Support Burden</h5><p id="diagSupport"></p></div>
+        <div class="metric-card"><h5>Failed Payment Rate</h5><p id="diagFailed"></p></div>
+        <div class="metric-card"><h5>NPS Gap</h5><p id="diagNps"></p></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-header">
+        <div class="section-heading">
+          <p class="section-kicker">Intervention Queue</p>
+          <h3 class="section-title">Risk Prioritization</h3>
+        </div>
+        <p class="section-subtitle">The ranked queue that should drive revenue protection meetings, save motions, and customer triage.</p>
+      </div>
+      <div class="risk-layout">
+        <div class="table-card">
+          <div class="table-head">
+            <div class="table-head-block">
+              <span class="table-overline">Priority table</span>
+              <span class="table-head-label">Ranked High-Priority Customers</span>
+            </div>
+            <span class="table-head-note">Live sort on every column.</span>
+          </div>
+          <div class="table-wrap">
+            <table id="priorityTable">
+              <caption class="sr-only">Ranked active customers by retention priority, current MRR, risk scores, main risk driver, and recommended action.</caption>
+              <thead>
+                <tr>
+                  <th data-sort="customer_id">customer_id</th>
+                  <th data-sort="segment">segment</th>
+                  <th data-sort="current_mrr">current_mrr</th>
+                  <th data-sort="churn_risk_score">churn_risk_score</th>
+                  <th data-sort="revenue_risk_score">revenue_risk_score</th>
+                  <th data-sort="retention_priority_score">retention_priority_score</th>
+                  <th data-sort="main_risk_driver">main_risk_driver</th>
+                  <th data-sort="recommended_action">recommended_action</th>
+                </tr>
+              </thead>
+              <tbody id="priorityTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="risk-side">
+          <div class="mini-card">
+            <div class="mini-card-body">
+            <p class="mini-kicker">Coverage mix</p>
+            <h4 class="chart-title">How much of the queue is intervention-grade?</h4>
+            <p class="mini-note">Shows how the current scope is split between monitoring, intervention, and already churned customers.</p>
+            <div class="stacked-tier" id="riskTierStack"></div>
+            <div class="tier-legend" id="riskTierLegend"></div>
+            </div>
+          </div>
+          <div class="chart-grid-risk" style="padding:0;">
+            <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Driver mix</p><h4 class="chart-title">What is the dominant reason accounts enter the queue?</h4><p class="chart-note">Most common reasons behind high-priority accounts inside the current lens.</p></div><div class="canvas-wrap"><canvas id="chartRiskDrivers" role="img" aria-label="Horizontal bar chart of top risk drivers"></canvas></div><p class="chart-insight" id="insightRiskDrivers"></p></div>
+            <div class="chart-card"><div class="chart-head"><p class="chart-kicker">Revenue exposure</p><h4 class="chart-title">Which segment carries the largest exposed MRR?</h4><p class="chart-note">Where current revenue exposure is concentrated and where executive attention should escalate first.</p></div><div class="canvas-wrap"><canvas id="chartRevenueRiskSegment" role="img" aria-label="Bar chart of revenue at risk by segment"></canvas></div><p class="chart-insight" id="insightRevenueRiskSegment"></p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-header">
+        <div class="section-heading">
+          <p class="section-kicker">Execution Lens</p>
+          <h3 class="section-title">Action Orientation</h3>
+        </div>
+        <p class="section-subtitle">Execution playbooks grouped by customer count, MRR coverage, and average intervention priority.</p>
+      </div>
+      <div class="actions-grid" id="actionsGrid"></div>
+    </section>
+
+    <section class="panel footer">
+      <div class="footer-grid">
+        <div><strong>Presentation note:</strong> Use this view to align leadership on retention health, value leakage, and the next accounts that deserve intervention.</div>
+        <div class="footer-note"><strong>Caveat:</strong> Cohort views remain portfolio-level inside the selected date window; commercial and risk filters apply to trend, diagnostic, and prioritization surfaces.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+__CHART_JS__
+  </script>
+  <script>
+const DATA = __DATA_JSON__;
+const ALL = '__all__';
+const THEME_KEY = 'cri_dashboard_theme';
+const charts = {};
+const tableSortState = { key: 'retention_priority_score', dir: 'desc' };
+const MONTHS = DATA.months || [];
+const DIM_INDEX = {
+  segment: new Map((DATA.domains.segment || []).map((v, i) => [v, i])),
+  region: new Map((DATA.domains.region || []).map((v, i) => [v, i])),
+  acquisition_channel: new Map((DATA.domains.acquisition_channel || []).map((v, i) => [v, i])),
+  plan_type: new Map((DATA.domains.plan_type || []).map((v, i) => [v, i])),
+};
+
+const numFmt = new Intl.NumberFormat('en-US');
+const curFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const cur2Fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pctFmt = new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+function pct(v) { return Number.isFinite(v) ? pctFmt.format(v) : 'n/a'; }
+function money(v) { return Number.isFinite(v) ? curFmt.format(v) : 'n/a'; }
+function money2(v) { return Number.isFinite(v) ? cur2Fmt.format(v) : 'n/a'; }
+function num(v, d = 1) { return Number.isFinite(v) ? Number(v).toFixed(d) : 'n/a'; }
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function currentTheme() {
+  return document.body.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+function resolveInitialTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'dark' || saved === 'light') return saved;
+  } catch (e) {}
+  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+
+function applyTheme(theme) {
+  const next = theme === 'dark' ? 'dark' : 'light';
+  document.body.dataset.theme = next;
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = next === 'dark' ? 'Light Mode' : 'Dark Mode';
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+}
+
+function toggleTheme() {
+  applyTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+  renderDashboard();
+}
+
+function chartPalette() {
+  if (currentTheme() === 'dark') {
+    return {
+      text: '#dbe9f7',
+      muted: '#a6bdd6',
+      grid: 'rgba(163, 186, 211, 0.18)',
+      tooltipBg: '#0f1e30',
+      tooltipText: '#eaf3ff',
+      lineCustomer: '#f48d86',
+      areaCustomer: 'rgba(244, 141, 134, 0.22)',
+      lineRevenue: '#78c3f1',
+      areaRevenue: 'rgba(120, 195, 241, 0.22)',
+      cohort: ['#78c3f1', '#5ba8de', '#8bd3ff', '#6ec6d3', '#65b0ff', '#8daff0', '#a7d7ff', '#94e7d2'],
+      churnBars: ['#7cbde7', '#69acd9', '#5a9ccc', '#4d90c3'],
+      driverBar: '#6cb6e3',
+      driverBorder: '#7fc4ed',
+      riskBar: '#f48d86',
+      riskBorder: '#f5a49f',
+      retentionBar: 'rgba(104, 203, 186, 0.78)',
+      retentionBorder: '#67ceb6',
+    };
+  }
+  return {
+    text: '#334155',
+    muted: '#475569',
+    grid: 'rgba(51, 65, 85, 0.16)',
+    tooltipBg: '#1f2937',
+    tooltipText: '#f8fafc',
+    lineCustomer: '#b42318',
+    areaCustomer: 'rgba(180,35,24,0.16)',
+    lineRevenue: '#174f77',
+    areaRevenue: 'rgba(23,79,119,0.15)',
+    cohort: ['#0b3c5d', '#174f77', '#2f6f97', '#2e86c1', '#4fa0d1', '#70b5de', '#9bcced', '#bddff6'],
+    churnBars: ['#0b3c5d', '#174f77', '#2e86c1', '#4fa0d1'],
+    driverBar: '#174f77cc',
+    driverBorder: '#174f77',
+    riskBar: '#b42318cc',
+    riskBorder: '#b42318',
+    retentionBar: 'rgba(15,118,110,0.70)',
+    retentionBorder: '#0f766e',
+  };
+}
+
+function deltaClass(delta, invert = false) {
+  if (!Number.isFinite(delta) || Math.abs(delta) < 1e-9) return 'delta-flat';
+  if (!invert) return delta > 0 ? 'delta-up' : 'delta-down';
+  return delta > 0 ? 'delta-down' : 'delta-up';
+}
+
+function setDelta(id, text, delta = 0, invert = false) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = `kpi-delta ${deltaClass(delta, invert)}`;
+}
+
+function addOption(select, value, label) {
+  const opt = document.createElement('option');
+  opt.value = value;
+  opt.textContent = label;
+  select.appendChild(opt);
+}
+
+function monthToStartDate(month) {
+  return `${month}-01`;
+}
+
+function monthToEndDate(month) {
+  const [y, m] = month.split('-').map(Number);
+  const end = new Date(Date.UTC(y, m, 0));
+  return end.toISOString().slice(0, 10);
+}
+
+function dateToMonth(dateStr, fallbackMonth) {
+  if (!dateStr || dateStr.length < 7) return fallbackMonth;
+  return dateStr.slice(0, 7);
+}
+
+function setSelectedPeriodLabel(startDate, endDate) {
+  document.getElementById('selectedPeriodText').textContent = `${startDate} to ${endDate}`;
+}
+
+function applyPeriodPreset(preset) {
+  const startEl = document.getElementById('filterStartMonth');
+  const endEl = document.getElementById('filterEndMonth');
+  const coverageStart = DATA.meta.coverage_start_month;
+  const coverageEnd = DATA.meta.coverage_end_month;
+  const endIdx = Math.max(0, MONTHS.indexOf(coverageEnd));
+
+  let start = coverageStart;
+  if (preset === '12m') start = MONTHS[Math.max(0, endIdx - 11)] || coverageStart;
+  else if (preset === '6m') start = MONTHS[Math.max(0, endIdx - 5)] || coverageStart;
+  else if (preset === '3m') start = MONTHS[Math.max(0, endIdx - 2)] || coverageStart;
+  else if (preset === 'all') start = coverageStart;
+  else return;
+
+  startEl.value = monthToStartDate(start);
+  endEl.value = monthToEndDate(coverageEnd);
+  setSelectedPeriodLabel(startEl.value, endEl.value);
+}
+
+function populateFilters() {
+  const domains = DATA.domains;
+  const map = [
+    ['filterSegment', domains.segment],
+    ['filterRegion', domains.region],
+    ['filterChannel', domains.acquisition_channel],
+    ['filterPlan', domains.plan_type],
+    ['filterRiskTier', domains.risk_tier],
+  ];
+
+  map.forEach(([id, values]) => {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    addOption(el, 'all', 'All');
+    values.forEach(v => addOption(el, v, v));
+  });
+
+  document.getElementById('filterStartMonth').value = monthToStartDate(DATA.meta.coverage_start_month);
+  document.getElementById('filterEndMonth').value = monthToEndDate(DATA.meta.coverage_end_month);
+  document.getElementById('filterPeriodPreset').value = 'all';
+  document.getElementById('coverageText').textContent = `${DATA.meta.coverage_start_month} to ${DATA.meta.coverage_end_month}`;
+  setSelectedPeriodLabel(
+    document.getElementById('filterStartMonth').value,
+    document.getElementById('filterEndMonth').value,
+  );
+
+  document.getElementById('filterStartMonth').min = monthToStartDate(DATA.meta.coverage_start_month);
+  document.getElementById('filterStartMonth').max = monthToEndDate(DATA.meta.coverage_end_month);
+  document.getElementById('filterEndMonth').min = monthToStartDate(DATA.meta.coverage_start_month);
+  document.getElementById('filterEndMonth').max = monthToEndDate(DATA.meta.coverage_end_month);
+
+  ['filterSegment','filterRegion','filterChannel','filterPlan','filterRiskTier'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderDashboard);
+  });
+  document.getElementById('filterPeriodPreset').addEventListener('change', (e) => {
+    applyPeriodPreset(e.target.value);
+    renderDashboard();
+  });
+  document.getElementById('filterStartMonth').addEventListener('change', () => {
+    document.getElementById('filterPeriodPreset').value = 'custom';
+    renderDashboard();
+  });
+  document.getElementById('filterEndMonth').addEventListener('change', () => {
+    document.getElementById('filterPeriodPreset').value = 'custom';
+    renderDashboard();
+  });
+  document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+  document.querySelectorAll('#priorityTable thead th').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.getAttribute('data-sort');
+      if (!key) return;
+      if (tableSortState.key === key) {
+        tableSortState.dir = tableSortState.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        tableSortState.key = key;
+        tableSortState.dir = ['customer_id', 'segment', 'main_risk_driver', 'recommended_action'].includes(key) ? 'asc' : 'desc';
+      }
+      renderDashboard();
+    });
+  });
+}
+
+function getFilters() {
+  const startDate = document.getElementById('filterStartMonth').value;
+  const endDate = document.getElementById('filterEndMonth').value;
+  let startMonth = dateToMonth(startDate, DATA.meta.coverage_start_month);
+  let endMonth = dateToMonth(endDate, DATA.meta.coverage_end_month);
+  const f = {
+    startDate,
+    endDate,
+    startMonth,
+    endMonth,
+    periodPreset: document.getElementById('filterPeriodPreset').value,
+    segment: document.getElementById('filterSegment').value,
+    region: document.getElementById('filterRegion').value,
+    channel: document.getElementById('filterChannel').value,
+    plan: document.getElementById('filterPlan').value,
+    riskTier: document.getElementById('filterRiskTier').value,
+  };
+
+  if (f.startDate > f.endDate) {
+    f.endDate = f.startDate;
+    document.getElementById('filterEndMonth').value = f.endDate;
+    endMonth = dateToMonth(f.endDate, DATA.meta.coverage_end_month);
+    f.endMonth = endMonth;
+  }
+  setSelectedPeriodLabel(f.startDate, f.endDate);
+  return f;
+}
+
+function filterLabel(v) {
+  return v === 'all' ? ALL : v;
+}
+
+function monthInRange(month, startMonth, endMonth) {
+  return month >= startMonth && month <= endMonth;
+}
+
+function matchDims(row, filters) {
+  if (filters.segment !== 'all' && row.segment !== filters.segment) return false;
+  if (filters.region !== 'all' && row.region !== filters.region) return false;
+  if (filters.channel !== 'all' && row.acquisition_channel !== filters.channel) return false;
+  if (filters.plan !== 'all' && row.plan_type !== filters.plan) return false;
+  return true;
+}
+
+function getTrendRows(filters) {
+  const segIdx = filters.segment === 'all' ? null : DIM_INDEX.segment.get(filters.segment);
+  const regIdx = filters.region === 'all' ? null : DIM_INDEX.region.get(filters.region);
+  const chnIdx = filters.channel === 'all' ? null : DIM_INDEX.acquisition_channel.get(filters.channel);
+  const planIdx = filters.plan === 'all' ? null : DIM_INDEX.plan_type.get(filters.plan);
+
+  const monthAgg = new Map();
+  (DATA.monthly_fact_rows || []).forEach(row => {
+    const month = MONTHS[Number(row[0])];
+    if (!month || !monthInRange(month, filters.startMonth, filters.endMonth)) return;
+
+    if (segIdx !== null && Number(row[1]) !== segIdx) return;
+    if (regIdx !== null && Number(row[2]) !== regIdx) return;
+    if (chnIdx !== null && Number(row[3]) !== chnIdx) return;
+    if (planIdx !== null && Number(row[4]) !== planIdx) return;
+
+    if (!monthAgg.has(month)) {
+      monthAgg.set(month, {
+        month,
+        active_customers_start: 0,
+        active_mrr_start: 0,
+        churned_customers: 0,
+        churned_mrr: 0,
+      });
+    }
+    const cur = monthAgg.get(month);
+    cur.active_customers_start += Number(row[5] || 0);
+    cur.active_mrr_start += Number(row[6] || 0);
+    cur.churned_customers += Number(row[7] || 0);
+    cur.churned_mrr += Number(row[8] || 0);
+  });
+
+  return Array.from(monthAgg.values())
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map(r => ({
+      ...r,
+      customer_churn_rate: r.active_customers_start > 0 ? r.churned_customers / r.active_customers_start : 0,
+      revenue_churn_rate: r.active_mrr_start > 0 ? r.churned_mrr / r.active_mrr_start : 0,
+      retention_rate: r.active_customers_start > 0 ? 1 - (r.churned_customers / r.active_customers_start) : 0,
+    }));
+}
+
+function aggregateTrendRows(trendRows) {
+  const totals = trendRows.reduce((acc, row) => {
+    acc.active_customers_start += Number(row.active_customers_start || 0);
+    acc.active_mrr_start += Number(row.active_mrr_start || 0);
+    acc.churned_customers += Number(row.churned_customers || 0);
+    acc.churned_mrr += Number(row.churned_mrr || 0);
+    return acc;
+  }, { active_customers_start: 0, active_mrr_start: 0, churned_customers: 0, churned_mrr: 0 });
+
+  return {
+    ...totals,
+    customer_churn_rate: totals.active_customers_start > 0 ? totals.churned_customers / totals.active_customers_start : 0,
+    revenue_churn_rate: totals.active_mrr_start > 0 ? totals.churned_mrr / totals.active_mrr_start : 0,
+  };
+}
+
+function renderDecisionBoard(filters, trendRows, riskKpi, scoredRows, snapshotRows) {
+  const interventions = DATA.intervention_priorities || [];
+  const topPlay = interventions[0] || {};
+  const drivers = DATA.driver_ranking || [];
+  const topDriver = drivers[0] || {};
+  const segRows = compactCategories(groupByDimension(snapshotRows, 'segment'), 6);
+  const topSeg = segRows[0] || { label: 'n/a', churnRate: 0, count: 0 };
+  const critical = Number(riskKpi.critical_customers || 0);
+  const high = Number(riskKpi.high_risk_customers || 0);
+  const validation = DATA.validation_summary || {};
+  const revAtRisk = Number(riskKpi.revenue_at_risk || 0);
+  const totalMrr = Number(riskKpi.total_current_mrr || 0);
+  const shareRisk = totalMrr > 0 ? revAtRisk / totalMrr : 0;
+
+  const urgency = critical > 0 ? `${numFmt.format(critical)} critical accounts` : `${numFmt.format(high)} high-risk accounts`;
+  const action = topPlay.opportunity || 'Retention queue review';
+  setText('decisionNarrative', `${action} is the first operating move: it covers ${numFmt.format(Number(topPlay.recoverable_customers || 0))} recoverable accounts and ${money(Number(topPlay.recoverable_mrr || 0))} of recoverable MRR. Treat the charts below as explanation, not the starting point.`);
+  setText('decisionCriticality', urgency);
+  setText('decisionCriticalityNote', critical > 0 ? 'Immediate executive-save handling is required before scaled plays.' : 'No critical tier is present, but high-risk exposure is large enough for a weekly save desk.');
+  setText('decisionExposure', money(revAtRisk));
+  setText('decisionExposureNote', `${pct(shareRisk)} of scoped MRR is exposed by at-risk status or high/critical tier.`);
+  setText('decisionBottleneck', String(topDriver.driver || topSeg.label || 'n/a').replaceAll('_', ' '));
+  setText('decisionBottleneckNote', topDriver.churn_rate_lift ? `${num(Number(topDriver.churn_rate_lift || 0), 2)}x churn-rate lift; segment hotspot: ${topSeg.label} at ${pct(topSeg.churnRate)}.` : `Segment hotspot: ${topSeg.label} at ${pct(topSeg.churnRate)}.`);
+  setText('validationBadge', `${Number(validation.pass_checks || 0)}/${Number(validation.total_checks || 0)} checks pass`);
+
+  document.getElementById('priorityActionList').innerHTML = interventions.slice(0, 3).map((row, idx) => `
+    <li>
+      <strong>${idx + 1}. ${esc(row.opportunity)}: ${money(Number(row.recoverable_mrr || 0))} recoverable MRR</strong>
+      <span>${numFmt.format(Number(row.recoverable_customers || 0))} accounts; benchmark churn ${pct(Number(row.benchmark_churn_rate || 0))}; focus ${esc(row.segment_focus || 'n/a')}.</span>
+    </li>
+  `).join('');
+}
+
+function getRiskKpi(filters) {
+  const seg = filterLabel(filters.segment);
+  const reg = filterLabel(filters.region);
+  const chn = filterLabel(filters.channel);
+  const plan = filterLabel(filters.plan);
+  const tier = filterLabel(filters.riskTier);
+
+  const row = DATA.risk_kpi_cube.find(r =>
+    r.segment === seg &&
+    r.region === reg &&
+    r.acquisition_channel === chn &&
+    r.plan_type === plan &&
+    r.risk_tier_filter === tier
+  );
+
+  return row || {
+    scored_customers: 0,
+    total_current_mrr: 0,
+    revenue_at_risk: 0,
+    high_risk_customers: 0,
+    critical_customers: 0,
+    avg_priority_score: 0,
+  };
+}
+
+function getFilteredSnapshot(filters) {
+  return DATA.snapshot_agg.filter(r => {
+    if (!matchDims(r, filters)) return false;
+    if (filters.riskTier !== 'all' && r.risk_tier !== filters.riskTier) return false;
+    return true;
+  });
+}
+
+function getFilteredScored(filters) {
+  return DATA.scored_customers.filter(r => {
+    if (!matchDims(r, filters)) return false;
+    if (filters.riskTier !== 'all' && r.risk_tier !== filters.riskTier) return false;
+    return true;
+  });
+}
+
+function getCohortRows(filters) {
+  return DATA.cohort_rows
+    .filter(r => monthInRange(r.observation_month, filters.startMonth, filters.endMonth))
+    .map(r => ({
+      cohort_month: r.cohort_month,
+      age: Number(r.cohort_age_months || 0),
+      retention_rate: Number(r.retention_rate || 0),
+      revenue_retention: Number(r.revenue_retention || 0),
+      observation_month: r.observation_month,
+    }));
+}
+
+function upsertChart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  const el = document.getElementById(id);
+  charts[id] = new Chart(el, config);
+}
+
+function commonOptions(yPercent = false, horizontal = false, maxTicks = 10) {
+  const pal = chartPalette();
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    indexAxis: horizontal ? 'y' : 'x',
+    interaction: {
+      mode: horizontal ? 'nearest' : 'index',
+      axis: horizontal ? 'y' : 'x',
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        align: 'start',
+        labels: { boxWidth: 12, boxHeight: 12, padding: 16, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 11, weight: '600' }, color: pal.text },
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        backgroundColor: pal.tooltipBg,
+        titleColor: pal.tooltipText,
+        bodyColor: pal.tooltipText,
+        borderColor: pal.grid,
+        borderWidth: 1,
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          autoSkip: true,
+          maxTicksLimit: maxTicks,
+          minRotation: horizontal ? 0 : 0,
+          maxRotation: horizontal ? 0 : 35,
+          font: { size: 12 },
+          color: pal.text,
+        },
+        grid: { color: pal.grid, drawTicks: false },
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: pal.grid },
+        ticks: {
+          maxTicksLimit: 6,
+          font: { size: 12 },
+          color: pal.text,
+          callback: yPercent ? (v => `${(Number(v) * 100).toFixed(0)}%`) : undefined,
+        },
+      },
+    },
+  };
+}
+
+function groupByDimension(snapshotRows, dimension) {
+  const map = new Map();
+  snapshotRows.forEach(r => {
+    const k = String(r[dimension] || 'Unknown');
+    if (!map.has(k)) map.set(k, { label: k, total: 0, churned: 0 });
+    const cur = map.get(k);
+    const cnt = Number(r.customer_count || 0);
+    cur.total += cnt;
+    if (Number(r.churn_flag) === 1) cur.churned += cnt;
+  });
+
+  return Array.from(map.values())
+    .map(r => ({ label: r.label, churnRate: r.total > 0 ? r.churned / r.total : 0, count: r.total }))
+    .sort((a, b) => b.churnRate - a.churnRate);
+}
+
+function compactCategories(rows, limit = 10) {
+  if (rows.length <= limit) return rows;
+  const top = rows.slice(0, limit - 1);
+  const rest = rows.slice(limit - 1);
+  const other = {
+    label: 'Other',
+    count: rest.reduce((a, r) => a + Number(r.count || 0), 0),
+    churnRate: 0,
+  };
+  const total = rest.reduce((a, r) => a + Number(r.count || 0), 0);
+  if (total > 0) {
+    const churnWeighted = rest.reduce((a, r) => a + Number(r.count || 0) * Number(r.churnRate || 0), 0);
+    other.churnRate = churnWeighted / total;
+  }
+  return [...top, other];
+}
+
+function renderScopeNote(filters) {
+  const scope = document.getElementById('scopeNote');
+  const tierTxt = filters.riskTier === 'all' ? 'all tiers' : filters.riskTier;
+  scope.textContent = `Commercial filters update trends, diagnostics, the intervention queue, and action groupings. Cohort views remain portfolio-level inside the selected dates. Current risk lens: ${tierTxt}.`;
+}
+
+function renderSummary(filters, trendRows, riskKpi, scoredRows, snapshotRows) {
+  const strip = document.getElementById('summaryStrip');
+  const period = aggregateTrendRows(trendRows);
+
+  const segRows = compactCategories(groupByDimension(snapshotRows, 'segment'), 6);
+  const topSeg = segRows[0] || { label: 'n/a', churnRate: 0 };
+
+  const highCritical = scoredRows.filter(r => ['high', 'critical'].includes(r.risk_tier));
+  const hcShare = scoredRows.length ? highCritical.length / scoredRows.length : 0;
+  const hcMrr = highCritical.reduce((a, r) => a + Number(r.current_mrr || 0), 0);
+  const baseMrr = scoredRows.reduce((a, r) => a + Number(r.current_mrr || 0), 0);
+
+  const usageDeclineShare = highCritical.length
+    ? highCritical.filter(r => Number(r.usage_trend || 0) < 0).length / highCritical.length
+    : 0;
+
+  const insights = [
+    { title: 'Churn Concentration', body: `${topSeg.label} has highest churn in current scope (${pct(topSeg.churnRate)}).` },
+    { title: 'Value Leakage', body: `Selected-period customer churn ${pct(period.customer_churn_rate)} vs revenue churn ${pct(period.revenue_churn_rate)}.` },
+    { title: 'Risk Concentration', body: `${pct(hcShare)} of scoped customers are high/critical, covering ${pct(baseMrr > 0 ? hcMrr / baseMrr : 0)} of scoped MRR.` },
+    { title: 'Behavior + Surface', body: `${pct(usageDeclineShare)} of high/critical accounts show usage decline; ${numFmt.format(Number(riskKpi.scored_customers || 0))} scored accounts are in current intervention scope.` },
+  ];
+
+  strip.innerHTML = insights.map((i, idx) => `
+    <div class="summary-card summary-card-${idx + 1}">
+      <div class="summary-head">
+        <span class="summary-index">0${idx + 1}</span>
+        <p class="summary-title">${esc(i.title)}</p>
+      </div>
+      <p class="summary-body">${esc(i.body)}</p>
+    </div>
+  `).join('');
+}
+
+function updateKpis(trendRows, riskKpi) {
+  const last = trendRows[trendRows.length - 1] || {
+    active_customers_start: 0,
+    churned_customers: 0,
+    customer_churn_rate: 0,
+    revenue_churn_rate: 0,
+    month: 'n/a',
+  };
+  const prev = trendRows.length > 1 ? trendRows[trendRows.length - 2] : null;
+  const period = aggregateTrendRows(trendRows);
+
+  const active = Number(riskKpi.scored_customers || 0);
+  const customerChurn = Number(period.customer_churn_rate || 0);
+  const revenueChurn = Number(period.revenue_churn_rate || 0);
+
+  document.getElementById('kpiActive').textContent = numFmt.format(active);
+  document.getElementById('kpiActiveNote').textContent = `Active, scored customers in current commercial and risk scope.`;
+  setDelta(
+    'kpiActiveDelta',
+    `Excludes already churned accounts by design`,
+    0,
+    true
+  );
+  setText('kpiActiveInterpretation', 'Interpretation: this is the reachable account pool for retention operations, not historical churn volume.');
+
+  document.getElementById('kpiCustChurn').textContent = pct(customerChurn);
+  document.getElementById('kpiCustChurnNote').textContent = `${numFmt.format(Number(period.churned_customers || 0))} churn events across selected monthly denominators.`;
+  setDelta(
+    'kpiCustChurnDelta',
+    prev ? `latest month vs prior: ${((Number(last.customer_churn_rate || 0) - Number(prev.customer_churn_rate || 0)) * 100 >= 0 ? '+' : '')}${((Number(last.customer_churn_rate || 0) - Number(prev.customer_churn_rate || 0)) * 100).toFixed(1)} pp` : 'No prior month in selected range',
+    prev ? Number(last.customer_churn_rate || 0) - Number(prev.customer_churn_rate || 0) : 0
+  );
+  setText('kpiCustChurnInterpretation', 'Interpretation: use this as the volume-control metric; spikes point to onboarding, segment quality, or service issues.');
+
+  document.getElementById('kpiRevChurn').textContent = pct(revenueChurn);
+  document.getElementById('kpiRevChurnNote').textContent = `${money(Number(period.churned_mrr || 0))} churned MRR over selected monthly revenue base.`;
+  setDelta(
+    'kpiRevChurnDelta',
+    prev ? `latest month vs prior: ${((Number(last.revenue_churn_rate || 0) - Number(prev.revenue_churn_rate || 0)) * 100 >= 0 ? '+' : '')}${((Number(last.revenue_churn_rate || 0) - Number(prev.revenue_churn_rate || 0)) * 100).toFixed(1)} pp` : 'No prior month in selected range',
+    prev ? Number(last.revenue_churn_rate || 0) - Number(prev.revenue_churn_rate || 0) : 0
+  );
+  setText('kpiRevChurnInterpretation', 'Interpretation: compare against customer churn to separate low-value churn volume from high-value leakage.');
+
+  const revAtRisk = Number(riskKpi.revenue_at_risk || 0);
+  const totalMrr = Number(riskKpi.total_current_mrr || 0);
+  const shareRisk = totalMrr > 0 ? revAtRisk / totalMrr : 0;
+
+  document.getElementById('kpiRevRisk').textContent = money(revAtRisk);
+  document.getElementById('kpiRevRiskNote').textContent = `${pct(shareRisk)} of scoped MRR under risk criteria.`;
+  setDelta('kpiRevRiskDelta', `${numFmt.format(Number(riskKpi.scored_customers || 0))} scored customers in scope`, 0);
+  setText('kpiRevRiskInterpretation', 'Interpretation: this is the prevention budget target; prioritize where MRR and risk tier overlap.');
+
+  document.getElementById('kpiHighRisk').textContent = numFmt.format(Number(riskKpi.high_risk_customers || 0));
+  document.getElementById('kpiHighRiskNote').textContent = 'Tier = high + critical.';
+  setDelta('kpiHighRiskDelta', 'From governed risk KPI cube', 0);
+  setText('kpiHighRiskInterpretation', 'Interpretation: this is the operating queue for CS, billing, product adoption, and renewal motions.');
+
+  document.getElementById('kpiCriticalRisk').textContent = numFmt.format(Number(riskKpi.critical_customers || 0));
+  document.getElementById('kpiCriticalRiskNote').textContent = 'Priority >= 75 or severe risk + high revenue importance.';
+  setDelta('kpiCriticalRiskDelta', Number(riskKpi.critical_customers || 0) > 0 ? 'Executive save motion required' : 'No critical tier in current scope', Number(riskKpi.critical_customers || 0));
+  setText('kpiCriticalRiskInterpretation', 'Interpretation: if this is non-zero, handle before scaled lifecycle plays.');
+
+  document.getElementById('kpiAvgPriority').textContent = num(Number(riskKpi.avg_priority_score || 0), 1);
+  document.getElementById('kpiAvgPriorityNote').textContent = 'Average retention priority in current scope.';
+  setDelta('kpiAvgPriorityDelta', 'Weighted score from risk methodology', 0);
+  setText('kpiAvgPriorityInterpretation', 'Interpretation: rising average priority means the filtered scope needs deeper intervention per account.');
+}
+
+function renderPrimaryCharts(trendRows, cohortRows) {
+  const pal = chartPalette();
+  const labels = trendRows.map(r => r.month);
+  const period = aggregateTrendRows(trendRows);
+  const last = trendRows[trendRows.length - 1] || { customer_churn_rate: 0, revenue_churn_rate: 0, month: 'n/a' };
+  const first = trendRows[0] || last;
+  const customerDelta = Number(last.customer_churn_rate || 0) - Number(first.customer_churn_rate || 0);
+  const revenueDelta = Number(last.revenue_churn_rate || 0) - Number(first.revenue_churn_rate || 0);
+
+  upsertChart('chartCustomerChurnTrend', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Customer churn rate',
+        data: trendRows.map(r => Number(r.customer_churn_rate || 0)),
+        borderColor: pal.lineCustomer,
+        backgroundColor: pal.areaCustomer,
+        borderWidth: 2.1,
+        pointRadius: labels.length > 24 ? 0 : 2,
+        fill: true,
+        tension: 0.25,
+      }],
+    },
+    options: commonOptions(true, false, 12),
+  });
+  setText(
+    'insightCustomerChurn',
+    `Answer: selected-period customer churn is ${pct(Number(period.customer_churn_rate || 0))}; latest month is ${pct(Number(last.customer_churn_rate || 0))}, ${customerDelta >= 0 ? 'up' : 'down'} ${Math.abs(customerDelta * 100).toFixed(1)} pp from the first selected month.`
+  );
+
+  upsertChart('chartRevenueChurnTrend', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Revenue churn rate',
+        data: trendRows.map(r => Number(r.revenue_churn_rate || 0)),
+        borderColor: pal.lineRevenue,
+        backgroundColor: pal.areaRevenue,
+        borderWidth: 2.1,
+        pointRadius: labels.length > 24 ? 0 : 2,
+        fill: true,
+        tension: 0.25,
+      }],
+    },
+    options: commonOptions(true, false, 12),
+  });
+  setText(
+    'insightRevenueChurn',
+    `Answer: selected-period revenue churn is ${pct(Number(period.revenue_churn_rate || 0))}; latest month is ${pct(Number(last.revenue_churn_rate || 0))}, ${revenueDelta >= 0 ? 'up' : 'down'} ${Math.abs(revenueDelta * 100).toFixed(1)} pp from the first selected month.`
+  );
+
+  const cohortMap = new Map();
+  cohortRows.forEach(r => {
+    if (!cohortMap.has(r.cohort_month)) cohortMap.set(r.cohort_month, []);
+    cohortMap.get(r.cohort_month).push(r);
+  });
+
+  const cohortMonths = Array.from(cohortMap.keys()).sort().slice(-8);
+  const lineSets = cohortMonths.map((cohort, idx) => {
+    const rows = (cohortMap.get(cohort) || []).slice().sort((a, b) => a.age - b.age);
+    return {
+      label: cohort,
+      data: rows.map(r => ({ x: Number(r.age), y: Number(r.retention_rate || 0) })),
+      borderColor: pal.cohort[idx % pal.cohort.length],
+      backgroundColor: pal.cohort[idx % pal.cohort.length],
+      borderWidth: 2,
+      pointRadius: 1.5,
+      tension: 0.2,
+    };
+  });
+
+  upsertChart('chartCohortRetention', {
+    type: 'line',
+    data: { datasets: lineSets },
+    options: {
+      ...commonOptions(true, false, 12),
+      parsing: false,
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Cohort age (months)', color: pal.muted },
+          ticks: { maxTicksLimit: 10, font: { size: 11 }, color: pal.text },
+          grid: { color: pal.grid, drawTicks: false },
+        },
+        y: {
+          beginAtZero: true,
+          max: 1.0,
+          grid: { color: pal.grid },
+          ticks: { callback: v => `${(Number(v) * 100).toFixed(0)}%`, font: { size: 11 }, color: pal.text },
+        },
+      },
+    },
+  });
+  const latestCohort = cohortMonths[cohortMonths.length - 1] || 'n/a';
+  const latestCohortRows = (cohortMap.get(latestCohort) || []).slice().sort((a, b) => a.age - b.age);
+  const monthSix = latestCohortRows.find(r => Number(r.age) === 6) || latestCohortRows[latestCohortRows.length - 1] || {};
+  setText(
+    'insightCohortRetention',
+    `Answer: latest visible cohort ${latestCohort} retains ${pct(Number(monthSix.retention_rate || 0))} at age ${Number(monthSix.age || 0)} months; use mature ages before calling a cohort trend.`
+  );
+
+  const latestByCohort = new Map();
+  cohortRows.forEach(r => {
+    const cur = latestByCohort.get(r.cohort_month);
+    if (!cur || r.observation_month > cur.observation_month) latestByCohort.set(r.cohort_month, r);
+  });
+
+  const latestRows = Array.from(latestByCohort.values())
+    .sort((a, b) => a.cohort_month.localeCompare(b.cohort_month))
+    .slice(-12);
+
+  upsertChart('chartRevenueRetentionCohort', {
+    type: 'bar',
+    data: {
+      labels: latestRows.map(r => r.cohort_month),
+      datasets: [{
+        label: 'Revenue retention',
+        data: latestRows.map(r => Number(r.revenue_retention || 0)),
+        borderColor: pal.retentionBorder,
+        backgroundColor: pal.retentionBar,
+        borderWidth: 1,
+        borderRadius: 8,
+        borderSkipped: false,
+        maxBarThickness: 42,
+      }],
+    },
+    options: commonOptions(true, false, 12),
+  });
+  const weakestRevenueCohort = latestRows.slice().sort((a, b) => Number(a.revenue_retention || 0) - Number(b.revenue_retention || 0))[0] || {};
+  setText(
+    'insightRevenueRetentionCohort',
+    `Answer: weakest visible cohort is ${weakestRevenueCohort.cohort_month || 'n/a'} at ${pct(Number(weakestRevenueCohort.revenue_retention || 0))} latest observed revenue retention.`
+  );
+}
+
+function renderDiagnosticCharts(snapshotRows) {
+  const pal = chartPalette();
+  const build = (dimension, chartId, insightId, labelName, color) => {
+    const rows = compactCategories(groupByDimension(snapshotRows, dimension), 10);
+    upsertChart(chartId, {
+      type: 'bar',
+      data: {
+        labels: rows.map(r => r.label),
+        datasets: [{
+          label: 'Churn rate',
+          data: rows.map(r => r.churnRate),
+          borderColor: color,
+          backgroundColor: `${color}bb`,
+          borderWidth: 1,
+          borderRadius: 8,
+          borderSkipped: false,
+          maxBarThickness: 44,
+        }],
+      },
+      options: commonOptions(true, false, Math.min(10, rows.length + 1)),
+    });
+    const top = rows[0] || { label: 'n/a', churnRate: 0, count: 0 };
+    setText(insightId, `Answer: ${top.label} is the ${labelName} hotspot at ${pct(Number(top.churnRate || 0))} churn across ${numFmt.format(Number(top.count || 0))} customers.`);
+  };
+
+  build('segment', 'chartChurnSegment', 'insightChurnSegment', 'segment', pal.churnBars[0]);
+  build('region', 'chartChurnRegion', 'insightChurnRegion', 'region', pal.churnBars[1]);
+  build('acquisition_channel', 'chartChurnChannel', 'insightChurnChannel', 'channel', pal.churnBars[2]);
+  build('plan_type', 'chartChurnPlan', 'insightChurnPlan', 'plan', pal.churnBars[3]);
+
+  const retained = { count: 0, usage: 0, support: 0, nps: 0, failed: 0 };
+  const churned = { count: 0, usage: 0, support: 0, nps: 0, failed: 0 };
+
+  snapshotRows.forEach(r => {
+    const target = Number(r.churn_flag) === 1 ? churned : retained;
+    const c = Number(r.customer_count || 0);
+    target.count += c;
+    target.usage += Number(r.usage_sum || 0);
+    target.support += Number(r.support_sum || 0);
+    target.nps += Number(r.nps_sum || 0);
+    target.failed += Number(r.payment_failure_sum || 0);
+  });
+
+  const retUsage = retained.count > 0 ? retained.usage / retained.count : 0;
+  const chUsage = churned.count > 0 ? churned.usage / churned.count : 0;
+  const retSupport = retained.count > 0 ? retained.support / retained.count : 0;
+  const chSupport = churned.count > 0 ? churned.support / churned.count : 0;
+  const retNps = retained.count > 0 ? retained.nps / retained.count : 0;
+  const chNps = churned.count > 0 ? churned.nps / churned.count : 0;
+  const retFailed = retained.count > 0 ? retained.failed / retained.count : 0;
+  const chFailed = churned.count > 0 ? churned.failed / churned.count : 0;
+
+  document.getElementById('diagUsage').textContent = `Retained ${num(retUsage,2)} vs churned ${num(chUsage,2)} (delta ${num(chUsage - retUsage,2)}).`;
+  document.getElementById('diagSupport').textContent = `Retained ${num(retSupport,2)} vs churned ${num(chSupport,2)} tickets/90d.`;
+  document.getElementById('diagFailed').textContent = `Retained ${pct(retFailed)} vs churned ${pct(chFailed)} failed-payment incidence.`;
+  document.getElementById('diagNps').textContent = `Retained ${num(retNps,1)} vs churned ${num(chNps,1)} (gap ${num(retNps - chNps,1)}).`;
+}
+
+function renderRiskSection(scoredRows) {
+  const pal = chartPalette();
+  const sorted = scoredRows.slice().sort((a, b) => {
+    const key = tableSortState.key;
+    const av = a[key];
+    const bv = b[key];
+
+    let cmp = 0;
+    if (typeof av === 'number' || typeof bv === 'number') cmp = Number(av || 0) - Number(bv || 0);
+    else cmp = String(av ?? '').localeCompare(String(bv ?? ''));
+
+    return tableSortState.dir === 'asc' ? cmp : -cmp;
+  });
+
+  const topRows = sorted.slice(0, 300);
+  document.getElementById('priorityTableBody').innerHTML = topRows.map(r => `
+    <tr>
+      <td>${esc(r.customer_id)}</td>
+      <td>${esc(r.segment)}</td>
+      <td>${money2(Number(r.current_mrr || 0))}</td>
+      <td>${num(Number(r.churn_risk_score || 0), 1)}</td>
+      <td>${num(Number(r.revenue_risk_score || 0), 1)}</td>
+      <td>${num(Number(r.retention_priority_score || 0), 1)}</td>
+      <td>${esc(r.main_risk_driver)}</td>
+      <td>${esc(r.recommended_action)}</td>
+    </tr>
+  `).join('');
+
+  const tierOrder = ['critical', 'high', 'medium', 'low', 'churned'];
+  const tierColors = {
+    critical: '#8e1b1b',
+    high: '#c0392b',
+    medium: '#d4a20f',
+    low: '#1f78b4',
+    churned: '#475467',
+  };
+
+  const tierCounts = new Map();
+  scoredRows.forEach(r => {
+    const t = String(r.risk_tier || 'low');
+    tierCounts.set(t, (tierCounts.get(t) || 0) + 1);
+  });
+
+  const total = scoredRows.length || 1;
+  const stack = document.getElementById('riskTierStack');
+  stack.innerHTML = tierOrder
+    .filter(t => (tierCounts.get(t) || 0) > 0)
+    .map(t => `<div title="${t}: ${tierCounts.get(t)}" style="background:${tierColors[t]};width:${((tierCounts.get(t) || 0) / total) * 100}%"></div>`)
+    .join('');
+
+  const legend = document.getElementById('riskTierLegend');
+  legend.innerHTML = tierOrder
+    .filter(t => (tierCounts.get(t) || 0) > 0)
+    .map(t => `<div><span class="pill" style="background:${tierColors[t]};${t==='medium' ? 'color:#111827;' : ''}">${t}</span>${numFmt.format(tierCounts.get(t) || 0)}</div>`)
+    .join('');
+
+  const driverMap = new Map();
+  scoredRows.forEach(r => {
+    const k = String(r.main_risk_driver || 'unknown');
+    driverMap.set(k, (driverMap.get(k) || 0) + 1);
+  });
+
+  const driverRows = Array.from(driverMap.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  upsertChart('chartRiskDrivers', {
+    type: 'bar',
+    data: {
+      labels: driverRows.map(r => r.label),
+      datasets: [{
+        label: 'Customers',
+        data: driverRows.map(r => r.count),
+        backgroundColor: pal.driverBar,
+        borderColor: pal.driverBorder,
+        borderWidth: 1,
+        borderRadius: 8,
+        borderSkipped: false,
+        maxBarThickness: 42,
+      }],
+    },
+    options: commonOptions(false, true, 8),
+  });
+  const topDriver = driverRows[0] || { label: 'n/a', count: 0 };
+  setText('insightRiskDrivers', `Answer: ${topDriver.label} is the most common queue driver with ${numFmt.format(Number(topDriver.count || 0))} accounts.`);
+
+  const riskSegMap = new Map();
+  scoredRows.forEach(r => {
+    const seg = String(r.segment || 'Unknown');
+    const rev = ((Number(r.at_risk_flag) === 1) || ['high', 'critical'].includes(String(r.risk_tier || '')))
+      ? Number(r.current_mrr || 0)
+      : 0;
+    riskSegMap.set(seg, (riskSegMap.get(seg) || 0) + rev);
+  });
+
+  const riskSegRows = Array.from(riskSegMap.entries())
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+
+  upsertChart('chartRevenueRiskSegment', {
+    type: 'bar',
+    data: {
+      labels: riskSegRows.map(r => r.label),
+      datasets: [{
+        label: 'Revenue at risk (MRR)',
+        data: riskSegRows.map(r => r.value),
+        backgroundColor: pal.riskBar,
+        borderColor: pal.riskBorder,
+        borderWidth: 1,
+        borderRadius: 8,
+        borderSkipped: false,
+        maxBarThickness: 48,
+      }],
+    },
+    options: {
+      ...commonOptions(false, false, 8),
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, maxRotation: 20, minRotation: 0, font: { size: 11 }, color: pal.text }, grid: { color: pal.grid, drawTicks: false } },
+        y: { beginAtZero: true, grid: { color: pal.grid }, ticks: { callback: v => curFmt.format(v), font: { size: 11 }, color: pal.text, maxTicksLimit: 6 } },
+      },
+    },
+  });
+  const topRiskSegment = riskSegRows[0] || { label: 'n/a', value: 0 };
+  setText('insightRevenueRiskSegment', `Answer: ${topRiskSegment.label} carries the largest exposed MRR at ${money(Number(topRiskSegment.value || 0))}.`);
+}
+
+function renderActions(scoredRows) {
+  const actions = [
+    'billing intervention',
+    'customer success outreach',
+    'product adoption campaign',
+    'renewal conversation',
+    'executive save motion',
+    'monitor only',
+  ];
+
+  const groups = new Map();
+  scoredRows.forEach(r => {
+    const a = String(r.recommended_action || 'monitor only');
+    if (!groups.has(a)) groups.set(a, []);
+    groups.get(a).push(r);
+  });
+
+  const cards = actions.map(action => {
+    const rows = groups.get(action) || [];
+    const count = rows.length;
+    const mrr = rows.reduce((a, r) => a + Number(r.current_mrr || 0), 0);
+    const avgPr = count ? rows.reduce((a, r) => a + Number(r.retention_priority_score || 0), 0) / count : 0;
+
+    const segMap = new Map();
+    rows.forEach(r => {
+      const seg = String(r.segment || 'Unknown');
+      segMap.set(seg, (segMap.get(seg) || 0) + Number(r.current_mrr || 0));
+    });
+
+    let topSeg = 'n/a';
+    let topSegMrr = 0;
+    segMap.forEach((val, key) => {
+      if (val > topSegMrr) {
+        topSeg = key;
+        topSegMrr = val;
+      }
+    });
+
+    return `
+      <div class="action-card">
+        <div class="action-card-head">
+          <h5>${esc(action)}</h5>
+          <span class="action-badge">${numFmt.format(count)} accts</span>
+        </div>
+        <div class="action-primary">${money(mrr)}</div>
+        <div class="action-primary-note">MRR currently routed into this playbook.</div>
+        <div class="meta">
+          <div><strong>Avg priority:</strong> ${num(avgPr, 1)}</div>
+          <div><strong>Top segment:</strong> ${esc(topSeg)} (${money(topSegMrr)})</div>
+          <div><strong>Account volume:</strong> ${numFmt.format(count)}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  document.getElementById('actionsGrid').innerHTML = cards.join('');
+}
+
+function renderDashboard() {
+  const filters = getFilters();
+  renderScopeNote(filters);
+
+  const trendRows = getTrendRows(filters);
+  const riskKpi = getRiskKpi(filters);
+  const snapshotRows = getFilteredSnapshot(filters);
+  const scoredRows = getFilteredScored(filters);
+  const cohortRows = getCohortRows(filters);
+
+  renderDecisionBoard(filters, trendRows, riskKpi, scoredRows, snapshotRows);
+  renderSummary(filters, trendRows, riskKpi, scoredRows, snapshotRows);
+  updateKpis(trendRows, riskKpi);
+  renderPrimaryCharts(trendRows, cohortRows);
+  renderDiagnosticCharts(snapshotRows);
+  renderRiskSection(scoredRows);
+  renderActions(scoredRows);
+}
+
+applyTheme(resolveInitialTheme());
+populateFilters();
+renderDashboard();
+  </script>
+</body>
+</html>

@@ -1,38 +1,42 @@
-.PHONY: install data profile features analysis risk charts dashboard validate test all
+.PHONY: install data profile features analyze risk dashboard validate test all clean
 
-PY := ./.venv/bin/python
+PY ?= ./.venv/bin/python
+MOD = $(PY) -m churn
 
 install:
 	python -m venv .venv
 	$(PY) -m pip install --upgrade pip
-	$(PY) -m pip install -r requirements.txt
+	$(PY) -m pip install -e .
 
 data:
-	$(PY) src/data_generation/generate_synthetic_data.py
+	$(MOD).generate
 
 profile:
-	$(PY) src/data_profiling/profile_data_quality.py
+	$(MOD).profile
 
 features:
-	$(PY) src/feature_engineering/create_retention_features.py
+	$(MOD).features
 
-analysis:
-	$(PY) src/churn_analysis/run_main_analysis.py
+analyze:
+	$(MOD).analyze
 
 risk:
-	$(PY) src/risk_scoring/build_risk_scores.py
-
-charts:
-	$(PY) src/visualization/build_chart_pack.py
+	$(MOD).risk
 
 dashboard:
-	$(PY) src/dashboard_builder/build_executive_dashboard.py
+	$(MOD).dashboard
 
 validate:
-	$(PY) src/validation/validate_data_contracts.py
-	$(PY) src/validation/run_final_validation.py
+	$(MOD).contracts
+	$(MOD).validate
 
 test:
 	$(PY) -m unittest discover -s tests -p "test_*.py" -v
 
-all: data profile features analysis risk charts dashboard validate
+# validate inspects the dashboard HTML, so dashboard must run first;
+# then we re-render so the released dashboard embeds the validation results.
+all: data profile features analyze risk dashboard validate dashboard
+
+clean:
+	rm -rf data/raw data/processed outputs/tables outputs/dashboard/*.html
+	rm -f index.html docs/index.html

@@ -1,26 +1,34 @@
-# Synthetic Data Generation Note
+# Synthetic Data Generation
 
-## Purpose
-This synthetic dataset is designed to support churn and retention analytics workflows by embedding realistic commercial and behavioral patterns tied to revenue risk.
+Deterministic given `(SEED, REFERENCE_DATE)`. Both are read from environment
+variables (`CHURN_SEED`, `CHURN_REFERENCE_DATE`) with defaults of `42` and
+`2026-03-01`.
 
-## Fixed Reproducibility
-- Random seed: `42`
-- Reference date used for account status simulation: `2026-03-01`
+## What the simulator embeds
 
-## Business-Oriented Simulation Assumptions
-1. Customer mix reflects B2B SaaS heterogeneity across `Startup`, `SMB`, `Mid-Market`, and `Enterprise` segments.
-2. Churn risk is structurally higher for `Startup` and `SMB` cohorts, and lower for `Enterprise`.
-3. Acquisition quality differs by channel, with lower retention from `Paid Search` and `Affiliate`, and stronger retention from `Referral` and `Partner`.
-4. Regional variance is explicit: `LATAM` and `APAC` have higher baseline churn pressure than `North America`.
-5. Revenue is plan-driven and right-skewed (lognormal), producing realistic concentration of account value in higher tiers.
-6. Subscription status includes a practical mix of `active`, `at_risk`, and `churned` customers.
-7. Product usage degrades prior to churn and, to a lesser extent, for at-risk accounts near the reference date.
-8. Support tickets rise before churn, with a stronger spike in `Startup` and `SMB` profiles.
-9. NPS drops as churn proximity increases and service friction rises.
-10. Failed payments are more likely near churn and are forcibly introduced for a subset of churned accounts to emulate delinquency-led attrition.
+- **Segment mix** weighted toward SMB and Mid-Market, with a long tail of Startup and Enterprise.
+- **Churn pressure** is higher for Startup/SMB and lower for Enterprise; logit
+  combines segment, channel, region, plan, tenure, and revenue effects.
+- **Acquisition quality** differs by channel: Paid Search and Affiliate retain
+  worse, Referral and Partner retain better.
+- **Revenue** is plan-driven and right-skewed (lognormal). Account value is
+  concentrated in higher tiers, as it tends to be in real B2B SaaS.
+- **Pre-churn deterioration** is observable in the usage stream up to 180 days
+  before churn: sessions decay, NPS drops, support tickets spike (more for
+  Startup/SMB), feature adoption falls.
+- **At-risk accounts** show a softer version of the same pattern in the last
+  90 days before the snapshot.
+- **Failed payments** spike near churn; a configurable share of churned
+  accounts gets a forced delinquency event in the final 60 days.
 
-## Files Produced
-- `data/raw/customers.csv`
-- `data/raw/subscriptions.csv`
-- `data/raw/product_usage.csv`
-- `data/raw/payments.csv`
+## Files produced
+
+- `data/raw/customers.csv` (3,500 rows)
+- `data/raw/subscriptions.csv` (3,500 rows)
+- `data/raw/product_usage.csv` (~367k rows, weekly grain)
+- `data/raw/payments.csv` (~56k rows, billing-cycle grain)
+
+## Why synthetic
+Real customer-level retention data is usually too sensitive to share. Synthetic
+data lets the analytics and governance design be inspected publicly while
+keeping the patterns realistic enough to behave like a real retention problem.

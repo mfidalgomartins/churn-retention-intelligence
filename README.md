@@ -1,53 +1,72 @@
-# Churn & Retention Intelligence System
+# Churn & Retention Intelligence
 
-An executive‑grade retention command center that turns churn signals into ranked intervention priorities. It is built to answer a simple, high‑stakes question: where future revenue is leaking and which customers should be saved first.
+An end-to-end retention command center built on synthetic SaaS data. It scores
+recoverable customers, ranks them by risk-weighted revenue exposure, and
+publishes a single self-contained dashboard for executive review.
 
-Most churn programs fail not on measurement, but on prioritization. This project translates usage, support, payment, and commercial signals into a clear action queue and a compact executive view.
+The deliverable is a **prioritised action queue**, not a chart gallery: which
+accounts to save first, why, and with what play.
 
-### What it delivers
-A full retention pipeline from simulated raw data to risk scoring, diagnostics, and an executive dashboard. Outputs are governed, reproducible, and tied to explicit decision use.
+**Live dashboard:** <https://mfidalgomartins.github.io/churn-retention-intelligence/>
 
-### Decisions it supports
-- Where churn is concentrated by segment, channel, plan, and region.
-- Which accounts combine high risk with high revenue exposure.
-- Which intervention plays should be sequenced now.
+## What it does
 
-### Architecture (at a glance)
-Data generation → profiling → feature engineering → churn analysis → risk scoring → visualization → dashboard → QA gates.
-
-### Repository layout
-```text
-src/        pipeline logic
-data/       raw + processed tables
-outputs/    governed outputs, charts, final dashboard
-docs/       decision memo, QA summary, methodology
-sql/        staging + marts (warehouse equivalents)
-config/     data contracts + QA policy
-tests/      integrity + bounds checks
+```
+generate → profile → features → analyze → risk → dashboard → validate
 ```
 
-### Core outputs
-- Decision memo: `docs/reports/executive_decision_memo.md`
-- QA summary: `docs/governance/qa_release_summary.md`
-- Dashboard: `outputs/dashboard/executive-retention-command-center.html`
-- Key tables: `outputs/tables/main_analysis_structured_findings.csv`, `outputs/tables/risk_tier_summary.csv`
+Every step is deterministic (`seed = 42`), governed by data contracts, and gated
+by automated quality checks. The output is one HTML file with embedded data and
+charts — no server, no external dependencies.
 
-Live dashboard (GitHub Pages):
-`https://mfidalgomartins.github.io/churn-retention-intelligence/`
+## Quickstart
 
-### Why it stands out
-It is not a chart gallery. It is an end‑to‑end decision system with QA gates, interpretable scoring, and a dashboard generated strictly from governed outputs. The SQL layer covers key KPI/feature logic and is intentionally scoped.
-
-### Run
 ```bash
 make install
 make all
 make test
 ```
 
-CI pipeline: `.github/workflows/ci.yml`
+That's it. `make all` produces every artifact from scratch; `make test` runs
+52 tests covering both unit logic and end-to-end integrity.
 
-### Limits
-Synthetic data; decision‑support only. Revenue churn uses a monthly‑value proxy. Behavioral drivers are correlational.
+## What the pipeline produces
 
-Tools: Python, SQL, pandas, matplotlib, Chart.js.
+| Layer | Output | Purpose |
+|---|---|---|
+| Raw | `data/raw/*.csv` | Simulated customers, subscriptions, weekly usage, payments |
+| Features | `data/processed/customer_retention_features.csv` | Per-customer snapshot with usage, billing, and health signals |
+| Analysis | `outputs/tables/main_analysis_*.csv` | Trends, drivers, revenue at risk, intervention plays |
+| Risk | `data/processed/customer_risk_scores.csv` | Tiered priority queue with recommended actions |
+| Dashboard | `outputs/dashboard/executive-retention-command-center.html` | Self-contained UI for executive review |
+| Governance | `outputs/tables/*validation*.csv`, `release_readiness_matrix.csv` | Release gates and audit log |
+
+## Decisions it supports
+
+- Where churn concentrates (segment, region, channel, plan).
+- Which accounts combine high risk and high revenue exposure.
+- Which intervention plays return the highest near-term ROI.
+
+## Architecture
+
+```
+src/churn/        pipeline modules (generate, profile, features, analyze, risk, dashboard, contracts, validate)
+src/churn/common  shared constants and helpers (REFERENCE_DATE, SEED, snapshot inference, paths)
+config/           data contracts and release policy
+sql/              warehouse equivalents of the staging and mart logic
+docs/             methodology, governance, decision memo
+tests/unit/       business-logic tests (38)
+tests/test_integration.py   end-to-end artifact and gate tests (14)
+```
+
+Each module is invocable via `python -m churn.<name>` and reads its inputs from
+governed locations only — no module reaches outside its declared contract.
+
+## Limits
+
+Synthetic data, decision-support only. Revenue churn uses a monthly-value proxy
+rather than full contract ARR accounting. Behavioural drivers are correlational.
+
+## Tech
+
+Python 3.12, NumPy, pandas, vanilla JS + Chart.js for the dashboard.

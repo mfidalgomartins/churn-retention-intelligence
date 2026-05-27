@@ -1,43 +1,38 @@
 # QA & Release Framework
 
-## Readiness States
-This project now tracks readiness using explicit states:
-- technically valid
-- analytically acceptable
-- decision-support only
-- screening-grade only
-- not committee-grade
-- publish-blocked
+## Readiness states
 
-## Gate Logic
-- **Contract gate**: required datasets/columns/primary keys must pass before analytical validation
-- **Blocker FAIL**: immediate `publish-blocked`
-- **Technical validity**: no blocker failures in data quality/metric/dashboard core gates
-- **Analytical acceptance**: technically valid + no analytical FAIL + bounded major WARNs
-- **Decision-support only**: analytically acceptable but still caveated (synthetic/proxy/correlation)
-- **Screening-grade only**: technically stable but analytically insufficient
-- **Not committee-grade**: any unresolved caveat or synthetic-data limitation
+| State | Means |
+|---|---|
+| `technically valid` | No blocker failures in data quality or product gates |
+| `analytically acceptable` | Technically valid + no analytical failures + ≤1 major warning |
+| `decision-support only` | Analytically acceptable but with synthetic-data or proxy caveats |
+| `screening-grade only` | Technically stable but analytically below decision-support threshold |
+| `not committee-grade` | Any unresolved caveat or the synthetic-data flag is on |
+| `publish-blocked` | Any FAIL anywhere |
 
-## Severity Levels
-- `blocker`: release stop
-- `critical`: major correctness failure
-- `major`: material caveat requiring explicit stakeholder acknowledgement
-- `minor`: non-blocking but trackable issue
-- `info`: pass/trace information
+## Severity
 
-## Policy Files
-- `config/governance/release_policy.yml`
-- `config/governance/score_stability_baseline.json`
-- `config/contracts/data_contracts.json`
+`blocker` → release stop. `critical` → correctness failure. `major` → caveat
+requiring acknowledgement. `minor` → tracked but non-blocking. `info` → trace.
 
-## Enforcement Outputs
-- `outputs/tables/data_contract_checks.csv`
-- `outputs/tables/data_contract_issues.csv`
-- `outputs/tables/final_validation_checks.csv`
-- `outputs/tables/final_validation_issues.csv`
+## Gate inputs
+
+- `config/contracts/data_contracts.json` — schema and primary-key contracts
+- `config/governance/release_policy.yml` — release policy
+- `config/governance/score_stability_baseline.json` — score drift baseline
+
+## Gate outputs
+
+- `outputs/tables/data_contract_checks.csv` and `data_contract_issues.csv`
+- `outputs/tables/final_validation_checks.csv` and `final_validation_issues.csv`
 - `outputs/tables/release_readiness_matrix.csv`
-- `docs/governance/data_contract_validation_report.md`
-- `docs/governance/qa_release_summary.md`
 
-## Operational Runbook
-- `docs/governance/release_runbook.md`
+## How to run
+
+```bash
+make validate    # contract gate then final validation
+make test        # unit + integration tests
+```
+
+Both run in CI on every push to `main` and every pull request.

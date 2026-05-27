@@ -1,29 +1,30 @@
-# Dashboard Design Note
+# Dashboard Design
 
-## Objective
-Build an executive retention command center that turns churn analytics into intervention decisions, with clear prioritization across revenue leadership, Customer Success, finance, and operations.
+## Goal
+One screen an executive can land on and act from. Not a chart gallery — a
+decision surface.
 
-## Design Choices
-- **Self-contained HTML**: The dashboard is fully offline-capable by embedding both data and Chart.js directly in one file.
-- **Executive hierarchy**: Header and filters first, then insight strip, KPI row, diagnostics, risk prioritization, and action playbooks.
-- **Decision-first titles**: Chart titles communicate implications, not only metric names.
-- **Interactivity**: Date + commercial + risk filters drive trend, diagnostics, risk, and action sections; cohort charts are portfolio-level and date-filtered.
-- **Operational readiness**: Includes sortable priority table with required intervention fields and an action grouping section.
-- **Traceability**: Dashboard metadata (`dashboard_version`, `builder_version`) remains embedded in payload for auditability without cluttering executive presentation.
+## Layout
+Filters first → insight strip → KPI row → retention trends → cohort curves →
+behavioural diagnostics → priority queue → action grouping.
 
-## Decision Surfaces
-- **Executive Summary**: Rapid alignment on where churn concentrates and which signals are most predictive.
-- **KPI Row**: Quick gating on current health and the size of the risk pool.
-- **Retention Trends**: Identify trend breaks that require immediate leadership attention.
-- **Cohort Retention**: Validate whether recent acquisition quality is improving or decaying.
-- **Diagnostics**: Pinpoint operational and product drivers to prioritize interventions.
-- **Risk Prioritization**: Rank accounts for action based on risk-weighted revenue impact.
-- **Action Section**: Translate scores into concrete plays for CS, billing, and renewal teams.
+Chart titles state the implication, not just the metric. Filters drive every
+section except the cohort curves, which are intentionally portfolio-level.
 
-## Performance & Maintainability
-- Uses governed pre-aggregated outputs (`monthly_fact_rows` + dimensions index, `risk_kpi_cube`, `snapshot_agg`) to avoid critical KPI logic in frontend runtime.
-- Built with readable vanilla JS + Chart.js and generated via a Python builder script for repeatable refreshes.
+## Performance
+The HTML embeds three pre-aggregated cubes (monthly trend, risk KPI, snapshot
+aggregates) plus a row-level scored customers table. Frontend code never
+re-computes KPIs from raw data — it picks the right pre-aggregated row.
 
-## Output
-- Main file: `outputs/dashboard/executive-retention-command-center.html`
-- Builder script: `src/dashboard_builder/build_executive_dashboard.py`
+Chart.js and the data payload are inlined, so the dashboard runs offline and on
+GitHub Pages with no extra setup.
+
+## Versioning
+A 12-char hash derived from the input artifact mtimes is embedded in the
+payload as `dashboard_version`. The builder version (`builder_version`) is
+bumped manually when the HTML or JS templates change.
+
+## Files
+- Builder: `src/churn/dashboard.py`
+- Output: `outputs/dashboard/executive-retention-command-center.html`
+- Pages entrypoints: `index.html`, `docs/index.html` (both redirect to the output)

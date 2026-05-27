@@ -1,68 +1,68 @@
-# Risk Scoring Methodology Note
+# Risk Scoring Methodology
 
-## Scope
-- This scoring layer targets **recoverable customers only** (`churn_flag = 0`).
-- Goal: prioritize intervention effort by combining behavioral churn risk and economic importance.
-- `at_risk_flag` is intentionally excluded from score magnitude to avoid label leakage from simulated operational status.
+Recoverable customers only (`churn_flag = 0`). `at_risk_flag` is excluded from the
+score to avoid label leakage from the simulator's own status field.
 
-## Score 1: `churn_risk_score` (0-100)
-`churn_risk_score = 100 * weighted_signal_sum + adjustments`
+## Signals (0-1, higher = more risk)
+- `usage_decline   = clip(-usage_trend / 5, 0, 1)`
+- `failed_payments = clip(failed_payments_90d / 1.5, 0, 1)`
+- `support_burden  = clip((support_tickets_90d - 3) / 6, 0, 1)`
+- `low_nps         = clip((20 - nps_score_recent) / 25, 0, 1)`
+- `low_adoption    = clip((50 - feature_adoption_score_recent) / 25, 0, 1)`
 
-Where weighted signal sum is:
-- `0.24 * usage_decline_signal`
-- `0.22 * failed_payment_signal`
-- `0.16 * support_burden_signal`
-- `0.18 * low_nps_signal`
-- `0.14 * low_adoption_signal`
-- `0.06 * contract_renewal_risk_signal`
+Thresholds are anchored on the active-customer distribution: each signal hits 1.0
+where the value enters the bottom decile of the active population.
 
-Signal definitions (all clipped to `[0,1]`):
-- `usage_decline_signal = clip((-usage_trend) / 4, 0, 1)`
-- `failed_payment_signal = clip(failed_payments_90d / 2, 0, 1)`
-- `support_burden_signal = clip(support_tickets_90d / 6, 0, 1)`
-- `low_nps_signal = clip((25 - nps_score_recent) / 35, 0, 1)`
-- `low_adoption_signal = clip((55 - feature_adoption_score_recent) / 35, 0, 1)`
-- `contract_renewal_risk_signal = renewal_near_flag * (0.60 + 0.40 * max(usage_decline_signal, failed_payment_signal, low_nps_signal, low_adoption_signal))`
+## Churn risk score (0-100)
+```
+churn_risk = 100 * sum(signal_i * weight_i)
+           + 4 * max(0, count(signals >= 0.5) - 2)        # concentration bonus
+           + renewal_near_flag * min(base, 60) * 0.10     # renewal amplifier
+           + contraction_flag * 6
+           + (recent_sessions_30d == 0) * 5
+clip to [0, 100]
+```
 
-Adjustments:
-- `+8` if `contraction_flag = 1`
-- `+6` if `recent_sessions_30d = 0`
+Weights:
+  - `usage_decline` → 0.26
+  - `failed_payments` → 0.22
+  - `low_nps` → 0.20
+  - `low_adoption` → 0.16
+  - `support_burden` → 0.16
 
-Final score is capped to `[0,100]`.
+The concentration bonus reflects that co-firing signals are stronger churn
+predictors than isolated ones; it adds 4 points per signal beyond the second.
 
-## Score 2: `revenue_risk_score` (0-100)
-Percentile-based value importance:
-- `revenue_risk_score = 100 * (0.60 * rank_pct(current_mrr) + 0.30 * rank_pct(avg_monthly_revenue) + 0.10 * rank_pct(lifetime_revenue))`
+## Revenue risk score (0-100)
+```
+revenue_risk = 100 * (0.60 * rank_pct(current_mrr)
+                    + 0.30 * rank_pct(avg_monthly_revenue)
+                    + 0.10 * rank_pct(lifetime_revenue))
+```
 
-## Score 3: `retention_priority_score` (0-100)
-Combined intervention priority:
-- `retention_priority_score = 0.65 * churn_risk_score + 0.35 * revenue_risk_score`
+## Retention priority (0-100)
+```
+retention_priority = 0.65 * churn_risk + 0.35 * revenue_risk
+```
 
-## Score 4: `risk_tier`
-- `critical`: priority >= 75 OR (`churn_risk_score >= 85` AND `revenue_risk_score >= 70`)
-- `high`: priority >= 60 and not critical
-- `medium`: priority >= 40 and not high/critical
-- `low`: priority < 40
+## Tiering
+  - `critical` → priority ≥ 50.0
+  - `high` → priority ≥ 40.0
+  - `medium` → priority ≥ 30.0
+  - `critical` override: `churn_risk >= 55 AND revenue_risk >= 60`
 
-## Score 5: `main_risk_driver`
-Assigned as the largest weighted component among:
-- usage decline
-- failed payments
-- support burden
-- low NPS
-- low adoption
-- contract renewal risk
+## Main risk driver
+The signal with the largest weighted contribution.
 
-## Score 6: `recommended_action`
-Rules:
-- `executive save motion`: critical tier and high revenue importance
-- `billing intervention`: failed payments is main driver with meaningful churn risk
-- `renewal conversation`: contract renewal risk is main driver for medium+ risk accounts, or high-value renewal-near accounts
-- `product adoption campaign`: usage decline or low adoption main driver in elevated risk
-- `customer success outreach`: all high/critical accounts, plus medium-tier support/NPS-led risk
-- `monitor only`: low-priority low-risk accounts
+## Recommended actions
+First match wins:
+- `executive save motion` — critical tier with revenue_risk ≥ 70
+- `billing intervention` — failed payments driver, churn_risk ≥ 45
+- `product adoption campaign` — usage / adoption driver, churn_risk ≥ 35
+- `renewal conversation` — renewal_near_flag + tier ≥ medium
+- `customer success outreach` — any remaining high/critical, plus support/NPS medium
+- `monitor only` — otherwise
 
-## Output Tables
-- `data/processed/customer_risk_scores.csv`
-- `data/processed/customer_risk_priority_ranked.csv`
-- `outputs/tables/risk_tier_summary.csv`
+## Outputs
+- `data/processed/customer_risk_scores.csv` — one row per scored customer
+- `outputs/tables/risk_tier_summary.csv` — tier-level rollup

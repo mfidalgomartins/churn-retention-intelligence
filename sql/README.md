@@ -1,9 +1,11 @@
-# SQL Layer
+# SQL Equivalents
 
-This project is primarily executed in Python, and selected core logic is mirrored in SQL for warehouse translation and metric governance checks.
+The Python pipeline is the source of truth. These SQL files exist to show how
+the same staging and mart logic translates to a warehouse — useful for porting
+the design to dbt or a direct SQL implementation.
 
-## Contents
-- `staging/`: basic cleaning and standardization
-- `marts/`: analytical models (features + KPIs)
+- `staging/subscriptions_clean.sql` — typed cast of `raw_subscriptions`
+- `marts/customer_retention_features.sql` — simplified per-customer feature mart
+- `marts/churn_kpis.sql` — monthly customer and revenue churn rates
 
-The SQL models focus on key transformations and KPI semantics, not full production orchestration.
+The SQL is illustrative; match the Python first when they drift.

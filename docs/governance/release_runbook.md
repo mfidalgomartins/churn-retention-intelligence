@@ -1,40 +1,34 @@
 # Release Runbook
 
-## Objective
-Produce a governed release of analytics outputs and dashboard artifacts with deterministic execution and QA gates.
+## Cut a release
 
-## Prerequisites
-- Python 3.12+
-- Clean working tree
-- Dependencies installed via `make install`
+```bash
+make install     # one-time setup
+make all         # regenerate everything from raw to dashboard
+make validate    # contract gate + final validation
+make test        # 52 tests across unit and integration
+```
 
-## Release Procedure
-1. Regenerate all governed artifacts:
-   - `make all`
-2. Execute governance checks:
-   - `make validate`
-3. Run integrity tests:
-   - `make test`
-4. Review release outputs:
-   - `outputs/tables/final_validation_checks.csv`
-   - `outputs/tables/final_validation_issues.csv`
-   - `outputs/tables/release_readiness_matrix.csv`
-5. Confirm dashboard packaging:
-   - `outputs/dashboard/executive-retention-command-center.html` is the only full dashboard payload.
-   - `index.html` and `docs/index.html` are redirect entrypoints.
+Inspect:
+- `outputs/tables/release_readiness_matrix.csv` — readiness state
+- `outputs/tables/final_validation_issues.csv` — open warnings or failures
+- `outputs/dashboard/executive-retention-command-center.html` — the deliverable
 
-## Blockers
-Do not release when any `FAIL` exists in:
-- `outputs/tables/data_contract_checks.csv`
-- `outputs/tables/final_validation_checks.csv`
+## Block release when
+
+Any FAIL in `data_contract_checks.csv` or `final_validation_checks.csv`.
 
 ## Rollback
-If a release artifact is invalid after publish:
-1. Revert to previous git commit.
-2. Re-run `make validate` and `make test` on the reverted state.
-3. Re-publish only after blocker checks pass.
+
+```bash
+git revert <bad-commit>
+make all && make validate && make test
+```
 
 ## Ownership
-- Data contracts and QA policy: Analytics Engineering
-- Dashboard artifact generation: BI / Analytics
-- Final release approval: Project owner
+
+| Area | Owner |
+|---|---|
+| Data contracts, QA policy | Analytics Engineering |
+| Dashboard artifact | BI / Analytics |
+| Final release approval | Project owner |
