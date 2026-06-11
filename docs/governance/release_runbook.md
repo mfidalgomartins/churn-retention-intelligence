@@ -4,9 +4,9 @@
 
 ```bash
 make install     # one-time setup
-make all         # regenerate everything from raw to dashboard
-make validate    # contract gate + final validation
-make test        # 52 tests across unit and integration
+make release     # regenerate dashboard, chart pack, report, and validation
+make test        # unit and integration tests
+make lint        # static code checks
 ```
 
 Inspect:
@@ -22,7 +22,7 @@ Any FAIL in `data_contract_checks.csv` or `final_validation_checks.csv`.
 
 ```bash
 git revert <bad-commit>
-make all && make validate && make test
+make release && make test && make lint
 ```
 
 ## Ownership

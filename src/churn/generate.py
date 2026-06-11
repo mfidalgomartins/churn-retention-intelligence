@@ -160,7 +160,7 @@ def generate_payments(
 ) -> pd.DataFrame:
     cycle_months = {"Monthly": 1, "Quarterly": 3, "Annual": 12}
     churned_ids = set(subscriptions.loc[subscriptions["status"] == "churned", "customer_id"])
-    forced_failed_ids = {cid for cid in churned_ids if rng.random() < 0.55}
+    forced_failed_ids = {cid for cid in sorted(churned_ids) if rng.random() < 0.55}
 
     rows: list[dict] = []
     idx = 1

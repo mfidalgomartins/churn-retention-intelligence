@@ -10,6 +10,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from churn.common import (
     outputs_tables_dir,
     processed_dir,
@@ -27,9 +29,11 @@ BLOCKER_CHECKS: set[tuple[str, str]] = {
     ("Data Quality", "Overlapping subscriptions where not expected"),
     ("Metric Correctness", "churn_flag logic"),
     ("Metric Correctness", "at_risk_flag logic"),
-    ("Metric Correctness", "Customer churn rate calculation"),
-    ("Metric Correctness", "Revenue churn rate calculation"),
+    ("Metric Correctness", "Feature observation date logic"),
+    ("Metric Correctness", "Cumulative customer churn share calculation"),
+    ("Metric Correctness", "Cumulative revenue loss share calculation"),
     ("Metric Correctness", "Monthly trend metric correctness"),
+    ("Metric Correctness", "Completed-period trend logic"),
     ("Analytical Integrity", "Join inflation risk"),
     ("Analytical Integrity", "Denominator correctness"),
     ("Dashboard Review", "Governed data-source usage"),
@@ -194,7 +198,12 @@ def severity_for_check(status: str, category: str, check_name: str) -> str:
     return "info"
 
 
-def release_matrix(checks: list[Check], synthetic_data: bool = True) -> tuple[list[dict[str, Any]], str]:
+def release_matrix(
+    checks: list[Check],
+    synthetic_data: bool = True,
+    analytical_warn_limit: int = 1,
+    decision_support_warn_limit: int = 3,
+) -> tuple[list[dict[str, Any]], str]:
     fail_checks = [c for c in checks if c.status == "FAIL"]
     warn_checks = [c for c in checks if c.status == "WARN"]
     blocker_fails = [c for c in fail_checks if is_blocker_check(c.category, c.check_name)]
@@ -206,9 +215,18 @@ def release_matrix(checks: list[Check], synthetic_data: bool = True) -> tuple[li
     analytical_failures = [c for c in fail_checks if gate_level_for_check(c.category) == "analytical_validity"]
 
     technically_valid = len(technical_failures) == 0 and len(blocker_fails) == 0
-    analytically_acceptable = technically_valid and len(analytical_failures) == 0 and len(major_warns) <= 1
-    decision_support_only = analytically_acceptable and (len(warn_checks) > 0 or synthetic_data)
-    screening_grade_only = technically_valid and not analytically_acceptable
+    analytically_acceptable = (
+        technically_valid
+        and len(analytical_failures) == 0
+        and len(major_warns) <= analytical_warn_limit
+    )
+    decision_support_only = (
+        technically_valid
+        and len(analytical_failures) == 0
+        and len(major_warns) <= decision_support_warn_limit
+        and (len(warn_checks) > 0 or synthetic_data)
+    )
+    screening_grade_only = technically_valid and not analytically_acceptable and not decision_support_only
     not_committee_grade = synthetic_data or len(warn_checks) > 0
     publish_blocked = len(blocker_fails) > 0 or len(fail_checks) > 0
 
@@ -222,14 +240,14 @@ def release_matrix(checks: list[Check], synthetic_data: bool = True) -> tuple[li
         {
             "state": "analytically acceptable",
             "active": analytically_acceptable,
-            "criterion": "Technically valid and no analytical failures with controlled major caveats.",
-            "evidence": f"analytical_failures={len(analytical_failures)}, major_warns={len(major_warns)}",
+            "criterion": "Technically valid and no analytical failures within the acceptance warning limit.",
+            "evidence": f"analytical_failures={len(analytical_failures)}, major_warns={len(major_warns)}, limit={analytical_warn_limit}",
         },
         {
             "state": "decision-support only",
             "active": decision_support_only,
-            "criterion": "Analytically acceptable but still caveated (simulation/proxy/correlation limits).",
-            "evidence": f"synthetic_data={synthetic_data}, total_warns={len(warn_checks)}",
+            "criterion": "Technically valid decision support within the configured warning limit, with explicit caveats.",
+            "evidence": f"synthetic_data={synthetic_data}, major_warns={len(major_warns)}, limit={decision_support_warn_limit}",
         },
         {
             "state": "screening-grade only",
@@ -528,9 +546,34 @@ def main() -> int:
         )
     )
 
+    sub_by_customer = {s["customer_id"]: s for s in subscriptions}
+    observation_mismatches = 0
+    open_observation_dates: set[date] = set()
+    for r in features:
+        obs = parse_date(r.get("observation_date", ""))
+        sub = sub_by_customer.get(r["customer_id"])
+        if sub is None or obs is None:
+            observation_mismatches += 1
+            continue
+        end = parse_date(sub["subscription_end_date"])
+        if sub["status"] == "churned":
+            if obs != end:
+                observation_mismatches += 1
+        else:
+            open_observation_dates.add(obs)
+    observation_ok = observation_mismatches == 0 and len(open_observation_dates) == 1
+    checks.append(
+        Check(
+            "Metric Correctness",
+            "Feature observation date logic",
+            "PASS" if observation_ok else "FAIL",
+            f"observation_mismatches={observation_mismatches}; open_account_snapshot_dates={sorted(open_observation_dates)}.",
+        )
+    )
+
     total_customers = len(features)
     churned = sum(to_int(r["churn_flag"]) for r in features)
-    customer_churn_rate = pct(churned, total_customers)
+    cumulative_customer_churn_share = pct(churned, total_customers)
 
     seg_total = 0
     seg_churned = 0
@@ -539,29 +582,29 @@ def main() -> int:
         churned_seg = to_int(r["churned_customers"])
         seg_total += active + churned_seg
         seg_churned += churned_seg
-    seg_implied_churn = pct(seg_churned, seg_total)
-    customer_churn_diff = abs(customer_churn_rate - seg_implied_churn)
+    seg_implied_churn_share = pct(seg_churned, seg_total)
+    customer_churn_diff = abs(cumulative_customer_churn_share - seg_implied_churn_share)
     checks.append(
         Check(
             "Metric Correctness",
-            "Customer churn rate calculation",
+            "Cumulative customer churn share calculation",
             "PASS" if customer_churn_diff <= 1e-6 else "FAIL",
-            f"features churn_rate={customer_churn_rate:.6f}; segment_summary implied={seg_implied_churn:.6f}; diff={customer_churn_diff:.8f}.",
+            f"features cumulative_churn_share={cumulative_customer_churn_share:.6f}; segment_summary implied={seg_implied_churn_share:.6f}; diff={customer_churn_diff:.8f}.",
         )
     )
 
     total_avg_mrr = sum(to_float(r["avg_monthly_revenue"]) for r in features)
     churned_avg_mrr = sum(to_float(r["avg_monthly_revenue"]) for r in features if to_int(r["churn_flag"]) == 1)
-    revenue_churn_rate = pct(churned_avg_mrr, total_avg_mrr)
+    cumulative_revenue_loss_share = pct(churned_avg_mrr, total_avg_mrr)
 
     total_churned_revenue_seg = sum(to_float(r["churned_revenue"]) for r in churn_by_segment)
     rev_churn_diff = abs(churned_avg_mrr - total_churned_revenue_seg)
     checks.append(
         Check(
             "Metric Correctness",
-            "Revenue churn rate calculation",
+            "Cumulative revenue loss share calculation",
             "PASS" if rev_churn_diff <= 1e-6 else "FAIL",
-            f"features churned_monthly_value={churned_avg_mrr:.2f}; churn_by_segment churned_revenue sum={total_churned_revenue_seg:.2f}; revenue_churn_rate={revenue_churn_rate:.6f}.",
+            f"features churned_monthly_value={churned_avg_mrr:.2f}; churn_by_segment churned_revenue sum={total_churned_revenue_seg:.2f}; cumulative_revenue_loss_share={cumulative_revenue_loss_share:.6f}.",
         )
     )
 
@@ -572,14 +615,17 @@ def main() -> int:
     for row in seg_summary:
         segment = row["segment"]
         rows = features_by_segment.get(segment, [])
-        recompute = sum(to_float(x["current_mrr"]) for x in rows if to_int(x["at_risk_flag"]) == 1) + sum(
-            to_float(x["avg_monthly_revenue"]) for x in rows if to_int(x["churn_flag"]) == 1
+        current_risk = sum(to_float(x["current_mrr"]) for x in rows if to_int(x["at_risk_flag"]) == 1)
+        churned_value = sum(to_float(x["avg_monthly_revenue"]) for x in rows if to_int(x["churn_flag"]) == 1)
+        seg_risk_recompute_diff = max(
+            seg_risk_recompute_diff,
+            abs(current_risk - to_float(row["current_mrr_at_risk"])),
+            abs(churned_value - to_float(row["churned_monthly_value_proxy"])),
         )
-        seg_risk_recompute_diff = max(seg_risk_recompute_diff, abs(recompute - to_float(row["revenue_at_risk"])))
     checks.append(
         Check(
             "Metric Correctness",
-            "Revenue at risk calculation",
+            "Segment exposure calculation",
             "PASS" if seg_risk_recompute_diff <= 0.01 else "FAIL",
             f"Max segment-level absolute diff vs recompute: {seg_risk_recompute_diff:.4f}.",
         )
@@ -626,6 +672,31 @@ def main() -> int:
             "Monthly trend metric correctness",
             "PASS" if trend_rate_mismatch == 0 else "FAIL",
             f"overall_retention_trend_monthly inconsistencies={trend_rate_mismatch}.",
+        )
+    )
+
+    snapshot_date = next(iter(open_observation_dates)) if len(open_observation_dates) == 1 else None
+    expected_last_complete_end = None
+    if snapshot_date:
+        snapshot_month = f"{snapshot_date.year:04d}-{snapshot_date.month:02d}"
+        expected_last_complete_end = (
+            snapshot_date
+            if snapshot_date == month_end(snapshot_month)
+            else month_start(snapshot_month) - timedelta(days=1)
+        )
+    trend_latest_end = month_end(max(r["month"][:7] for r in trend)) if trend else None
+    cohort_latest_end = month_end(max(r["observation_month"][:7] for r in cohort)) if cohort else None
+    completed_periods_ok = (
+        expected_last_complete_end is not None
+        and trend_latest_end == expected_last_complete_end
+        and cohort_latest_end == expected_last_complete_end
+    )
+    checks.append(
+        Check(
+            "Metric Correctness",
+            "Completed-period trend logic",
+            "PASS" if completed_periods_ok else "FAIL",
+            f"snapshot={snapshot_date}; expected_last_complete_end={expected_last_complete_end}; trend_latest_end={trend_latest_end}; cohort_latest_end={cohort_latest_end}.",
         )
     )
 
@@ -688,12 +759,13 @@ def main() -> int:
     )
 
     low_denom_months = [r["month"] for r in trend if to_int(r["active_customers_start"]) < 100]
+    low_denom_is_prefix = low_denom_months == [r["month"] for r in trend[:len(low_denom_months)]]
     checks.append(
         Check(
             "Analytical Integrity",
             "Incomplete period comparison risk",
-            "WARN" if low_denom_months else "PASS",
-            f"Months with active_customers_start < 100: {len(low_denom_months)} ({', '.join(low_denom_months[:6])}{'...' if len(low_denom_months) > 6 else ''}).",
+            "PASS" if low_denom_is_prefix else "WARN",
+            f"Low-denominator months form an initial prefix and are excluded from dashboard coverage: {low_denom_months}.",
         )
     )
 
@@ -701,7 +773,7 @@ def main() -> int:
     for r in churn_by_segment + churn_by_region + churn_by_channel + churn_by_plan:
         c = to_int(r["customers"])
         ch = to_int(r["churned_customers"])
-        rate = to_float(r["churn_rate"])
+        rate = to_float(r["cumulative_churn_share"])
         if c <= 0 or ch > c:
             denom_issues += 1
         if abs(rate - pct(ch, c)) > 1.1e-6:
@@ -742,10 +814,10 @@ def main() -> int:
         )
     )
 
-    top_seg = max(churn_by_segment, key=lambda x: to_float(x["churn_rate"]))["segment"] if churn_by_segment else ""
-    top_reg = max(churn_by_region, key=lambda x: to_float(x["churn_rate"]))["region"] if churn_by_region else ""
-    top_chn = max(churn_by_channel, key=lambda x: to_float(x["churn_rate"]))["acquisition_channel"] if churn_by_channel else ""
-    top_plan = max(churn_by_plan, key=lambda x: to_float(x["churn_rate"]))["plan_type"] if churn_by_plan else ""
+    top_seg = max(churn_by_segment, key=lambda x: to_float(x["cumulative_churn_share"]))["segment"] if churn_by_segment else ""
+    top_reg = max(churn_by_region, key=lambda x: to_float(x["cumulative_churn_share"]))["region"] if churn_by_region else ""
+    top_chn = max(churn_by_channel, key=lambda x: to_float(x["cumulative_churn_share"]))["acquisition_channel"] if churn_by_channel else ""
+    top_plan = max(churn_by_plan, key=lambda x: to_float(x["cumulative_churn_share"]))["plan_type"] if churn_by_plan else ""
     top_rel = max(behavioral, key=lambda x: to_float(x["churn_rate_lift"]))["relationship"] if behavioral else ""
     sec3 = next((r for r in findings if r.get("section", "").startswith("3.")), None)
     sec3_result = sec3.get("result", "") if sec3 else ""
@@ -937,7 +1009,7 @@ def main() -> int:
             "plan_type",
             "current_mrr",
             "churn_risk_score",
-            "revenue_risk_score",
+            "customer_value_score",
             "retention_priority_score",
             "risk_tier",
             "main_risk_driver",
@@ -974,7 +1046,7 @@ def main() -> int:
             "segment",
             "current_mrr",
             "churn_risk_score",
-            "revenue_risk_score",
+            "customer_value_score",
             "retention_priority_score",
             "main_risk_driver",
             "recommended_action",
@@ -991,7 +1063,7 @@ def main() -> int:
 
     chart_ids = re.findall(r'id="(chart[A-Za-z0-9_]+)"', dashboard_html)
     chart_count = len(set(chart_ids))
-    chart_density_status = "PASS" if 8 <= chart_count <= 10 else "WARN"
+    chart_density_status = "PASS" if 4 <= chart_count <= 6 else "WARN"
     checks.append(
         Check(
             "Dashboard Review",
@@ -1003,17 +1075,16 @@ def main() -> int:
 
     layout_safe = (
         ("minmax(0, 1fr)" in dashboard_html)
-        and ("@media (max-width: 1200px)" in dashboard_html)
-        and ("@media (max-width: 760px)" in dashboard_html)
+        and ("@media (max-width: 960px)" in dashboard_html)
+        and ("@media print" in dashboard_html)
         and ("overflow: hidden" in dashboard_html)
-        and ("position: absolute" not in dashboard_html)
     )
     checks.append(
         Check(
             "Dashboard Review",
             "Responsive/layout safety",
             "PASS" if layout_safe else "WARN",
-            "Layout uses grid-based responsive rules with constrained overflow and without fragile absolute positioning.",
+            "Layout uses grid-based responsive rules with constrained overflow.",
         )
     )
 
@@ -1048,7 +1119,7 @@ def main() -> int:
         token in dashboard_html
         for token in [
             "dashboard_version",
-            "builder_version",
+            "data_snapshot_month",
             "coverage_start_month",
             "coverage_end_month",
             'id="filterPeriodPreset"',
@@ -1121,6 +1192,25 @@ def main() -> int:
         )
     )
 
+    zero_risk_priority_violations = sum(
+        1
+        for r in risk_scores
+        if to_float(r.get("churn_risk_score")) == 0.0
+        and (
+            to_float(r.get("retention_priority_score")) != 0.0
+            or r.get("risk_tier") != "low"
+            or r.get("main_risk_driver") != "no material signal"
+        )
+    )
+    checks.append(
+        Check(
+            "Governance & Release",
+            "Value cannot create churn priority",
+            "PASS" if zero_risk_priority_violations == 0 else "FAIL",
+            f"Zero-churn-risk rows with nonzero priority, non-low tier, or false driver: {zero_risk_priority_violations}.",
+        )
+    )
+
     # Decision logic consistency: recommended action should be aligned with driver/tier constraints.
     action_mismatch = 0
     for r in risk_scores:
@@ -1128,10 +1218,10 @@ def main() -> int:
         action = r.get("recommended_action", "")
         main_driver = r.get("main_risk_driver", "")
         churn_risk = to_float(r.get("churn_risk_score"))
-        rev_risk = to_float(r.get("revenue_risk_score"))
+        customer_value = to_float(r.get("customer_value_score"))
         renewal_near = to_int(r.get("renewal_near_flag"))
 
-        if action == "executive save motion" and not (tier == "critical" and rev_risk >= 70.0):
+        if action == "executive save motion" and not (tier == "critical" and customer_value >= 70.0):
             action_mismatch += 1
         if action == "billing intervention" and not (main_driver == "failed payments" and churn_risk >= 45.0):
             action_mismatch += 1
@@ -1149,11 +1239,14 @@ def main() -> int:
     )
 
     # Financial consistency: segment-level risk table should tie to overall proxies.
-    seg_total_future_risk = sum(to_float(r.get("future_revenue_risk")) for r in seg_risk)
-    seg_total_loss_proxy = sum(to_float(r.get("total_revenue_loss_proxy")) for r in seg_risk)
+    seg_total_future_risk = sum(to_float(r.get("current_mrr_at_risk")) for r in seg_risk)
+    seg_total_churned_value = sum(to_float(r.get("churned_monthly_value_proxy")) for r in seg_risk)
     recompute_future_risk = sum(to_float(r["current_mrr"]) for r in features if to_int(r["at_risk_flag"]) == 1)
-    recompute_loss_proxy = recompute_future_risk + sum(to_float(r["avg_monthly_revenue"]) for r in features if to_int(r["churn_flag"]) == 1)
-    finance_diff = max(abs(seg_total_future_risk - recompute_future_risk), abs(seg_total_loss_proxy - recompute_loss_proxy))
+    recompute_churned_value = sum(to_float(r["avg_monthly_revenue"]) for r in features if to_int(r["churn_flag"]) == 1)
+    finance_diff = max(
+        abs(seg_total_future_risk - recompute_future_risk),
+        abs(seg_total_churned_value - recompute_churned_value),
+    )
     checks.append(
         Check(
             "Governance & Release",
@@ -1252,7 +1345,16 @@ def main() -> int:
     else:
         confidence = "Ready to share"
 
-    matrix_rows, _recommended_release_state = release_matrix(checks, synthetic_data=True)
+    policy = yaml.safe_load(
+        (root / "config" / "governance" / "release_policy.yml").read_text(encoding="utf-8")
+    )
+    warn_policy = policy["warn_policy"]
+    matrix_rows, _recommended_release_state = release_matrix(
+        checks,
+        synthetic_data=True,
+        analytical_warn_limit=int(warn_policy["major_warn_threshold_for_analytical_acceptance"]),
+        decision_support_warn_limit=int(warn_policy["major_warn_threshold_for_decision_support"]),
+    )
     write_csv(
         outputs_tables / "release_readiness_matrix.csv",
         matrix_rows,

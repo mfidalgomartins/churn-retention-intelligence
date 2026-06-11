@@ -10,9 +10,9 @@ from churn.risk import (
     assign_tiers,
     churn_risk_score,
     compute_scores,
+    customer_value_score,
     main_risk_driver,
     normalize_signals,
-    revenue_risk_score,
 )
 
 
@@ -28,7 +28,7 @@ def _baseline_row(**overrides) -> dict:
         "support_tickets_30d": 0, "support_tickets_90d": 1,
         "nps_score_recent": 50.0, "recent_sessions_30d": 30, "recent_sessions_90d": 100,
         "failed_payments_90d": 0, "payment_failure_flag": 0,
-        "renewal_near_flag": 0, "contraction_flag": 0,
+        "renewal_near_flag": 0,
         "churn_flag": 0, "at_risk_flag": 0,
     }
     base.update(overrides)
@@ -84,7 +84,7 @@ class TestChurnRiskScore(unittest.TestCase):
             _baseline_row(usage_trend=-30, failed_payments_90d=5,
                           support_tickets_90d=20, nps_score_recent=-100,
                           feature_adoption_score_recent=0,
-                          renewal_near_flag=1, contraction_flag=1, recent_sessions_30d=0),
+                          renewal_near_flag=1, recent_sessions_30d=0),
         )
         s = normalize_signals(df)
         score = churn_risk_score(df, s).iloc[0]
@@ -100,29 +100,29 @@ class TestChurnRiskScore(unittest.TestCase):
         self.assertGreater(s_many, s_single + 4.0)
 
 
-class TestRevenueRiskScore(unittest.TestCase):
+class TestCustomerValueScore(unittest.TestCase):
     def test_higher_mrr_gets_higher_score(self) -> None:
         df = _frame(
             _baseline_row(customer_id="low", current_mrr=50.0, avg_monthly_revenue=50.0, lifetime_revenue=600),
             _baseline_row(customer_id="mid", current_mrr=300.0, avg_monthly_revenue=300.0, lifetime_revenue=8000),
             _baseline_row(customer_id="high", current_mrr=2000.0, avg_monthly_revenue=2000.0, lifetime_revenue=80000),
         )
-        s = revenue_risk_score(df)
+        s = customer_value_score(df)
         self.assertLess(s.iloc[0], s.iloc[1])
         self.assertLess(s.iloc[1], s.iloc[2])
 
 
 class TestAssignTiers(unittest.TestCase):
     def test_priority_thresholds_map_to_tiers(self) -> None:
-        priority = pd.Series([10, 35, 45, 55])
+        priority = pd.Series([10, 20, 30, 40])
         churn = pd.Series([10, 30, 40, 50])
         revenue = pd.Series([20, 20, 20, 20])
         tiers = assign_tiers(priority, churn, revenue)
         self.assertEqual(list(tiers), ["low", "medium", "high", "critical"])
 
     def test_critical_override_fires_when_both_scores_high(self) -> None:
-        # priority < 50 but churn >= 55 and revenue >= 60 → critical override
-        tiers = assign_tiers(pd.Series([45.0]), pd.Series([60.0]), pd.Series([70.0]))
+        # priority < 35 but churn >= 45 and customer value >= 70 → critical override
+        tiers = assign_tiers(pd.Series([30.0]), pd.Series([50.0]), pd.Series([80.0]))
         self.assertEqual(tiers.iloc[0], "critical")
 
 
@@ -133,6 +133,11 @@ class TestMainRiskDriver(unittest.TestCase):
         signals = normalize_signals(df)
         driver = main_risk_driver(signals).iloc[0]
         self.assertEqual(driver, "failed payments")
+
+    def test_clean_customer_has_no_material_driver(self) -> None:
+        df = _frame(_baseline_row())
+        driver = main_risk_driver(normalize_signals(df)).iloc[0]
+        self.assertEqual(driver, "no material signal")
 
 
 class TestRecommendActions(unittest.TestCase):
@@ -161,7 +166,7 @@ class TestRecommendActions(unittest.TestCase):
         self.assertEqual(target["recommended_action"], "billing intervention")
 
     def test_low_risk_clean_customer_just_monitors(self) -> None:
-        # revenue_risk_score is percentile-based, so we need a population for it
+        # customer_value_score is percentile-based, so we need a population for it
         # to be meaningful; the clean baseline customer should rank in the middle.
         df = _frame(
             _baseline_row(customer_id="poor", current_mrr=10.0, avg_monthly_revenue=10.0, lifetime_revenue=120),
@@ -172,6 +177,15 @@ class TestRecommendActions(unittest.TestCase):
         clean = scored[scored["customer_id"] == "clean"].iloc[0]
         self.assertEqual(clean["risk_tier"], "low")
         self.assertEqual(clean["recommended_action"], "monitor only")
+
+    def test_customer_value_cannot_create_priority_without_churn_risk(self) -> None:
+        df = _frame(
+            _baseline_row(customer_id="small", current_mrr=10, avg_monthly_revenue=10, lifetime_revenue=100),
+            _baseline_row(customer_id="large", current_mrr=10000, avg_monthly_revenue=10000, lifetime_revenue=500000),
+        )
+        scored = compute_scores(df)
+        self.assertTrue((scored["retention_priority_score"] == 0).all())
+        self.assertTrue((scored["risk_tier"] == "low").all())
 
 
 class TestComputeScoresContract(unittest.TestCase):
@@ -196,7 +210,7 @@ class TestComputeScoresContract(unittest.TestCase):
     def test_required_columns_present(self) -> None:
         df = _frame(_baseline_row())
         scored = compute_scores(df)
-        required = {"customer_id", "churn_risk_score", "revenue_risk_score",
+        required = {"customer_id", "churn_risk_score", "customer_value_score",
                     "retention_priority_score", "risk_tier", "main_risk_driver",
                     "recommended_action"}
         self.assertTrue(required.issubset(scored.columns))

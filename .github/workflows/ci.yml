@@ -19,13 +19,29 @@ jobs:
         run: |
           python -m venv .venv
           ./.venv/bin/pip install --upgrade pip
-          ./.venv/bin/pip install -e . ruff
+          ./.venv/bin/pip install -e ".[dev,charts]"
 
-      - name: Build pipeline (includes validation gates)
-        run: make all
+      - name: Build release (includes validation gates)
+        run: make release
+
+      - name: Verify generated artifacts
+        run: |
+          git diff --exit-code -- \
+            docs/index.html \
+            docs/methodology/feature_dictionary.md \
+            docs/methodology/risk_scoring_methodology.md \
+            index.html \
+            outputs/dashboard \
+            outputs/graphs \
+            outputs/reports
 
       - name: Tests
         run: make test
 
       - name: Lint
-        run: ./.venv/bin/ruff check src tests
+        run: make lint
+
+      - name: Package and dependency check
+        run: |
+          ./.venv/bin/pip check
+          ./.venv/bin/pip wheel --no-deps . -w /tmp/churn-release-wheel

@@ -1,12 +1,13 @@
-.PHONY: install data profile features analyze risk dashboard validate test all clean
+.PHONY: install data profile features analyze risk dashboard charts report validate test lint all release clean
 
 PY ?= ./.venv/bin/python
 MOD = $(PY) -m churn
+MPLCONFIGDIR ?= ./.cache/matplotlib
 
 install:
 	python -m venv .venv
 	$(PY) -m pip install --upgrade pip
-	$(PY) -m pip install -e .
+	$(PY) -m pip install -e ".[dev,charts]"
 
 data:
 	$(MOD).generate
@@ -26,6 +27,13 @@ risk:
 dashboard:
 	$(MOD).dashboard
 
+charts:
+	MPLCONFIGDIR=$(MPLCONFIGDIR) $(MOD).graphs
+
+# Builds the static chart pack first, then the narrative PDF that embeds it.
+report: charts
+	$(MOD).report
+
 validate:
 	$(MOD).contracts
 	$(MOD).validate
@@ -33,10 +41,17 @@ validate:
 test:
 	$(PY) -m unittest discover -s tests -p "test_*.py" -v
 
-# validate inspects the dashboard HTML, so dashboard must run first;
-# then we re-render so the released dashboard embeds the validation results.
-all: data profile features analyze risk dashboard validate dashboard
+lint:
+	$(PY) -m ruff check src tests
+
+# Validate inspects the first render; the recipe then publishes a final render
+# with the current validation summary embedded.
+all: data profile features analyze risk dashboard validate
+	$(MOD).dashboard
+
+release: all report
 
 clean:
-	rm -rf data/raw data/processed outputs/tables outputs/dashboard/*.html
+	rm -rf data/raw data/processed outputs/tables
+	rm -f outputs/dashboard/*.html outputs/graphs/*.png outputs/reports/*.pdf
 	rm -f index.html docs/index.html

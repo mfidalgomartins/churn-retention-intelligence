@@ -20,9 +20,9 @@ Chart.js and the data payload are inlined, so the dashboard runs offline and on
 GitHub Pages with no extra setup.
 
 ## Versioning
-A 12-char hash derived from the input artifact mtimes is embedded in the
-payload as `dashboard_version`. The builder version (`builder_version`) is
-bumped manually when the HTML or JS templates change.
+A 12-character content hash covers the governed input tables, dashboard
+builder, HTML template, and bundled Chart.js runtime. Rebuilding unchanged
+inputs produces byte-identical dashboard HTML.
 
 ## Files
 - Builder: `src/churn/dashboard.py`

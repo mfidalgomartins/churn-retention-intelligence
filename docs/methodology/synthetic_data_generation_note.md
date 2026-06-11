@@ -4,6 +4,9 @@ Deterministic given `(SEED, REFERENCE_DATE)`. Both are read from environment
 variables (`CHURN_SEED`, `CHURN_REFERENCE_DATE`) with defaults of `42` and
 `2026-03-01`.
 
+The PDF release reference is also deterministic by default and can be
+overridden explicitly with `CHURN_REPORT_DATE`.
+
 ## What the simulator embeds
 
 - **Segment mix** weighted toward SMB and Mid-Market, with a long tail of Startup and Enterprise.
@@ -18,8 +21,8 @@ variables (`CHURN_SEED`, `CHURN_REFERENCE_DATE`) with defaults of `42` and
   Startup/SMB), feature adoption falls.
 - **At-risk accounts** show a softer version of the same pattern in the last
   90 days before the snapshot.
-- **Failed payments** spike near churn; a configurable share of churned
-  accounts gets a forced delinquency event in the final 60 days.
+- **Failed payments** spike near churn; 55% of churned accounts receive a
+  forced delinquency event in the final 60 days.
 
 ## Files produced
 

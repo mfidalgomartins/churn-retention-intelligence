@@ -5,6 +5,7 @@ should be considered blockers — anything downstream assumes these pass.
 """
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 
 import numpy as np
@@ -151,7 +152,7 @@ def run_checks(tables: dict[str, pd.DataFrame], snapshot: pd.Timestamp) -> pd.Da
     return pd.DataFrame([c.to_row() for c in checks])
 
 
-def main() -> None:
+def main() -> int:
     tables = load_raw()
     snapshot = infer_snapshot_date(
         tables["customers"]["signup_date"],
@@ -169,7 +170,8 @@ def main() -> None:
     fails = int((checks["status"] == "FAIL").sum())
     print(f"Profiled raw tables (snapshot={snapshot.date()}). "
           f"Checks={len(checks)}, failed={fails}.")
+    return 1 if fails else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -8,6 +8,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.cache/
 .coverage
 htmlcov/
 
@@ -22,6 +23,7 @@ env/
 # Editor / IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 
@@ -38,4 +40,3 @@ dist/
 /data/processed/
 /outputs/tables/
 /outputs/profiling/
-/outputs/charts/

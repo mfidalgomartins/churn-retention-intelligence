@@ -1,11 +1,14 @@
-# SQL Equivalents
+# PostgreSQL Reference Models
 
-The Python pipeline is the source of truth. These SQL files exist to show how
-the same staging and mart logic translates to a warehouse — useful for porting
-the design to dbt or a direct SQL implementation.
+These PostgreSQL 15+ queries implement the pipeline's core temporal definitions
+for warehouse use:
 
-- `staging/subscriptions_clean.sql` — typed cast of `raw_subscriptions`
-- `marts/customer_retention_features.sql` — simplified per-customer feature mart
-- `marts/churn_kpis.sql` — monthly customer and revenue churn rates
+- `staging/subscriptions_clean.sql` — typed subscription staging model.
+- `marts/customer_retention_features.sql` — customer features measured at churn
+  date for closed accounts and snapshot date for open accounts.
+- `marts/churn_kpis.sql` — monthly customer and revenue churn over fully observed
+  calendar months.
 
-The SQL is illustrative; match the Python first when they drift.
+Assumptions: one subscription per customer and raw tables named
+`raw_customers`, `raw_subscriptions`, `raw_product_usage`, and `raw_payments`.
+Set the snapshot date in each mart's `params` CTE before execution.

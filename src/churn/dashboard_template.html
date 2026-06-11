@@ -550,7 +550,7 @@
           <div class="kpi-foot"><span id="kpiRevChurnNote">selected period</span><span class="delta flat" id="kpiRevChurnDelta">—</span></div>
         </div>
         <div class="kpi">
-          <div class="kpi-label">Revenue at risk</div>
+          <div class="kpi-label">Priority MRR</div>
           <div class="kpi-value" id="kpiRevRisk">—</div>
           <div class="kpi-foot"><span id="kpiRevRiskNote">snapshot</span><span class="delta flat" id="kpiRevRiskDelta">—</span></div>
         </div>
@@ -604,10 +604,10 @@
     <section aria-labelledby="concentrationTitle">
       <div class="eyebrow-bar">
         <p class="eyebrow">02 · Concentration</p>
-        <span class="eyebrow-note">churn rate per cut · active base</span>
+        <span class="eyebrow-note">cumulative churn share · historical base</span>
       </div>
       <h2 class="h2" id="concentrationTitle">Where the losses concentrate</h2>
-      <p class="section-sub">Churn rate shown against each cut's active base, not as a share of total churn.</p>
+      <p class="section-sub">Cumulative churned accounts as a share of each historical customer group.</p>
 
       <div class="two-col" style="margin-top: 16px;">
         <div class="card">
@@ -698,7 +698,7 @@
                 <th data-sort="segment">Segment</th>
                 <th data-sort="current_mrr" class="num">MRR</th>
                 <th data-sort="churn_risk_score" class="num">Churn risk</th>
-                <th data-sort="revenue_risk_score" class="num">Rev risk</th>
+                <th data-sort="customer_value_score" class="num">Value</th>
                 <th data-sort="retention_priority_score" class="num sort-desc">Priority</th>
                 <th data-sort="main_risk_driver">Driver</th>
                 <th data-sort="recommended_action">Play</th>
@@ -716,7 +716,7 @@
         &nbsp;Synthetic data · decision-support only.
       </div>
       <div>
-        <code id="versionTag">—</code> &nbsp; generated <code id="generatedAt">—</code>
+        <code id="versionTag">—</code> &nbsp; data through <code id="snapshotMonth">—</code>
       </div>
     </footer>
   </main>
@@ -873,7 +873,7 @@ function populateFilters() {
         tableSort.dir = tableSort.dir === 'asc' ? 'desc' : 'asc';
       } else {
         tableSort.key = key;
-        tableSort.dir = ['current_mrr', 'churn_risk_score', 'revenue_risk_score', 'retention_priority_score'].includes(key)
+        tableSort.dir = ['current_mrr', 'churn_risk_score', 'customer_value_score', 'retention_priority_score'].includes(key)
           ? 'desc' : 'asc';
       }
       renderDashboard();
@@ -973,7 +973,7 @@ function getRiskKpi(f) {
     r.acquisition_channel === (f.channel === 'all' ? ALL : f.channel)  &&
     r.plan_type          === (f.plan     === 'all' ? ALL : f.plan)     &&
     r.risk_tier_filter   === (f.riskTier === 'all' ? ALL : f.riskTier)
-  ) || { scored_customers: 0, total_current_mrr: 0, revenue_at_risk: 0, high_risk_customers: 0, critical_customers: 0, avg_priority_score: 0 };
+  ) || { scored_customers: 0, total_current_mrr: 0, priority_mrr_exposure: 0, priority_accounts: 0, high_risk_customers: 0, critical_customers: 0, avg_priority_score: 0 };
 }
 
 function getSnapshot(f) {
@@ -1012,8 +1012,8 @@ function groupByDim(snapshotRows, dim) {
     if (Number(r.churn_flag) === 1) cur.churned += cnt;
   });
   return Array.from(map.values())
-    .map(r => ({ label: r.label, churnRate: r.total > 0 ? r.churned / r.total : 0, count: r.total }))
-    .sort((a, b) => b.churnRate - a.churnRate);
+    .map(r => ({ label: r.label, churnShare: r.total > 0 ? r.churned / r.total : 0, count: r.total }))
+    .sort((a, b) => b.churnShare - a.churnShare);
 }
 
 /* ── Renderers ────────────────────────────────────────── */
@@ -1032,14 +1032,15 @@ function renderHero(f, trendRows, riskKpi) {
   const period   = aggregateTrend(trendRows);
   const critical = Number(riskKpi.critical_customers || 0);
   const high     = Number(riskKpi.high_risk_customers || 0);
-  const exposed  = Number(riskKpi.revenue_at_risk || 0);
+  const exposed  = Number(riskKpi.priority_mrr_exposure || 0);
+  const priority = Number(riskKpi.priority_accounts || 0);
   const scored   = Number(riskKpi.scored_customers || 0);
 
   setText('periodLabel', `${f.startMonth} → ${f.endMonth}`);
 
   document.getElementById('heroHeadline').innerHTML =
-    `<span class="h1-accent">${money(exposed)}</span> of MRR exposed across `
-    + `<span>${intf(critical + high)}</span> accounts that need a save motion.`;
+    `<span class="h1-accent">${money(exposed)}</span> of MRR in save scope across `
+    + `<span>${intf(priority)}</span> priority accounts.`;
 
   const level = period.cust_rate > 0.20 ? 'elevated' : period.cust_rate > 0.10 ? 'manageable' : 'contained';
   document.getElementById('heroLede').innerHTML =
@@ -1069,13 +1070,13 @@ function renderKpis(trendRows, riskKpi) {
   setText('kpiRevChurnNote',  `${money(period.mrr_lost)} lost / ${money(period.mrr_start)} base`);
   setDelta('kpiRevChurnDelta', last && prev ? last.rev_rate - prev.rev_rate : NaN);
 
-  const rev      = Number(riskKpi.revenue_at_risk || 0);
+  const rev      = Number(riskKpi.priority_mrr_exposure || 0);
   const totalMrr = Number(riskKpi.total_current_mrr || 0);
   setText('kpiRevRisk',     money(rev));
   setText('kpiRevRiskNote', `${pct(totalMrr > 0 ? rev / totalMrr : 0)} of scoped MRR`);
   document.getElementById('kpiRevRiskDelta').className = 'delta flat';
   setText('kpiRevRiskDelta',
-    `${intf(Number(riskKpi.high_risk_customers || 0) + Number(riskKpi.critical_customers || 0))} at risk`);
+    `${intf(Number(riskKpi.priority_accounts || 0))} priority accounts`);
 
   const scored = Number(riskKpi.scored_customers || 0);
   setText('kpiActive',      intf(scored));
@@ -1220,8 +1221,8 @@ function renderConcentration(snapshotRows) {
       data: {
         labels: rows.map(r => r.label),
         datasets: [{
-          label: 'Churn rate',
-          data: rows.map(r => r.churnRate),
+          label: 'Cumulative churn share',
+          data: rows.map(r => r.churnShare),
           backgroundColor: rows.map((_, i) => i === 0 ? p.loss : p.neutralSoft),
           borderRadius: 2, borderSkipped: false, maxBarThickness: 36,
         }],
@@ -1229,7 +1230,7 @@ function renderConcentration(snapshotRows) {
       options: barChartOpts(p, 8, true),
     });
     const top = rows[0];
-    setText(hotspotId, top ? `Top: ${top.label} · ${pct(top.churnRate)} · ${intf(top.count)} accts` : '—');
+    setText(hotspotId, top ? `Top: ${top.label} · ${pct(top.churnShare)} · ${intf(top.count)} accts` : '—');
   };
 
   drawBar('chartChurnSegment', 'segHotspot', 'segment');
@@ -1341,7 +1342,7 @@ function renderQueue(scoredRows) {
       <td>${esc(r.segment)}</td>
       <td class="num">${money2(Number(r.current_mrr || 0))}</td>
       <td class="num">${num(Number(r.churn_risk_score || 0), 1)}</td>
-      <td class="num">${num(Number(r.revenue_risk_score || 0), 1)}</td>
+      <td class="num">${num(Number(r.customer_value_score || 0), 1)}</td>
       <td class="num">${num(Number(r.retention_priority_score || 0), 1)}</td>
       <td>${esc(r.main_risk_driver)}</td>
       <td>${esc(r.recommended_action)}</td>
@@ -1371,8 +1372,8 @@ function renderFooter() {
   const badge = document.getElementById('validationBadge');
   badge.className = `badge ${fails > 0 ? 'fail' : warns > 0 ? 'warn' : ''}`;
   setText('validationText', `${Number(v.pass_checks || 0)} / ${Number(v.total_checks || 0)} checks passing`);
-  setText('versionTag',     `v${DATA.meta.builder_version} · ${DATA.meta.dashboard_version}`);
-  setText('generatedAt',    DATA.meta.generated_at_utc);
+  setText('versionTag',     DATA.meta.dashboard_version);
+  setText('snapshotMonth',  DATA.meta.data_snapshot_month);
 }
 
 /* ── Main render ──────────────────────────────────────── */

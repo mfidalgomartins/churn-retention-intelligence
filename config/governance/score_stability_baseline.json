@@ -1,13 +1,12 @@
 {
-  "baseline_version": "2026-05-27-v3",
-  "generated_at_utc": "2026-05-27 00:00:00 UTC",
+  "baseline_version": "2026-06-06-v4",
   "population": 2547,
   "tier_share": {
-    "critical": 0.02198665096191598,
-    "high": 0.08048684727129957,
-    "medium": 0.24538672948566942,
-    "low": 0.6521397722811151
+    "critical": 0.009422850412249706,
+    "high": 0.07813113466823714,
+    "medium": 0.18374558303886925,
+    "low": 0.7287004318806439
   },
-  "avg_priority_score": 26.04656065959953,
-  "notes": "Recalibrated thresholds with concentration bonus; critical tier is now reachable."
+  "avg_priority_score": 10.127966234786022,
+  "notes": "Value-adjusted priority baseline; customer value cannot create risk when churn risk is zero."
 }

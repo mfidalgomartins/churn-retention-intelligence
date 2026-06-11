@@ -1,46 +1,104 @@
--- Mart model: customer_retention_features
--- Simplified illustration of core feature table.
+-- PostgreSQL mart: core customer retention features.
+-- Windows are anchored to churn date for closed accounts and snapshot date for open accounts.
 
-with customers as (
-  select
-    customer_id,
-    segment,
-    region,
-    acquisition_channel,
-    plan_type,
-    cast(signup_date as date) as signup_date
-  from raw_customers
+with params as (
+  select date '2026-03-01' as snapshot_date
 ),
-subscriptions as (
+base as (
+  select
+    c.customer_id,
+    c.segment,
+    c.region,
+    c.acquisition_channel,
+    c.plan_type,
+    s.subscription_start_date,
+    least(coalesce(s.subscription_end_date, p.snapshot_date), p.snapshot_date) as observation_date,
+    s.monthly_revenue,
+    s.billing_cycle,
+    (s.status = 'churned')::integer as churn_flag,
+    (s.status = 'at_risk')::integer as at_risk_flag,
+    case when s.status = 'churned' then 0.0 else s.monthly_revenue end as current_mrr
+  from raw_customers c
+  join subscriptions_clean s using (customer_id)
+  cross join params p
+),
+usage_observed as (
+  select
+    b.customer_id,
+    b.observation_date - cast(u.usage_date as date) as days_before_observation,
+    u.sessions,
+    u.feature_adoption_score,
+    u.support_tickets,
+    u.nps_score
+  from base b
+  join raw_product_usage u
+    on u.customer_id = b.customer_id
+   and cast(u.usage_date as date) <= b.observation_date
+),
+usage_features as (
   select
     customer_id,
-    min(subscription_start_date) as first_start_date,
-    max(subscription_end_date) as last_end_date,
-    max(case when status = 'active' then monthly_revenue else 0 end) as current_mrr,
-    avg(monthly_revenue) as avg_monthly_revenue
-  from subscriptions_clean
+    coalesce(sum(sessions) filter (where days_before_observation between 0 and 29), 0) as recent_sessions_30d,
+    coalesce(sum(sessions) filter (where days_before_observation between 0 and 89), 0) as recent_sessions_90d,
+    coalesce(
+      avg(sessions) filter (where days_before_observation between 0 and 29)
+      - avg(sessions) filter (where days_before_observation between 30 and 59),
+      0.0
+    ) as usage_trend,
+    coalesce(avg(feature_adoption_score) filter (where days_before_observation between 0 and 29), 0.0) as feature_adoption_score_recent,
+    coalesce(sum(support_tickets) filter (where days_before_observation between 0 and 89), 0) as support_tickets_90d,
+    coalesce(avg(nps_score) filter (where days_before_observation between 0 and 89), 0.0) as nps_score_recent
+  from usage_observed
   group by customer_id
 ),
-payments as (
+payment_observed as (
+  select
+    b.customer_id,
+    b.observation_date - cast(p.payment_date as date) as days_before_observation,
+    p.payment_status,
+    p.amount::numeric,
+    case b.billing_cycle
+      when 'Annual' then 12
+      when 'Quarterly' then 3
+      else 1
+    end as cycle_months
+  from base b
+  join raw_payments p
+    on p.customer_id = b.customer_id
+   and cast(p.payment_date as date) <= b.observation_date
+),
+payment_features as (
   select
     customer_id,
-    sum(case when payment_status = 'paid' then amount else 0 end) as lifetime_revenue,
-    sum(case when payment_status = 'failed' and payment_date >= current_date - interval '90 day' then 1 else 0 end) as failed_payments_90d
-  from raw_payments
+    coalesce(sum(amount) filter (where payment_status = 'paid'), 0.0) as lifetime_revenue,
+    avg(amount / cycle_months) filter (where payment_status = 'paid') as avg_monthly_revenue_calc,
+    count(*) filter (
+      where payment_status = 'failed' and days_before_observation between 0 and 89
+    ) as failed_payments_90d
+  from payment_observed
   group by customer_id
 )
 select
-  c.customer_id,
-  c.segment,
-  c.region,
-  c.acquisition_channel,
-  c.plan_type,
-  datediff('day', s.first_start_date, coalesce(s.last_end_date, current_date)) as tenure_days,
-  s.current_mrr,
-  s.avg_monthly_revenue,
-  p.lifetime_revenue,
-  p.failed_payments_90d,
-  case when p.failed_payments_90d > 0 then 1 else 0 end as payment_failure_flag
-from customers c
-left join subscriptions s using (customer_id)
-left join payments p using (customer_id);
+  b.customer_id,
+  b.observation_date,
+  b.segment,
+  b.region,
+  b.acquisition_channel,
+  b.plan_type,
+  b.observation_date - b.subscription_start_date as tenure_days,
+  b.current_mrr,
+  coalesce(p.avg_monthly_revenue_calc, b.monthly_revenue) as avg_monthly_revenue,
+  coalesce(p.lifetime_revenue, 0.0) as lifetime_revenue,
+  coalesce(u.recent_sessions_30d, 0) as recent_sessions_30d,
+  coalesce(u.recent_sessions_90d, 0) as recent_sessions_90d,
+  coalesce(u.usage_trend, 0.0) as usage_trend,
+  coalesce(u.feature_adoption_score_recent, 0.0) as feature_adoption_score_recent,
+  coalesce(u.support_tickets_90d, 0) as support_tickets_90d,
+  coalesce(u.nps_score_recent, 0.0) as nps_score_recent,
+  coalesce(p.failed_payments_90d, 0) as failed_payments_90d,
+  (coalesce(p.failed_payments_90d, 0) > 0)::integer as payment_failure_flag,
+  b.churn_flag,
+  b.at_risk_flag
+from base b
+left join usage_features u using (customer_id)
+left join payment_features p using (customer_id);

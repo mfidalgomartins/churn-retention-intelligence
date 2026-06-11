@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime
 from itertools import product
 from pathlib import Path
 
@@ -19,13 +18,11 @@ def _json_records(df: pd.DataFrame) -> list[dict]:
     return clean.to_dict(orient="records")
 
 
-def _build_version(inputs: list[Path], builder_path: Path) -> str:
+def _build_version(inputs: list[Path]) -> str:
     h = hashlib.sha256()
-    for p in sorted([*inputs, builder_path]):
-        stat = p.stat()
+    for p in sorted(inputs):
         h.update(p.name.encode("utf-8"))
-        h.update(str(stat.st_size).encode("utf-8"))
-        h.update(str(int(stat.st_mtime)).encode("utf-8"))
+        h.update(p.read_bytes())
     return h.hexdigest()[:12]
 
 
@@ -59,9 +56,6 @@ def _load_base_tables(project_root: Path) -> dict[str, pd.DataFrame]:
         "risk": pd.read_csv(processed / "customer_risk_scores.csv"),
         "monthly_dim": pd.read_csv(outputs / "monthly_dimensional_trend.csv", parse_dates=["month"]),
         "cohort": pd.read_csv(processed / "cohort_retention_table.csv", parse_dates=["cohort_month", "observation_month"]),
-        "findings": pd.read_csv(outputs / "main_analysis_structured_findings.csv"),
-        "interventions": pd.read_csv(outputs / "main_analysis_intervention_priorities.csv"),
-        "drivers": pd.read_csv(outputs / "main_analysis_churn_driver_ranking.csv"),
         "validation_checks": optional(
             outputs / "final_validation_checks.csv",
             ["category", "check_name", "status", "severity", "gate_level", "is_blocker", "evidence"],
@@ -78,7 +72,7 @@ def _build_snapshot_tables(features: pd.DataFrame, risk: pd.DataFrame) -> tuple[
     risk_cols = [
         "customer_id",
         "churn_risk_score",
-        "revenue_risk_score",
+        "customer_value_score",
         "retention_priority_score",
         "risk_tier",
         "main_risk_driver",
@@ -133,7 +127,7 @@ def _build_snapshot_tables(features: pd.DataFrame, risk: pd.DataFrame) -> tuple[
             "nps_score_recent",
             "payment_failure_flag",
             "churn_risk_score",
-            "revenue_risk_score",
+            "customer_value_score",
             "retention_priority_score",
             "risk_tier",
             "main_risk_driver",
@@ -147,7 +141,7 @@ def _build_snapshot_tables(features: pd.DataFrame, risk: pd.DataFrame) -> tuple[
         "support_tickets_90d": 2,
         "nps_score_recent": 2,
         "churn_risk_score": 2,
-        "revenue_risk_score": 2,
+        "customer_value_score": 2,
         "retention_priority_score": 2,
     }
     for col, digits in numeric_round.items():
@@ -203,9 +197,12 @@ def _build_risk_kpi_cube(scored: pd.DataFrame) -> pd.DataFrame:
     base["scored_customers"] = 1
     base["high_risk_customers"] = base["risk_tier"].isin(["high", "critical"]).astype(int)
     base["critical_customers"] = (base["risk_tier"] == "critical").astype(int)
+    base["priority_accounts"] = (
+        (base["at_risk_flag"] == 1) | base["risk_tier"].isin(["high", "critical"])
+    ).astype(int)
     base["priority_sum"] = base["retention_priority_score"]
-    base["revenue_at_risk_component"] = np.where(
-        (base["at_risk_flag"] == 1) | (base["risk_tier"].isin(["high", "critical"])),
+    base["priority_mrr_component"] = np.where(
+        base["priority_accounts"] == 1,
         base["current_mrr"],
         0.0,
     )
@@ -225,7 +222,8 @@ def _build_risk_kpi_cube(scored: pd.DataFrame) -> pd.DataFrame:
         .agg(
             scored_customers=("scored_customers", "sum"),
             total_current_mrr=("current_mrr", "sum"),
-            revenue_at_risk=("revenue_at_risk_component", "sum"),
+            priority_mrr_exposure=("priority_mrr_component", "sum"),
+            priority_accounts=("priority_accounts", "sum"),
             high_risk_customers=("high_risk_customers", "sum"),
             critical_customers=("critical_customers", "sum"),
             priority_sum=("priority_sum", "sum"),
@@ -239,7 +237,7 @@ def _build_risk_kpi_cube(scored: pd.DataFrame) -> pd.DataFrame:
         0.0,
     )
 
-    for col in ["total_current_mrr", "revenue_at_risk", "avg_priority_score"]:
+    for col in ["total_current_mrr", "priority_mrr_exposure", "avg_priority_score"]:
         cube[col] = cube[col].round(2)
 
     return cube
@@ -266,14 +264,6 @@ def _prepare_cohort_rows(cohort: pd.DataFrame) -> pd.DataFrame:
     ].copy()
 
 
-def _executive_findings(findings: pd.DataFrame) -> list[dict[str, str]]:
-    out: list[dict[str, str]] = []
-    for row in findings.itertuples(index=False):
-        title = str(row.section).split(". ", 1)[-1]
-        out.append({"title": title, "body": str(row.result)})
-    return out[:5]
-
-
 def load_data(project_root: Path) -> dict:
     base = _load_base_tables(project_root)
 
@@ -281,8 +271,6 @@ def load_data(project_root: Path) -> dict:
     risk = base["risk"]
     monthly_dim = base["monthly_dim"]
     cohort = base["cohort"]
-    findings = base["findings"]
-
     snapshot_agg, scored_all = _build_snapshot_tables(features, risk)
     risk_kpi_cube = _build_risk_kpi_cube(scored_all)
     cohort_rows = _prepare_cohort_rows(cohort)
@@ -311,36 +299,40 @@ def load_data(project_root: Path) -> dict:
     domains = {dim: sorted(features[dim].dropna().astype(str).unique().tolist()) for dim in dims}
     domains["risk_tier"] = ["critical", "high", "medium", "low", "churned"]
     months, monthly_fact_rows = _encode_monthly_fact(monthly_dim, domains)
+    monthly_base = (
+        monthly_dim.assign(month_key=_month_str(monthly_dim["month"]))
+        .groupby("month_key")["active_customers_start"]
+        .sum()
+    )
+    mature_months = monthly_base[monthly_base >= 100].index.tolist()
+    coverage_start_month = mature_months[0] if mature_months else months[0]
 
     # Keep the ranking table payload intentionally bounded for fast dashboard load.
     scored = scored_all.sort_values(["retention_priority_score", "current_mrr"], ascending=[False, False]).head(800).copy()
 
     processed = project_root / "data" / "processed"
     outputs = project_root / "outputs" / "tables"
-    builder_path = Path(__file__).resolve()
     source_inputs = [
         processed / "customer_retention_features.csv",
         processed / "customer_risk_scores.csv",
         processed / "cohort_retention_table.csv",
         outputs / "monthly_dimensional_trend.csv",
-        outputs / "main_analysis_structured_findings.csv",
+        Path(__file__).resolve(),
+        TEMPLATE_PATH,
+        project_root / "assets" / "vendor" / "chart.umd.min.js",
     ]
-    version = _build_version(source_inputs, builder_path)
+    version = _build_version([path for path in source_inputs if path.exists()])
 
     data = {
         "meta": {
             "project": "Churn & Retention Intelligence System",
             "dashboard_version": version,
-            "builder_version": "2.0.0",
-            "generated_at_utc": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "coverage_start_month": months[0],
+            "coverage_start_month": coverage_start_month,
             "coverage_end_month": months[-1],
+            "data_snapshot_month": months[-1],
         },
         "domains": domains,
         "months": months,
-        "executive_findings": _executive_findings(findings),
-        "intervention_priorities": _json_records(base["interventions"]),
-        "driver_ranking": _json_records(base["drivers"]),
         "validation_summary": validation_summary,
         "monthly_fact_rows": monthly_fact_rows,
         "risk_kpi_cube": _json_records(risk_kpi_cube),

@@ -5,6 +5,7 @@
 | Column | Definition |
 |---|---|
 | `customer_id` | Stable customer key. |
+| `observation_date` | Churn date for closed accounts; portfolio snapshot for open accounts. |
 | `segment`, `region`, `acquisition_channel`, `plan_type` | Commercial dimensions from customer master. |
 | `tenure_days` | Days from subscription start to churn date (if churned) or snapshot. |
 | `current_mrr` | Monthly recurring revenue proxy; zero for churned accounts. |
@@ -18,7 +19,6 @@
 | `failed_payments_90d` | Failed payments in last 90 days. |
 | `payment_failure_flag` | `1` if any failed payment in last 90 days. |
 | `renewal_near_flag` | `1` if non-churned account renews within 45 days. |
-| `contraction_flag` | `1` if recent paid monthly-equivalent < 85% of prior 90-day average. |
 | `churn_flag` | `1` if `status == "churned"`. |
 | `at_risk_flag` | `1` if `status == "at_risk"`. |
 
@@ -28,7 +28,9 @@
 `retained_customers` is the number not yet churned by the observation month-end.
 `retention_rate = retained_customers / active_customers`.
 `revenue_retention = sum(retained MRR) / sum(initial MRR)`.
+Only fully observed calendar months are included.
 
 ## segment_retention_summary (one row per segment)
 
-`revenue_at_risk = sum(current_mrr for at_risk) + sum(avg_monthly_revenue for churned)`.
+`current_mrr_at_risk` and `churned_monthly_value_proxy` are reported separately
+to avoid mixing future exposure with realised churn.

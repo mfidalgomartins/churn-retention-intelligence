@@ -10,6 +10,7 @@ from churn.analyze import (
     churn_by_dimension,
     cohort_movement,
     intervention_priorities,
+    monthly_retention_trend,
     overall_health,
     rank_drivers,
     revenue_at_risk,
@@ -28,7 +29,7 @@ def _features(rows: list[dict]) -> pd.DataFrame:
         "support_tickets_30d": 1, "support_tickets_90d": 2,
         "nps_score_recent": 30.0,
         "failed_payments_90d": 0, "payment_failure_flag": 0,
-        "renewal_near_flag": 0, "contraction_flag": 0,
+        "renewal_near_flag": 0,
         "churn_flag": 0, "at_risk_flag": 0,
     }
     return pd.DataFrame([{**defaults, **r} for r in rows])
@@ -44,8 +45,8 @@ class TestChurnByDimension(unittest.TestCase):
         out = churn_by_dimension(features, "segment")
         smb = out[out["segment"] == "SMB"].iloc[0]
         ent = out[out["segment"] == "Enterprise"].iloc[0]
-        self.assertEqual(smb["churn_rate"], 0.5)
-        self.assertEqual(ent["churn_rate"], 0.0)
+        self.assertEqual(smb["cumulative_churn_share"], 0.5)
+        self.assertEqual(ent["cumulative_churn_share"], 0.0)
         self.assertEqual(smb["churned_revenue"], 100.0)
 
     def test_result_sorted_by_churn_rate_descending(self) -> None:
@@ -105,8 +106,16 @@ class TestOverallHealth(unittest.TestCase):
         self.assertEqual(summary["total_customers"], 3)
         self.assertEqual(summary["churned_customers"], 1)
         self.assertEqual(summary["at_risk_customers"], 1)
-        self.assertAlmostEqual(summary["customer_churn_rate"], 1 / 3)
+        self.assertAlmostEqual(summary["cumulative_customer_churn_share"], 1 / 3)
         self.assertGreater(len(trend), 0)
+
+    def test_monthly_trend_excludes_partial_snapshot_month(self) -> None:
+        subs = pd.DataFrame([
+            {"customer_id": "A", "subscription_start_date": pd.Timestamp("2025-01-01"),
+             "subscription_end_date": pd.NaT, "monthly_revenue": 100},
+        ])
+        trend = monthly_retention_trend(subs, pd.Timestamp("2026-03-01"))
+        self.assertEqual(trend.iloc[-1]["month"], "2026-02-01")
 
 
 class TestRevenueAtRisk(unittest.TestCase):
@@ -130,9 +139,9 @@ class TestInterventionPriorities(unittest.TestCase):
         ])
         out = intervention_priorities(features)
         rescue = out[out["opportunity"] == "Payment Rescue"].iloc[0]
-        # Only the non-churned customer is "recoverable"
-        self.assertEqual(rescue["recoverable_customers"], 1)
-        self.assertEqual(rescue["recoverable_mrr"], 500.0)
+        # Only the non-churned customer belongs in the intervention queue.
+        self.assertEqual(rescue["candidate_customers"], 1)
+        self.assertEqual(rescue["current_mrr_scope"], 500.0)
 
 
 class TestCohortMovement(unittest.TestCase):

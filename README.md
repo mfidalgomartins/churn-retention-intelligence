@@ -1,13 +1,17 @@
 # Churn & Retention Intelligence
 
-An end-to-end retention command center built on synthetic SaaS data. It scores
-recoverable customers, ranks them by risk-weighted revenue exposure, and
-publishes a single self-contained dashboard for executive review.
+A reproducible SaaS retention analysis that measures churn, audits cohorts, and
+ranks open accounts by behavioural risk adjusted for customer value.
 
-The deliverable is a **prioritised action queue**, not a chart gallery: which
-accounts to save first, why, and with what play.
+**Open:** [Live dashboard](https://mfidalgomartins.github.io/churn-retention-intelligence/)
+· [PDF analysis](outputs/reports/churn-retention-intelligence-report.pdf)
 
-**Live dashboard:** <https://mfidalgomartins.github.io/churn-retention-intelligence/>
+![Intervention priorities by account coverage and MRR](outputs/graphs/intervention_priorities.png)
+
+The deterministic case covers **3,500 synthetic B2B SaaS accounts** through the
+**2026-03-01 snapshot**. The main deliverable is a self-contained dashboard
+with a prioritised account queue: which accounts to review first, why, and with
+what intervention.
 
 ## What it does
 
@@ -15,37 +19,40 @@ accounts to save first, why, and with what play.
 generate → profile → features → analyze → risk → dashboard → validate
 ```
 
-Every step is deterministic (`seed = 42`), governed by data contracts, and gated
-by automated quality checks. The output is one HTML file with embedded data and
-charts — no server, no external dependencies.
+Every generated artifact is deterministic (`seed = 42`), governed by data
+contracts, and checked before release. The dashboard embeds its data and chart
+runtime, so it works without a server or network connection.
 
 ## Quickstart
 
 ```bash
 make install
-make all
+make release
 make test
 ```
 
-That's it. `make all` produces every artifact from scratch; `make test` runs
-52 tests covering both unit logic and end-to-end integrity.
+`make release` rebuilds the raw simulation, analytical outputs, validated
+dashboard, 18-chart pack, and PDF report. `make test` runs unit and end-to-end
+checks.
 
 ## What the pipeline produces
 
 | Layer | Output | Purpose |
 |---|---|---|
 | Raw | `data/raw/*.csv` | Simulated customers, subscriptions, weekly usage, payments |
-| Features | `data/processed/customer_retention_features.csv` | Per-customer snapshot with usage, billing, and health signals |
+| Features | `data/processed/customer_retention_features.csv` | Per-customer signals measured at churn date or the open-account snapshot |
 | Analysis | `outputs/tables/main_analysis_*.csv` | Trends, drivers, revenue at risk, intervention plays |
 | Risk | `data/processed/customer_risk_scores.csv` | Tiered priority queue with recommended actions |
 | Dashboard | `outputs/dashboard/executive-retention-command-center.html` | Self-contained UI for executive review |
+| Chart pack | `outputs/graphs/*.png` | 18 static charts; regenerate with `make charts` |
+| Report | `outputs/reports/churn-retention-intelligence-report.pdf` | ~30-page narrative analysis with charts inline; `make report` |
 | Governance | `outputs/tables/*validation*.csv`, `release_readiness_matrix.csv` | Release gates and audit log |
 
 ## Decisions it supports
 
-- Where churn concentrates (segment, region, channel, plan).
-- Which accounts combine high risk and high revenue exposure.
-- Which intervention plays return the highest near-term ROI.
+- How monthly customer and revenue churn are moving.
+- Which cohorts and commercial groups have the highest cumulative churn share.
+- Which open accounts combine behavioural risk with material customer value.
 
 ## Architecture
 
@@ -53,10 +60,11 @@ That's it. `make all` produces every artifact from scratch; `make test` runs
 src/churn/        pipeline modules (generate, profile, features, analyze, risk, dashboard, contracts, validate)
 src/churn/common  shared constants and helpers (REFERENCE_DATE, SEED, snapshot inference, paths)
 config/           data contracts and release policy
-sql/              warehouse equivalents of the staging and mart logic
+sql/              PostgreSQL 15+ reference models
 docs/             methodology, governance, decision memo
-tests/unit/       business-logic tests (38)
-tests/test_integration.py   end-to-end artifact and gate tests (14)
+outputs/          published dashboard, chart pack, and PDF report
+tests/unit/       business-logic tests
+tests/test_integration.py   end-to-end artifact and gate tests
 ```
 
 Each module is invocable via `python -m churn.<name>` and reads its inputs from
@@ -64,9 +72,11 @@ governed locations only — no module reaches outside its declared contract.
 
 ## Limits
 
-Synthetic data, decision-support only. Revenue churn uses a monthly-value proxy
-rather than full contract ARR accounting. Behavioural drivers are correlational.
+Synthetic data, decision-support only. The risk score is a transparent
+prioritisation index, not a calibrated churn probability. Revenue loss uses a
+monthly-value proxy rather than contract ARR. Behavioural relationships are
+associative, not causal.
 
 ## Tech
 
-Python 3.12, NumPy, pandas, vanilla JS + Chart.js for the dashboard.
+Python 3.11+, NumPy, pandas, vanilla JavaScript, and Chart.js.

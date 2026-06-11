@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import csv
+import json
+import os
+import subprocess
+import sys
 import unittest
 from datetime import date
 from pathlib import Path
@@ -14,9 +18,6 @@ class TestIntegration(unittest.TestCase):
             "data/raw",
             "data/processed",
             "src",
-            "sql",
-            "sql/staging",
-            "sql/marts",
             "outputs/tables",
             "outputs/dashboard",
             "assets",
@@ -31,6 +32,7 @@ class TestIntegration(unittest.TestCase):
         ]
         required_files = [
             "README.md",
+            "LICENSE",
             "pyproject.toml",
             ".gitignore",
             "Makefile",
@@ -43,6 +45,21 @@ class TestIntegration(unittest.TestCase):
             self.assertTrue((ROOT / rel).exists(), f"Missing required directory: {rel}")
         for rel in required_files:
             self.assertTrue((ROOT / rel).exists(), f"Missing required file: {rel}")
+
+    def test_sql_reference_models_are_temporally_aligned_postgresql(self) -> None:
+        readme = (ROOT / "sql/README.md").read_text(encoding="utf-8").lower()
+        features = (ROOT / "sql/marts/customer_retention_features.sql").read_text(
+            encoding="utf-8"
+        ).lower()
+        kpis = (ROOT / "sql/marts/churn_kpis.sql").read_text(encoding="utf-8").lower()
+        combined = "\n".join((features, kpis))
+
+        self.assertIn("postgresql 15+", readme)
+        self.assertIn("observation_date", features)
+        self.assertIn("complete calendar months", kpis)
+        self.assertEqual(combined.count("with params as"), 2)
+        self.assertNotIn("datediff(", combined)
+        self.assertNotIn("current_date", combined)
 
     def test_no_invalid_subscription_date_ranges(self) -> None:
         path = ROOT / "data/raw/subscriptions.csv"
@@ -80,10 +97,10 @@ class TestIntegration(unittest.TestCase):
         allowed_tiers = {"low", "medium", "high", "critical"}
         for r in rows:
             churn_score = float(r["churn_risk_score"])
-            revenue_score = float(r["revenue_risk_score"])
+            value_score = float(r["customer_value_score"])
             priority_score = float(r["retention_priority_score"])
             self.assertTrue(0 <= churn_score <= 100)
-            self.assertTrue(0 <= revenue_score <= 100)
+            self.assertTrue(0 <= value_score <= 100)
             self.assertTrue(0 <= priority_score <= 100)
             self.assertIn(r["risk_tier"], allowed_tiers)
 
@@ -144,6 +161,10 @@ class TestIntegration(unittest.TestCase):
 
         publish_blocked = next(r for r in rows if r.get("state") == "publish-blocked")
         self.assertEqual(publish_blocked.get("active"), "False")
+        analytically_acceptable = next(r for r in rows if r.get("state") == "analytically acceptable")
+        decision_support = next(r for r in rows if r.get("state") == "decision-support only")
+        self.assertIn("limit=1", analytically_acceptable["evidence"])
+        self.assertIn("limit=3", decision_support["evidence"])
 
     def test_dashboard_wires_filters_and_core_views(self) -> None:
         builder_path = ROOT / "src/churn/dashboard.py"
@@ -197,7 +218,7 @@ class TestIntegration(unittest.TestCase):
     def test_only_one_project_html_outside_virtualenv(self) -> None:
         html_files = [
             p for p in ROOT.rglob("*.html")
-            if ".venv" not in p.parts and "src" not in p.parts
+            if not {".venv", "build", "src"}.intersection(p.parts)
         ]
         rel = sorted(str(p.relative_to(ROOT)) for p in html_files)
         self.assertEqual(
@@ -214,6 +235,74 @@ class TestIntegration(unittest.TestCase):
         size_bytes = html_path.stat().st_size
         self.assertGreaterEqual(size_bytes, 250_000)
         self.assertLessEqual(size_bytes, 3_000_000)
+
+    def test_dashboard_build_is_deterministic(self) -> None:
+        from churn.dashboard import build_html, load_data
+
+        chart_js = (ROOT / "assets/vendor/chart.umd.min.js").read_text(encoding="utf-8")
+        first = json.dumps(load_data(ROOT), separators=(",", ":"), ensure_ascii=False)
+        second = json.dumps(load_data(ROOT), separators=(",", ":"), ensure_ascii=False)
+
+        self.assertEqual(first, second)
+        self.assertEqual(build_html(first, chart_js), build_html(second, chart_js))
+        self.assertNotIn("generated_at_utc", first)
+
+    def test_dashboard_priority_scope_count_matches_priority_mrr_scope(self) -> None:
+        import pandas as pd
+
+        from churn.dashboard import ALL_TOKEN, load_data
+
+        payload = load_data(ROOT)
+        all_row = next(
+            row
+            for row in payload["risk_kpi_cube"]
+            if all(
+                row[dim] == ALL_TOKEN
+                for dim in (
+                    "segment",
+                    "region",
+                    "acquisition_channel",
+                    "plan_type",
+                    "risk_tier_filter",
+                )
+            )
+        )
+        scored = pd.read_csv(ROOT / "data/processed/customer_risk_scores.csv")
+        priority = (scored["at_risk_flag"] == 1) | scored["risk_tier"].isin(
+            ["high", "critical"]
+        )
+
+        self.assertEqual(all_row["priority_accounts"], int(priority.sum()))
+        self.assertAlmostEqual(
+            all_row["priority_mrr_exposure"],
+            float(scored.loc[priority, "current_mrr"].sum()),
+            places=2,
+        )
+
+    def test_generator_is_hash_seed_independent(self) -> None:
+        code = """
+import hashlib
+import numpy as np
+from churn.common import SEED
+from churn.generate import generate_customers, generate_payments, generate_subscriptions
+
+rng = np.random.default_rng(SEED)
+customers = generate_customers(rng)
+subscriptions = generate_subscriptions(customers, rng)
+payments = generate_payments(customers, subscriptions, rng)
+print(hashlib.sha256(payments.to_csv(index=False).encode("utf-8")).hexdigest())
+"""
+
+        hashes = []
+        for hash_seed in ("1", "2"):
+            env = {**os.environ, "PYTHONHASHSEED": hash_seed}
+            hashes.append(subprocess.check_output(
+                [sys.executable, "-c", code],
+                cwd=ROOT,
+                env=env,
+                text=True,
+            ).strip())
+        self.assertEqual(hashes[0], hashes[1])
 
     def test_pages_entrypoints_redirect_to_official_dashboard(self) -> None:
         root_index = (ROOT / "index.html").read_text(encoding="utf-8")
@@ -233,6 +322,18 @@ class TestIntegration(unittest.TestCase):
         makefile_text = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn("$(MOD).contracts", makefile_text)
         self.assertIn("$(MOD).validate", makefile_text)
+        self.assertIn("all: data profile features analyze risk dashboard validate\n\t$(MOD).dashboard", makefile_text)
+        self.assertIn("release: all report", makefile_text)
+
+    def test_published_release_artifacts_exist(self) -> None:
+        graph_files = sorted((ROOT / "outputs/graphs").glob("*.png"))
+        self.assertEqual(len(graph_files), 18)
+        self.assertTrue(
+            (ROOT / "outputs/reports/churn-retention-intelligence-report.pdf").exists()
+        )
+        self.assertTrue(
+            (ROOT / "outputs/dashboard/executive-retention-command-center.html").exists()
+        )
 
 
 if __name__ == "__main__":

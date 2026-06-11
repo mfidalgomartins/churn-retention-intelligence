@@ -50,3 +50,12 @@ def infer_snapshot_date(*date_series: pd.Series) -> pd.Timestamp:
     if not maxima:
         raise ValueError("infer_snapshot_date requires at least one non-empty date series")
     return pd.Timestamp(max(maxima))
+
+
+def last_complete_month_start(snapshot: pd.Timestamp) -> pd.Timestamp:
+    """Month start for the latest fully observed calendar month."""
+    snapshot = pd.Timestamp(snapshot).normalize()
+    current_month_end = snapshot + pd.offsets.MonthEnd(0)
+    if snapshot == current_month_end:
+        return snapshot.to_period("M").to_timestamp()
+    return (snapshot.to_period("M") - 1).to_timestamp()

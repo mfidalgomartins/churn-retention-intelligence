@@ -1,19 +1,20 @@
--- KPI model: monthly churn and revenue churn rates
--- aligned with src/churn_analysis/run_main_analysis.py monthly_retention_trend().
+-- PostgreSQL mart: monthly churn and revenue churn over complete calendar months.
 
-with month_bounds as (
+with params as (
+  select date '2026-03-01' as snapshot_date
+),
+month_bounds as (
   select
     generate_series(
       date_trunc('month', (select min(subscription_start_date) from subscriptions_clean)),
-      date_trunc(
-        'month',
-        greatest(
-          (select max(subscription_start_date) from subscriptions_clean),
-          coalesce((select max(subscription_end_date) from subscriptions_clean), (select max(subscription_start_date) from subscriptions_clean))
-        )
-      ),
+      case
+        when p.snapshot_date = (date_trunc('month', p.snapshot_date) + interval '1 month - 1 day')::date
+          then date_trunc('month', p.snapshot_date)
+        else date_trunc('month', p.snapshot_date) - interval '1 month'
+      end,
       interval '1 month'
     )::date as month_start
+  from params p
 ),
 active_base as (
   select

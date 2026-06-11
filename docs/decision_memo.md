@@ -1,38 +1,30 @@
 # Executive Decision Memo
 
-## Where revenue is leaking
+## Readout
 
-- 3,500 customers in the base; 2,547 active, 953 churned.
-- Customer churn **27.2%**, revenue churn **13.8%** — value loss is concentrated, not uniform.
-- Explicit at-risk MRR: **$142,193**. Adding hidden risk signals brings the future exposure to **$214,300**.
+- Historical base: **3,500** customers; **2,547** remain open and **953** have churned.
+- Cumulative customer churn share is **27.2%**; cumulative monthly-value loss share is **13.8%**.
+- Explicit at-risk MRR is **$142,193**. Additional behavioural signals identify **$41,110** of current MRR exposure.
+- The dashboard save scope contains **603** accounts and **$236,689** of current MRR.
 
-## What to do first
-
-1. **Protect high-value accounts.** A small number of accounts carry a disproportionate share of exposed revenue.
-2. **Separate volume from value.** Use scaled plays for high-volume churn segments; reserve dedicated save motions for high-tier accounts.
-3. **Act on the strongest behavioural signals.** Failed payments, low NPS, and low adoption have the highest churn lift in this run.
-
-## What the analysis shows
+## Concentration
 
 | Question | Result |
 |---|---|
-| Strongest segments at risk | Startup churn highest; Mid-Market and SMB carry the most absolute revenue exposure |
-| Strongest channel quality issues | Paid Search and Affiliate retain materially worse than Referral or Partner |
-| Cohort trend | 6-month retention has weakened in recent cohorts — acquisition or onboarding drift |
-| Top behavioural lift | Failed payments and low NPS show the largest in-vs-out churn ratios |
+| Highest cumulative churn share | Startup **44.8%**; Basic plan **44.7%** |
+| Weakest acquisition channels | Affiliate **42.1%**; Paid Search **38.6%** |
+| Largest explicit MRR exposure | SMB **$50,900** |
+| Strongest behavioural separation | Low NPS and high support load |
+| Cohort movement | Six-month retention is **98.5%** and recent cohorts are weaker than early cohorts |
 
-## Priority interventions
+## Intervention Order
 
-| Play | Target | When |
-|---|---|---|
-| Renewal Save Desk | Renewal-near accounts with any risk signal | This quarter |
-| Service Recovery | Low NPS or high ticket load + usage decline | Now (7-day SLA) |
-| Payment Rescue | Failed payments in last 90 days | Always-on |
-| Adoption Rescue | Basic/Startup, low adoption + usage decline | Onboarding pivot |
-| Channel Quality | Tighten Paid Search and Affiliate gates | Procurement review |
+1. Review the **24 critical** and **199 high-risk** accounts first.
+2. Run the Renewal Save Desk queue as the broadest near-term test: **898** open accounts covering **$291,539** of current MRR.
+3. Isolate Payment Rescue as a measurable operational play: **119** open accounts covering **$50,156** of current MRR.
+4. Track treatment conversion and retained MRR before treating the exposure proxy as expected value.
 
-## Caveats
+## Limits
 
-Synthetic data. Revenue uses monthly-value proxies, not full ARR.
-Behavioural drivers indicate correlation, not causation. Cohort comparisons at
-long horizons are unfair while recent cohorts remain right-censored.
+Synthetic data, monthly-value proxies, and associative behavioural evidence.
+The risk score is a prioritisation index, not a calibrated churn probability.

@@ -10,7 +10,13 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from churn.common import docs_dir, infer_snapshot_date, processed_dir, raw_dir
+from churn.common import (
+    docs_dir,
+    infer_snapshot_date,
+    last_complete_month_start,
+    processed_dir,
+    raw_dir,
+)
 
 CYCLE_TO_MONTHS = {"Monthly": 1, "Quarterly": 3, "Annual": 12}
 
@@ -27,14 +33,34 @@ def load_raw() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return customers, subscriptions, usage, payments
 
 
-def usage_aggregates(usage: pd.DataFrame, snapshot: pd.Timestamp) -> pd.DataFrame:
-    w30 = snapshot - pd.Timedelta(days=30)
-    w60 = snapshot - pd.Timedelta(days=60)
-    w90 = snapshot - pd.Timedelta(days=90)
+def customer_observation_dates(
+    subscriptions: pd.DataFrame,
+    snapshot: pd.Timestamp,
+) -> pd.DataFrame:
+    """Use churn date for closed accounts and the portfolio snapshot for open accounts."""
+    dates = subscriptions[["customer_id", "subscription_end_date"]].copy()
+    dates["observation_date"] = dates["subscription_end_date"].fillna(snapshot).clip(upper=snapshot)
+    return dates[["customer_id", "observation_date"]]
 
-    recent_30 = usage[usage["usage_date"] > w30]
-    recent_90 = usage[usage["usage_date"] > w90]
-    prior_30 = usage[(usage["usage_date"] > w60) & (usage["usage_date"] <= w30)]
+
+def usage_aggregates(
+    usage: pd.DataFrame,
+    observation_dates: pd.DataFrame,
+) -> pd.DataFrame:
+    observed = usage.merge(
+        observation_dates,
+        on="customer_id",
+        how="inner",
+        validate="many_to_one",
+    )
+    observed["days_before_observation"] = (
+        observed["observation_date"] - observed["usage_date"]
+    ).dt.days
+    observed = observed[observed["days_before_observation"] >= 0]
+
+    recent_30 = observed[observed["days_before_observation"] < 30]
+    recent_90 = observed[observed["days_before_observation"] < 90]
+    prior_30 = observed[observed["days_before_observation"].between(30, 59)]
 
     agg_30 = recent_30.groupby("customer_id", as_index=False).agg(
         recent_sessions_30d=("sessions", "sum"),
@@ -76,13 +102,10 @@ def usage_aggregates(usage: pd.DataFrame, snapshot: pd.Timestamp) -> pd.DataFram
 
 
 def next_renewal_date(start: pd.Series, snapshot: pd.Timestamp, cycle_months: pd.Series) -> pd.Series:
-    """Vectorised: next anniversary on the billing cycle that is strictly > snapshot."""
+    """Next billing-cycle anniversary strictly after the snapshot."""
     months_elapsed = ((snapshot.year - start.dt.year) * 12
                       + (snapshot.month - start.dt.month))
     cycles_done = (months_elapsed // cycle_months).clip(lower=0)
-    candidate = start + pd.to_timedelta(cycles_done * cycle_months * 30, unit="D")  # rough
-    # Replace with an exact computation per row (DateOffset months isn't vectorised),
-    # but only where the rough date isn't already past the snapshot.
     exact = []
     for s, c, n in zip(start, cycle_months, cycles_done, strict=False):
         if pd.isna(s):
@@ -95,49 +118,50 @@ def next_renewal_date(start: pd.Series, snapshot: pd.Timestamp, cycle_months: pd
     return pd.Series(exact, index=start.index, dtype="datetime64[ns]")
 
 
-def payment_aggregates(payments: pd.DataFrame, subscriptions: pd.DataFrame, snapshot: pd.Timestamp) -> pd.DataFrame:
+def payment_aggregates(
+    payments: pd.DataFrame,
+    subscriptions: pd.DataFrame,
+    observation_dates: pd.DataFrame,
+) -> pd.DataFrame:
     pay = payments.merge(
-        subscriptions[["customer_id", "billing_cycle"]], on="customer_id", how="left",
+        subscriptions[["customer_id", "billing_cycle"]],
+        on="customer_id",
+        how="left",
+        validate="many_to_one",
+    ).merge(
+        observation_dates,
+        on="customer_id",
+        how="inner",
+        validate="many_to_one",
     )
     pay["cycle_months"] = pay["billing_cycle"].map(CYCLE_TO_MONTHS).fillna(1).astype(int)
     pay["monthly_equivalent"] = pay["amount"] / pay["cycle_months"]
+    pay["days_before_observation"] = (pay["observation_date"] - pay["payment_date"]).dt.days
+    pay = pay[pay["days_before_observation"] >= 0]
 
-    w90 = snapshot - pd.Timedelta(days=90)
-    w180 = snapshot - pd.Timedelta(days=180)
-    recent = pay[pay["payment_date"] > w90]
-    prior = pay[(pay["payment_date"] > w180) & (pay["payment_date"] <= w90)]
+    recent = pay[pay["days_before_observation"] < 90]
 
     paid_all = pay[pay["payment_status"] == "paid"].groupby("customer_id", as_index=False).agg(
         lifetime_revenue=("amount", "sum"),
         avg_monthly_revenue_calc=("monthly_equivalent", "mean"),
     )
-    paid_recent = recent[recent["payment_status"] == "paid"].groupby("customer_id", as_index=False).agg(
-        recent_paid_monthly_equiv=("monthly_equivalent", "mean"),
-    )
-    paid_prior = prior[prior["payment_status"] == "paid"].groupby("customer_id", as_index=False).agg(
-        prior_paid_monthly_equiv=("monthly_equivalent", "mean"),
-    )
     failed_recent = (recent.assign(is_failed=lambda d: (d["payment_status"] == "failed").astype(int))
                      .groupby("customer_id", as_index=False)
                      .agg(failed_payments_90d=("is_failed", "sum")))
 
-    out = (paid_all
-           .merge(paid_recent, on="customer_id", how="left")
-           .merge(paid_prior, on="customer_id", how="left")
-           .merge(failed_recent, on="customer_id", how="left"))
+    out = (
+        observation_dates[["customer_id"]]
+        .merge(paid_all, on="customer_id", how="left", validate="one_to_one")
+        .merge(failed_recent, on="customer_id", how="left", validate="one_to_one")
+    )
 
-    out["recent_paid_monthly_equiv"] = out["recent_paid_monthly_equiv"].fillna(0.0)
-    out["prior_paid_monthly_equiv"] = out["prior_paid_monthly_equiv"].fillna(0.0)
+    out["lifetime_revenue"] = out["lifetime_revenue"].fillna(0.0)
     out["failed_payments_90d"] = out["failed_payments_90d"].fillna(0).astype(int)
     out["payment_failure_flag"] = (out["failed_payments_90d"] > 0).astype(int)
-    out["contraction_flag"] = (
-        (out["prior_paid_monthly_equiv"] > 0)
-        & (out["recent_paid_monthly_equiv"] < out["prior_paid_monthly_equiv"] * 0.85)
-    ).astype(int)
 
     return out[[
         "customer_id", "lifetime_revenue", "avg_monthly_revenue_calc",
-        "failed_payments_90d", "payment_failure_flag", "contraction_flag",
+        "failed_payments_90d", "payment_failure_flag",
     ]]
 
 
@@ -155,6 +179,8 @@ def build_customer_features(
     base["churn_flag"] = (base["status"] == "churned").astype(int)
     base["at_risk_flag"] = (base["status"] == "at_risk").astype(int)
     base["current_mrr"] = np.where(base["churn_flag"] == 1, 0.0, base["monthly_revenue"])
+    observation_dates = customer_observation_dates(subscriptions, snapshot)
+    base = base.merge(observation_dates, on="customer_id", how="left", validate="one_to_one")
 
     cycle = base["billing_cycle"].map(CYCLE_TO_MONTHS).fillna(1).astype(int)
     base["next_renewal_date"] = next_renewal_date(base["subscription_start_date"], snapshot, cycle)
@@ -164,15 +190,15 @@ def build_customer_features(
     ).astype(int)
 
     features = (base
-                .merge(usage_aggregates(usage, snapshot), on="customer_id", how="left")
-                .merge(payment_aggregates(payments, subscriptions, snapshot), on="customer_id", how="left"))
+                .merge(usage_aggregates(usage, observation_dates), on="customer_id", how="left")
+                .merge(payment_aggregates(payments, subscriptions, observation_dates), on="customer_id", how="left"))
 
     defaults = {
         "recent_sessions_30d": 0, "recent_sessions_90d": 0, "usage_trend": 0.0,
         "feature_adoption_score_recent": 0.0,
         "support_tickets_30d": 0, "support_tickets_90d": 0, "nps_score_recent": 0.0,
         "lifetime_revenue": 0.0, "failed_payments_90d": 0,
-        "payment_failure_flag": 0, "contraction_flag": 0,
+        "payment_failure_flag": 0,
     }
     for col, val in defaults.items():
         features[col] = features[col].fillna(val)
@@ -182,22 +208,23 @@ def build_customer_features(
     features["current_mrr"] = features["current_mrr"].round(2)
     features["feature_adoption_score_recent"] = features["feature_adoption_score_recent"].round(4)
     features["nps_score_recent"] = features["nps_score_recent"].round(4)
+    features["observation_date"] = pd.to_datetime(features["observation_date"]).dt.date.astype(str)
 
     cols = [
-        "customer_id", "segment", "region", "acquisition_channel", "plan_type",
+        "customer_id", "observation_date", "segment", "region", "acquisition_channel", "plan_type",
         "tenure_days", "current_mrr", "avg_monthly_revenue", "lifetime_revenue",
         "recent_sessions_30d", "recent_sessions_90d", "usage_trend",
         "feature_adoption_score_recent",
         "support_tickets_30d", "support_tickets_90d", "nps_score_recent",
         "failed_payments_90d", "payment_failure_flag",
-        "renewal_near_flag", "contraction_flag",
+        "renewal_near_flag",
         "churn_flag", "at_risk_flag",
     ]
     features = features[cols].copy()
 
     for col in ["tenure_days", "recent_sessions_30d", "recent_sessions_90d",
                 "support_tickets_30d", "support_tickets_90d", "failed_payments_90d",
-                "payment_failure_flag", "renewal_near_flag", "contraction_flag",
+                "payment_failure_flag", "renewal_near_flag",
                 "churn_flag", "at_risk_flag"]:
         features[col] = features[col].astype(int)
 
@@ -207,9 +234,10 @@ def build_customer_features(
 def build_cohort_table(subscriptions: pd.DataFrame, snapshot: pd.Timestamp) -> pd.DataFrame:
     subs = subscriptions.copy()
     subs["cohort_month"] = subs["subscription_start_date"].dt.to_period("M").dt.to_timestamp()
+    last_complete_month = last_complete_month_start(snapshot)
     all_months = pd.period_range(
         start=subs["cohort_month"].min(),
-        end=snapshot.to_period("M"),
+        end=last_complete_month.to_period("M"),
         freq="M",
     ).to_timestamp()
 
@@ -241,10 +269,12 @@ def build_segment_summary(features: pd.DataFrame) -> pd.DataFrame:
         return pd.Series({
             "active_customers": active,
             "churned_customers": churned,
-            "churn_rate": round(churned / total, 6) if total else 0.0,
-            "revenue_at_risk": round(float(
+            "cumulative_churn_share": round(churned / total, 6) if total else 0.0,
+            "current_mrr_at_risk": round(float(
                 group.loc[group["at_risk_flag"] == 1, "current_mrr"].sum()
-                + group.loc[group["churn_flag"] == 1, "avg_monthly_revenue"].sum()
+            ), 2),
+            "churned_monthly_value_proxy": round(float(
+                group.loc[group["churn_flag"] == 1, "avg_monthly_revenue"].sum()
             ), 2),
             "avg_tenure": round(group["tenure_days"].mean(), 2),
             "avg_nps": round(group["nps_score_recent"].mean(), 2),
@@ -265,6 +295,7 @@ def write_feature_dictionary() -> None:
 | Column | Definition |
 |---|---|
 | `customer_id` | Stable customer key. |
+| `observation_date` | Churn date for closed accounts; portfolio snapshot for open accounts. |
 | `segment`, `region`, `acquisition_channel`, `plan_type` | Commercial dimensions from customer master. |
 | `tenure_days` | Days from subscription start to churn date (if churned) or snapshot. |
 | `current_mrr` | Monthly recurring revenue proxy; zero for churned accounts. |
@@ -278,7 +309,6 @@ def write_feature_dictionary() -> None:
 | `failed_payments_90d` | Failed payments in last 90 days. |
 | `payment_failure_flag` | `1` if any failed payment in last 90 days. |
 | `renewal_near_flag` | `1` if non-churned account renews within 45 days. |
-| `contraction_flag` | `1` if recent paid monthly-equivalent < 85% of prior 90-day average. |
 | `churn_flag` | `1` if `status == "churned"`. |
 | `at_risk_flag` | `1` if `status == "at_risk"`. |
 
@@ -288,10 +318,12 @@ def write_feature_dictionary() -> None:
 `retained_customers` is the number not yet churned by the observation month-end.
 `retention_rate = retained_customers / active_customers`.
 `revenue_retention = sum(retained MRR) / sum(initial MRR)`.
+Only fully observed calendar months are included.
 
 ## segment_retention_summary (one row per segment)
 
-`revenue_at_risk = sum(current_mrr for at_risk) + sum(avg_monthly_revenue for churned)`.
+`current_mrr_at_risk` and `churned_monthly_value_proxy` are reported separately
+to avoid mixing future exposure with realised churn.
 """, encoding="utf-8")
 
 

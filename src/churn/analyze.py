@@ -6,6 +6,7 @@ import pandas as pd
 
 from churn.common import (
     infer_snapshot_date,
+    last_complete_month_start,
     outputs_tables_dir,
     processed_dir,
     raw_dir,
@@ -34,9 +35,10 @@ def load_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
 
 def monthly_retention_trend(subs: pd.DataFrame, snapshot: pd.Timestamp) -> pd.DataFrame:
+    last_complete_month = last_complete_month_start(snapshot)
     months = pd.period_range(
         start=subs["subscription_start_date"].min().to_period("M"),
-        end=snapshot.to_period("M"),
+        end=last_complete_month.to_period("M"),
         freq="M",
     )
     rows: list[dict] = []
@@ -76,9 +78,10 @@ def monthly_dimensional_trend(features: pd.DataFrame, subs: pd.DataFrame, snapsh
     enriched = subs.merge(
         features[["customer_id", *dims]], on="customer_id", how="left",
     )
+    last_complete_month = last_complete_month_start(snapshot)
     months = pd.period_range(
         start=subs["subscription_start_date"].min().to_period("M"),
-        end=snapshot.to_period("M"),
+        end=last_complete_month.to_period("M"),
         freq="M",
     )
 
@@ -120,12 +123,12 @@ def overall_health(features: pd.DataFrame, subs: pd.DataFrame, snapshot: pd.Time
     total = len(features)
     churned = int((features["churn_flag"] == 1).sum())
     at_risk = int((features["at_risk_flag"] == 1).sum())
-    customer_churn = churned / total if total else 0.0
+    cumulative_customer_churn_share = churned / total if total else 0.0
 
     total_value = float(features["avg_monthly_revenue"].sum())
     churned_value = float(features.loc[features["churn_flag"] == 1, "avg_monthly_revenue"].sum())
     at_risk_mrr = float(features.loc[features["at_risk_flag"] == 1, "current_mrr"].sum())
-    revenue_churn = churned_value / total_value if total_value else 0.0
+    cumulative_revenue_loss_share = churned_value / total_value if total_value else 0.0
 
     trend = monthly_retention_trend(subs, snapshot)
     mature = trend[trend["active_customers_start"] >= 100].tail(12)
@@ -142,12 +145,14 @@ def overall_health(features: pd.DataFrame, subs: pd.DataFrame, snapshot: pd.Time
         "active_customers": total - churned,
         "churned_customers": churned,
         "at_risk_customers": at_risk,
-        "customer_churn_rate": customer_churn,
-        "total_monthly_value": total_value,
-        "churned_monthly_value": churned_value,
-        "revenue_churn_rate": revenue_churn,
+        "cumulative_customer_churn_share": cumulative_customer_churn_share,
+        "portfolio_monthly_value_proxy": total_value,
+        "churned_monthly_value_proxy": churned_value,
+        "cumulative_revenue_loss_share": cumulative_revenue_loss_share,
         "at_risk_mrr": at_risk_mrr,
-        "customer_vs_revenue_churn_delta": revenue_churn - customer_churn,
+        "cumulative_customer_vs_revenue_loss_delta": (
+            cumulative_revenue_loss_share - cumulative_customer_churn_share
+        ),
         "avg_customer_churn_last12": float(mature["customer_churn_rate"].mean()) if len(mature) else np.nan,
         "avg_revenue_churn_last12": float(mature["revenue_churn_rate"].mean()) if len(mature) else np.nan,
         "customer_churn_slope_last12": cust_slope,
@@ -196,11 +201,11 @@ def churn_by_dimension(features: pd.DataFrame, dim: str) -> pd.DataFrame:
     out = df.groupby(dim, as_index=False).agg(
         customers=("customer_id", "count"),
         churned_customers=("churn_flag", "sum"),
-        churn_rate=("churn_flag", "mean"),
+        cumulative_churn_share=("churn_flag", "mean"),
         churned_revenue=("churned_revenue", "sum"),
         avg_monthly_revenue=("avg_monthly_revenue", "mean"),
     )
-    return out.sort_values("churn_rate", ascending=False).reset_index(drop=True)
+    return out.sort_values("cumulative_churn_share", ascending=False).reset_index(drop=True)
 
 
 def behavioral_relationships(features: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
@@ -272,10 +277,10 @@ def rank_drivers(features: pd.DataFrame, thresholds: dict) -> pd.DataFrame:
             "baseline_churn_rate": round(baseline, 6),
             "churn_rate_lift": round(rate / baseline, 4) if baseline else np.nan,
             "avg_monthly_revenue": round(avg_value, 2),
-            "estimated_excess_mrr_loss": round(max(rate - baseline, 0) * n * avg_value, 2),
+            "excess_mrr_association_proxy": round(max(rate - baseline, 0) * n * avg_value, 2),
         })
     return (pd.DataFrame(rows).drop_duplicates(subset=["driver"])
-            .sort_values(["estimated_excess_mrr_loss", "churn_rate_lift"], ascending=False)
+            .sort_values(["excess_mrr_association_proxy", "churn_rate_lift"], ascending=False)
             .reset_index(drop=True))
 
 
@@ -306,9 +311,11 @@ def revenue_at_risk(features: pd.DataFrame) -> tuple[dict, pd.DataFrame, pd.Data
         at_risk_mrr=("at_risk_mrr_component", "sum"),
         churned_revenue=("churned_revenue_component", "sum"),
     )
-    seg_loss["future_revenue_risk"] = seg_loss["at_risk_mrr"]
-    seg_loss["total_revenue_loss_proxy"] = seg_loss["at_risk_mrr"] + seg_loss["churned_revenue"]
-    seg_loss = seg_loss.sort_values("total_revenue_loss_proxy", ascending=False).reset_index(drop=True)
+    seg_loss = seg_loss.rename(columns={
+        "at_risk_mrr": "current_mrr_at_risk",
+        "churned_revenue": "churned_monthly_value_proxy",
+    })
+    seg_loss = seg_loss.sort_values("current_mrr_at_risk", ascending=False).reset_index(drop=True)
 
     df["value_tier"] = pd.qcut(df["avg_monthly_revenue"], q=4,
                                 labels=["Low", "Mid-Low", "Mid-High", "High"], duplicates="drop")
@@ -324,9 +331,9 @@ def revenue_at_risk(features: pd.DataFrame) -> tuple[dict, pd.DataFrame, pd.Data
 
     summary = {
         "at_risk_mrr": at_risk_mrr,
-        "hidden_at_risk_mrr": hidden_mrr,
-        "future_revenue_at_risk": at_risk_mrr + hidden_mrr,
-        "realized_churned_revenue": churned_value,
+        "behavioral_signal_mrr": hidden_mrr,
+        "current_mrr_exposure": at_risk_mrr + hidden_mrr,
+        "churned_monthly_value_proxy": churned_value,
     }
     return summary, seg_loss, tier_stats
 
@@ -366,25 +373,25 @@ def intervention_priorities(features: pd.DataFrame) -> pd.DataFrame:
     ]
 
     rows: list[dict] = []
-    for name, recoverable, benchmark, action in plays:
-        recoverable = recoverable.fillna(False)
+    for name, candidate, benchmark, action in plays:
+        candidate = candidate.fillna(False)
         benchmark = benchmark.fillna(False)
-        rec_n = int(recoverable.sum())
-        rec_mrr = float(features.loc[recoverable, "current_mrr"].sum())
+        candidate_n = int(candidate.sum())
+        current_mrr_scope = float(features.loc[candidate, "current_mrr"].sum())
         bench_rate = float(features.loc[benchmark, "churn_flag"].mean()) if int(benchmark.sum()) else 0.0
-        top_segments = (features.loc[recoverable].groupby("segment")["current_mrr"]
+        top_segments = (features.loc[candidate].groupby("segment")["current_mrr"]
                         .sum().sort_values(ascending=False).head(2))
         focus = ", ".join(f"{seg} ({_money(val)})" for seg, val in top_segments.items()) or "n/a"
         rows.append({
             "opportunity": name,
-            "recoverable_customers": rec_n,
-            "recoverable_mrr": round(rec_mrr, 2),
-            "benchmark_churn_rate": round(bench_rate, 6),
-            "priority_score": round(rec_mrr * bench_rate, 2),
+            "candidate_customers": candidate_n,
+            "current_mrr_scope": round(current_mrr_scope, 2),
+            "historical_churn_share": round(bench_rate, 6),
+            "mrr_exposure_proxy": round(current_mrr_scope * bench_rate, 2),
             "segment_focus": focus,
             "recommended_action": action,
         })
-    return pd.DataFrame(rows).sort_values("priority_score", ascending=False).reset_index(drop=True)
+    return pd.DataFrame(rows).sort_values("mrr_exposure_proxy", ascending=False).reset_index(drop=True)
 
 
 def structured_findings(
@@ -403,16 +410,16 @@ def structured_findings(
     return pd.DataFrame([
         {
             "section": "1. Overall Retention Health",
-            "question": "How severe is current revenue loss and pre-churn pressure?",
-            "metrics_used": "active customers, churn rate, revenue churn rate, at-risk MRR",
+            "question": "How large are cumulative loss and current pre-churn pressure?",
+            "metrics_used": "active customers, cumulative churn share, cumulative revenue loss share, at-risk MRR",
             "result": (
                 f"Active base {overall['active_customers']:,} / {overall['total_customers']:,}; "
-                f"customer churn {_pct(overall['customer_churn_rate'])}; "
-                f"revenue churn {_pct(overall['revenue_churn_rate'])}; "
+                f"cumulative customer churn {_pct(overall['cumulative_customer_churn_share'])}; "
+                f"cumulative revenue loss share {_pct(overall['cumulative_revenue_loss_share'])}; "
                 f"at-risk MRR {_money(overall['at_risk_mrr'])}."
             ),
-            "business_interpretation": "Pressure is material and needs both churn response and pre-churn prevention.",
-            "caveat": "Revenue churn uses a monthly-value proxy, not full contract ARR.",
+            "business_interpretation": "Use monthly trends for rate monitoring and the open-account queue for prevention.",
+            "caveat": "Cumulative revenue loss uses a monthly-value proxy, not full contract ARR.",
         },
         {
             "section": "2. Cohort Retention",
@@ -429,24 +436,24 @@ def structured_findings(
         {
             "section": "3. Churn Drivers",
             "question": "Which customer groups and behaviours associate with churn most strongly?",
-            "metrics_used": "dimension churn rates, behavioural churn-rate lift",
+            "metrics_used": "dimension cumulative churn shares, behavioural churn-share lift",
             "result": (
-                f"Highest segment churn: {top_segment['segment']} ({_pct(top_segment['churn_rate'])}); "
-                f"region: {top_region['region']} ({_pct(top_region['churn_rate'])}); "
-                f"channel: {top_channel['acquisition_channel']} ({_pct(top_channel['churn_rate'])}); "
-                f"plan: {top_plan['plan_type']} ({_pct(top_plan['churn_rate'])}); "
+                f"Highest cumulative churn share: {top_segment['segment']} ({_pct(top_segment['cumulative_churn_share'])}); "
+                f"region: {top_region['region']} ({_pct(top_region['cumulative_churn_share'])}); "
+                f"channel: {top_channel['acquisition_channel']} ({_pct(top_channel['cumulative_churn_share'])}); "
+                f"plan: {top_plan['plan_type']} ({_pct(top_plan['cumulative_churn_share'])}); "
                 f"strongest behavioural lift: {top_driver['relationship']} ({top_driver['churn_rate_lift']:.2f}x)."
             ),
-            "business_interpretation": "Churn is driven by both acquisition mix and account-health deterioration.",
+            "business_interpretation": "Acquisition mix and pre-churn account health both separate retained from churned accounts.",
             "caveat": "Relationships are associative; causal effects require controlled experiments.",
         },
         {
             "section": "4. Revenue at Risk",
-            "question": "Where is future revenue most exposed and is loss concentrated in high-value accounts?",
-            "metrics_used": "future revenue at risk, segment loss concentration, value-tier churn mix",
+            "question": "Where is current MRR exposed and is loss concentrated in high-value accounts?",
+            "metrics_used": "current MRR exposure, segment loss concentration, value-tier churn mix",
             "result": (
-                f"Future revenue at risk {_money(revenue_risk['future_revenue_at_risk'])}; "
-                f"largest loss segment {top_loss['segment']} ({_money(top_loss['total_revenue_loss_proxy'])}); "
+                f"Current MRR exposure {_money(revenue_risk['current_mrr_exposure'])}; "
+                f"largest explicitly at-risk segment {top_loss['segment']} ({_money(top_loss['current_mrr_at_risk'])}); "
                 f"high-tier share of churned customers {_pct(high_tier_share)}."
             ),
             "business_interpretation": "Concentration justifies targeted save motions over broad campaigns.",
@@ -454,15 +461,15 @@ def structured_findings(
         },
         {
             "section": "5. Retention Opportunities",
-            "question": "Which intervention plays offer the highest retention ROI now?",
-            "metrics_used": "recoverable customers, recoverable MRR, benchmark churn, priority score",
+            "question": "Which intervention queues carry the largest weighted MRR exposure?",
+            "metrics_used": "candidate customers, current MRR scope, historical churn share, MRR exposure proxy",
             "result": (
-                f"Top play: {interventions.iloc[0]['opportunity']} with recoverable MRR "
-                f"{_money(interventions.iloc[0]['recoverable_mrr'])} "
-                f"and benchmark churn {_pct(interventions.iloc[0]['benchmark_churn_rate'])}."
+                f"Top play: {interventions.iloc[0]['opportunity']} with current MRR scope "
+                f"{_money(interventions.iloc[0]['current_mrr_scope'])} "
+                f"and historical churn share {_pct(interventions.iloc[0]['historical_churn_share'])}."
             ),
-            "business_interpretation": "Sequence plays by recoverable MRR × churn propensity to maximise near-term impact.",
-            "caveat": "Priority scores are heuristic; validate against intervention conversion data.",
+            "business_interpretation": "Use the exposure proxy to sequence tests, not to claim expected ROI.",
+            "caveat": "Exposure proxies are heuristic; validate them against intervention conversion data.",
         },
     ])
 
@@ -507,8 +514,9 @@ def main() -> None:
     plays.to_csv(out / "main_analysis_intervention_priorities.csv", index=False)
     findings.to_csv(out / "main_analysis_structured_findings.csv", index=False)
 
-    print(f"Analysis complete. customer_churn={overall['customer_churn_rate']:.3f}, "
-          f"revenue_churn={overall['revenue_churn_rate']:.3f}, "
+    print(f"Analysis complete. cumulative_customer_churn="
+          f"{overall['cumulative_customer_churn_share']:.3f}, "
+          f"cumulative_revenue_loss={overall['cumulative_revenue_loss_share']:.3f}, "
           f"at_risk_mrr={_money(overall['at_risk_mrr'])}.")
 
 

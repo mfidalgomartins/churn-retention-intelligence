@@ -44,7 +44,7 @@
       "grain": "one_row_per_customer_snapshot",
       "primary_key": "customer_id",
       "required_columns": [
-        "customer_id", "churn_flag", "at_risk_flag",
+        "customer_id", "observation_date", "churn_flag", "at_risk_flag",
         "current_mrr", "avg_monthly_revenue",
         "usage_trend", "support_tickets_90d", "nps_score_recent",
         "payment_failure_flag"
@@ -52,10 +52,10 @@
     },
     "processed_risk_scores": {
       "path": "data/processed/customer_risk_scores.csv",
-      "grain": "one_row_per_recoverable_customer",
+      "grain": "one_row_per_open_customer",
       "primary_key": "customer_id",
       "required_columns": [
-        "customer_id", "churn_risk_score", "revenue_risk_score",
+        "customer_id", "churn_risk_score", "customer_value_score",
         "retention_priority_score", "risk_tier",
         "main_risk_driver", "recommended_action"
       ]
