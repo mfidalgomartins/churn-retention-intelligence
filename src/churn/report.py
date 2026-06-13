@@ -386,8 +386,7 @@ class ReportDoc(BaseDocTemplate):
         canvas.drawRightString(PAGE_W - RMARGIN, y,
                                f"Retention Review  ·  Page {doc.page}")
         canvas.setFont("Helvetica", 7)
-        canvas.drawCentredString(PAGE_W / 2, y,
-                                 "Synthetic data  ·  decision-support only")
+        canvas.drawCentredString(PAGE_W / 2, y, "")
         canvas.restoreState()
 
 
@@ -437,12 +436,10 @@ def build_story(styles: dict, M: dict) -> list:
     story.append(Spacer(1, 5.4 * cm))
     story.append(rule(HAIR, 0.6, 0, 8))
     story.append(P(
-        f"Prepared by the Retention Analytics function  ·  Release reference {BUILD_DATE}<br/>"
+        "Retention Analytics  ·  "
         "Companion deliverable to the self-contained executive dashboard "
         "(executive-retention-command-center.html).<br/>"
-        "<b>Confidential working analysis.</b> Built on deterministic synthetic "
-        "data for portfolio demonstration. Findings are decision-support, not "
-        "audited financial results.",
+        "Findings are decision-support only, not audited financial results.",
         styles, "cover_meta"))
     story.append(NextPageTemplate("content"))
     story.append(PageBreak())
@@ -528,7 +525,7 @@ def build_story(styles: dict, M: dict) -> list:
 
     story.append(P(
         "The recommended sequence follows directly from these three findings and "
-        "is set out in full in Section 09. In short: stand up the renewal save desk "
+        "is set out in full in Section 11. In short: stand up the renewal save desk "
         "first because it carries the largest weighted exposure and the accounts are "
         "already identifiable; fix the payment-failure path second because it is "
         "cheap to run and the affected accounts churn at more than seven times the "
@@ -541,10 +538,8 @@ def build_story(styles: dict, M: dict) -> list:
         "One caveat frames everything that follows. This analysis runs on "
         "deterministic synthetic data and the risk score is a transparent "
         "prioritisation index, not a calibrated churn probability. The patterns are "
-        "internally consistent and the method is the deliverable. On a real book the "
-        "same pipeline would produce the same artifacts; the numbers would move but "
-        "the analytical questions and the way they are answered would not. Section "
-        "08 states the limitations in full.", styles))
+        "internally consistent, but the exact magnitudes are illustrative. Section "
+        "10 states the limitations in full.", styles))
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
@@ -666,10 +661,9 @@ def build_story(styles: dict, M: dict) -> list:
         "behavioural processes, then simulates usage, support, payment, and survey "
         "events consistent with that propensity. The result is a book in which the "
         "relationships between account health and churn are real and stable but "
-        "designed rather than discovered. This is the right substrate for "
-        "demonstrating a retention method end to end. It is not a substitute for the "
-        "messy, partially observed data of a live business, and the report treats "
-        "the magnitudes as illustrative while treating the method as the product.",
+        "designed rather than discovered. The report treats the magnitudes as "
+        "illustrative; the metric definitions, the analytical framework, and the "
+        "prioritisation logic are the transferable outputs.",
         styles))
 
     H2("Metric definitions", "s3c", styles, story)
@@ -834,7 +828,7 @@ def build_story(styles: dict, M: dict) -> list:
         "losing accounts faster than it was. The measurement reading is that accounts "
         "closing near the snapshot date are mechanically over-represented because the "
         "window is right-censored, so the final months are not yet fully comparable "
-        "to settled history. Section 08 returns to this. Either way the recent "
+        "to settled history. Section 10 returns to this. Either way the recent "
         "months warrant attention rather than alarm.", styles))
 
     story.append(fig("recent_churn_acceleration.png",
@@ -1170,7 +1164,7 @@ def build_story(styles: dict, M: dict) -> list:
     ))
     story.append(P(
         "The five behavioural signals at the top of this table are the foundation of "
-        "the risk index in Section 04 and of the intervention queues in Section 10. "
+        "the risk index in Section 04 and of the intervention queues in Section 11. "
         "They are also the natural candidates for the controlled experiments the "
         "framework calls for: each one defines a population, a plausible "
         "intervention, and a revenue stake large enough to justify the test.",
@@ -1340,6 +1334,18 @@ def build_story(styles: dict, M: dict) -> list:
         "between tiers and changes the headline counts. The ranking is stable to "
         "these choices; the exact tier populations are not, and any operational "
         "commitment to a tier size should be set against real data.", styles))
+
+    H2("The book is observed at a single snapshot", "s10f", styles, story)
+    story.append(P(
+        "Every active account is measured at one date, the reference snapshot, rather "
+        "than followed continuously. That keeps the cross-sectional comparison clean, "
+        "because every account is read at a comparable point in its own life, but it "
+        "means the analysis cannot see seasonality, recovery, or the path an account "
+        "took to its current state. An account that spiked on support tickets last "
+        "month and has since settled looks the same at the snapshot as one still "
+        "deteriorating. A live deployment would refresh the snapshot on a schedule "
+        "and watch the trajectory between refreshes, which would sharpen the risk "
+        "index and catch recoveries the single snapshot misses.", styles))
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
@@ -1552,19 +1558,7 @@ def build_story(styles: dict, M: dict) -> list:
         "governed pipeline; neither contains a number the other cannot reproduce.",
         styles))
 
-    H2("F. Reproducibility", "s12e", styles, story)
-    story.append(P(
-        "Every artifact behind this report is reconstructible. The pipeline runs "
-        "generate, profile, features, analyze, risk, dashboard, and validate in "
-        "order from a fixed seed, governed by data contracts that are checked before "
-        "release. Regenerating the charts and rebuilding this document from the "
-        "processed data reproduces it byte-for-byte when the optional "
-        "CHURN_REPORT_DATE override is unchanged. The limits stated in Section 10 "
-        "apply in full: this is a "
-        "decision-support analysis on synthetic data, not an audited financial "
-        "statement.", styles))
-
-    H2("G. Per-account feature dictionary", "s12f", styles, story)
+    H2("F. Per-account feature dictionary", "s12f", styles, story)
     story.append(P(
         "The behavioural signals examined in Sections 07 and 08 and scored in the "
         "risk index are measured at the account's churn date or, for active accounts, "

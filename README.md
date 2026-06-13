@@ -1,17 +1,18 @@
 # Churn & Retention Intelligence
 
-A reproducible SaaS retention analysis that measures churn, audits cohorts, and
-ranks open accounts by behavioural risk adjusted for customer value.
+A SaaS retention analysis that measures churn, audits cohorts, and ranks open
+accounts by behavioural risk adjusted for customer value.
 
-**Open:** [Live dashboard](https://mfidalgomartins.github.io/churn-retention-intelligence/)
-· [PDF analysis](outputs/reports/churn-retention-intelligence-report.pdf)
+**[Live dashboard](https://mfidalgomartins.github.io/churn-retention-intelligence/)**
+&nbsp;&nbsp;·&nbsp;&nbsp;
+**[PDF report](https://github.com/mfidalgomartins/churn-retention-intelligence/blob/main/outputs/reports/churn-retention-intelligence-report.pdf)**
 
-![Intervention priorities by account coverage and MRR](outputs/graphs/intervention_priorities.png)
+![Retention plays ranked by weighted MRR exposure](outputs/graphs/intervention_priorities.png)
 
-The deterministic case covers **3,500 synthetic B2B SaaS accounts** through the
+The analysis covers **3,500 synthetic B2B SaaS accounts** through a
 **2026-03-01 snapshot**. The main deliverable is a self-contained dashboard
-with a prioritised account queue: which accounts to review first, why, and with
-what intervention.
+with a prioritised account queue: which accounts to review first, why, and
+with what intervention.
 
 ## What it does
 
@@ -19,9 +20,9 @@ what intervention.
 generate → profile → features → analyze → risk → dashboard → validate
 ```
 
-Every generated artifact is deterministic (`seed = 42`), governed by data
-contracts, and checked before release. The dashboard embeds its data and chart
-runtime, so it works without a server or network connection.
+Every artifact is deterministic (seed 42), governed by data contracts, and
+checked before release. The dashboard embeds its data and chart runtime and
+works without a server or network connection.
 
 ## Quickstart
 
@@ -32,7 +33,7 @@ make test
 ```
 
 `make release` rebuilds the raw simulation, analytical outputs, validated
-dashboard, 18-chart pack, and PDF report. `make test` runs unit and end-to-end
+dashboard, chart pack, and PDF report. `make test` runs unit and end-to-end
 checks.
 
 ## What the pipeline produces
@@ -44,14 +45,14 @@ checks.
 | Analysis | `outputs/tables/main_analysis_*.csv` | Trends, drivers, revenue at risk, intervention plays |
 | Risk | `data/processed/customer_risk_scores.csv` | Tiered priority queue with recommended actions |
 | Dashboard | `outputs/dashboard/executive-retention-command-center.html` | Self-contained UI for executive review |
-| Chart pack | `outputs/graphs/*.png` | 18 static charts; regenerate with `make charts` |
-| Report | `outputs/reports/churn-retention-intelligence-report.pdf` | ~30-page narrative analysis with charts inline; `make report` |
+| Chart pack | `outputs/graphs/*.png` | Static charts; regenerate with `make charts` |
+| Report | `outputs/reports/churn-retention-intelligence-report.pdf` | Narrative analysis with charts inline; `make report` |
 | Governance | `outputs/tables/*validation*.csv`, `release_readiness_matrix.csv` | Release gates and audit log |
 
 ## Decisions it supports
 
 - How monthly customer and revenue churn are moving.
-- Which cohorts and commercial groups have the highest cumulative churn share.
+- Which cohorts and commercial groups carry a disproportionate share of the loss.
 - Which open accounts combine behavioural risk with material customer value.
 
 ## Architecture
@@ -68,7 +69,7 @@ tests/test_integration.py   end-to-end artifact and gate tests
 ```
 
 Each module is invocable via `python -m churn.<name>` and reads its inputs from
-governed locations only — no module reaches outside its declared contract.
+governed locations only, with no module reaching outside its declared contract.
 
 ## Limits
 
