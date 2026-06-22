@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ALL_TOKEN = "__all__"
+ALL_FILTER_VALUE = "__all__"
 RISK_ORDER = ["critical", "high", "medium", "low", "churned"]
 OFFICIAL_DASHBOARD_FILENAME = "executive-retention-command-center.html"
 
@@ -36,7 +36,7 @@ def _expand_dims_with_all(df: pd.DataFrame, dims: list[str]) -> pd.DataFrame:
         part = df.copy()
         for idx, dim in enumerate(dims):
             if use_all_mask[idx] == 1:
-                part[dim] = ALL_TOKEN
+                part[dim] = ALL_FILTER_VALUE
         expanded_frames.append(part)
     return pd.concat(expanded_frames, ignore_index=True)
 
@@ -210,7 +210,7 @@ def _build_risk_kpi_cube(scored: pd.DataFrame) -> pd.DataFrame:
     expanded_dims = _expand_dims_with_all(base, dims)
 
     all_rows = expanded_dims.copy()
-    all_rows["risk_tier_filter"] = ALL_TOKEN
+    all_rows["risk_tier_filter"] = ALL_FILTER_VALUE
 
     tier_rows = expanded_dims.copy()
     tier_rows["risk_tier_filter"] = tier_rows["risk_tier"]
@@ -350,7 +350,14 @@ def build_html(data_json: str, chart_js: str) -> str:
     """Render the dashboard HTML by injecting the data JSON and Chart.js into the template."""
     # Defensive escaping for inline <script> boundaries.
     safe_chart_js = chart_js.replace("</script", "<\\/script")
-    safe_data_json = data_json.replace("</script", "<\\/script")
+    safe_data_json = (
+        data_json
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     return template.replace("__CHART_JS__", safe_chart_js).replace("__DATA_JSON__", safe_data_json)
 

@@ -8,7 +8,9 @@
 - `architecture/dashboard_design_note.md` — why the dashboard is shaped the way it is.
 - `governance/`
   - `qa_release_framework.md` — readiness states and gate logic.
-  - `release_runbook.md` — how to cut a release.
+  - `quality_security_gates.md` — lint, coverage, dependency, and security gates.
+  - `release_runbook.md` — release verification, evidence, and rollback steps.
+- `../SECURITY.md` — vulnerability reporting and support policy.
 
 Files marked **generated** are regenerated whenever the corresponding `make`
 target runs — edit the source code, not the file.

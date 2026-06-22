@@ -40,6 +40,71 @@ TIER_CUTOFFS: dict[str, float] = {
     "medium":   15.0,
 }
 
+REQUIRED_FEATURE_COLUMNS: tuple[str, ...] = (
+    "customer_id",
+    "segment",
+    "region",
+    "acquisition_channel",
+    "plan_type",
+    "tenure_days",
+    "current_mrr",
+    "avg_monthly_revenue",
+    "lifetime_revenue",
+    "recent_sessions_30d",
+    "usage_trend",
+    "support_tickets_90d",
+    "nps_score_recent",
+    "feature_adoption_score_recent",
+    "failed_payments_90d",
+    "payment_failure_flag",
+    "renewal_near_flag",
+    "churn_flag",
+    "at_risk_flag",
+)
+
+SCORE_OUTPUT_COLUMNS: list[str] = [
+    "customer_id",
+    "segment",
+    "region",
+    "acquisition_channel",
+    "plan_type",
+    "tenure_days",
+    "current_mrr",
+    "avg_monthly_revenue",
+    "lifetime_revenue",
+    "churn_risk_score",
+    "customer_value_score",
+    "retention_priority_score",
+    "risk_tier",
+    "main_risk_driver",
+    "recommended_action",
+    "recommendation_context",
+    "at_risk_flag",
+    "payment_failure_flag",
+    "renewal_near_flag",
+    "usage_trend",
+    "support_tickets_90d",
+    "nps_score_recent",
+    "feature_adoption_score_recent",
+    "failed_payments_90d",
+]
+
+TIER_SUMMARY_COLUMNS: list[str] = [
+    "risk_tier",
+    "customers",
+    "share_of_scored_base",
+    "total_current_mrr",
+    "avg_churn_risk_score",
+    "avg_customer_value_score",
+    "avg_retention_priority_score",
+]
+
+
+def _validate_feature_input(features: pd.DataFrame) -> None:
+    missing = sorted(set(REQUIRED_FEATURE_COLUMNS) - set(features.columns))
+    if missing:
+        raise ValueError(f"features missing required columns: {missing}")
+
 
 def normalize_signals(df: pd.DataFrame) -> pd.DataFrame:
     """Map raw features to 0-1 signals. Higher = more risk."""
@@ -142,7 +207,11 @@ def recommendation_context(scored: pd.DataFrame) -> pd.Series:
 
 
 def compute_scores(features: pd.DataFrame) -> pd.DataFrame:
+    _validate_feature_input(features)
     scored = features[features["churn_flag"] == 0].copy()
+    if scored.empty:
+        return pd.DataFrame(columns=SCORE_OUTPUT_COLUMNS)
+
     signals = normalize_signals(scored)
 
     scored["churn_risk_score"] = churn_risk_score(scored, signals).values
@@ -164,18 +233,27 @@ def compute_scores(features: pd.DataFrame) -> pd.DataFrame:
         ["retention_priority_score", "current_mrr"], ascending=[False, False]
     ).reset_index(drop=True)
 
-    return scored[[
-        "customer_id", "segment", "region", "acquisition_channel", "plan_type",
-        "tenure_days", "current_mrr", "avg_monthly_revenue", "lifetime_revenue",
-        "churn_risk_score", "customer_value_score", "retention_priority_score",
-        "risk_tier", "main_risk_driver", "recommended_action", "recommendation_context",
-        "at_risk_flag", "payment_failure_flag", "renewal_near_flag",
-        "usage_trend", "support_tickets_90d", "nps_score_recent",
-        "feature_adoption_score_recent", "failed_payments_90d",
-    ]]
+    return scored[SCORE_OUTPUT_COLUMNS]
 
 
 def risk_tier_summary(scored: pd.DataFrame) -> pd.DataFrame:
+    if scored.empty:
+        return pd.DataFrame(
+            [
+                {
+                    "risk_tier": tier,
+                    "customers": 0,
+                    "share_of_scored_base": 0.0,
+                    "total_current_mrr": 0.0,
+                    "avg_churn_risk_score": 0.0,
+                    "avg_customer_value_score": 0.0,
+                    "avg_retention_priority_score": 0.0,
+                }
+                for tier in ["critical", "high", "medium", "low"]
+            ],
+            columns=TIER_SUMMARY_COLUMNS,
+        )
+
     summary = scored.groupby("risk_tier", as_index=False).agg(
         customers=("customer_id", "count"),
         share_of_scored_base=("customer_id", lambda s: len(s) / len(scored)),
@@ -285,7 +363,10 @@ def main() -> None:
     write_methodology_note()
 
     print(f"Scored {len(scored)} customers across {summary['risk_tier'].nunique()} tiers.")
-    print(f"Top priority: {scored.iloc[0]['customer_id']} @ {scored.iloc[0]['retention_priority_score']:.1f}")
+    if scored.empty:
+        print("Top priority: none (no open customers to score).")
+    else:
+        print(f"Top priority: {scored.iloc[0]['customer_id']} @ {scored.iloc[0]['retention_priority_score']:.1f}")
 
 
 if __name__ == "__main__":

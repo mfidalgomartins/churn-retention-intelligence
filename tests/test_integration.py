@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import os
 import subprocess
@@ -250,14 +251,14 @@ class TestIntegration(unittest.TestCase):
     def test_dashboard_priority_scope_count_matches_priority_mrr_scope(self) -> None:
         import pandas as pd
 
-        from churn.dashboard import ALL_TOKEN, load_data
+        from churn.dashboard import ALL_FILTER_VALUE, load_data
 
         payload = load_data(ROOT)
         all_row = next(
             row
             for row in payload["risk_kpi_cube"]
             if all(
-                row[dim] == ALL_TOKEN
+                row[dim] == ALL_FILTER_VALUE
                 for dim in (
                     "segment",
                     "region",
@@ -295,12 +296,16 @@ print(hashlib.sha256(payments.to_csv(index=False).encode("utf-8")).hexdigest())
 
         hashes = []
         for hash_seed in ("1", "2"):
-            env = {**os.environ, "PYTHONHASHSEED": hash_seed}
+            env = {
+                "PATH": os.environ.get("PATH", ""),
+                "PYTHONHASHSEED": hash_seed,
+            }
             hashes.append(subprocess.check_output(
                 [sys.executable, "-c", code],
                 cwd=ROOT,
                 env=env,
                 text=True,
+                timeout=30,
             ).strip())
         self.assertEqual(hashes[0], hashes[1])
 
@@ -322,8 +327,18 @@ print(hashlib.sha256(payments.to_csv(index=False).encode("utf-8")).hexdigest())
         makefile_text = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn("$(MOD).contracts", makefile_text)
         self.assertIn("$(MOD).validate", makefile_text)
+        self.assertIn("coverage:", makefile_text)
+        self.assertIn("security:", makefile_text)
+        self.assertIn("quality: lint coverage security", makefile_text)
         self.assertIn("all: data profile features analyze risk dashboard validate\n\t$(MOD).dashboard", makefile_text)
         self.assertIn("release: all report", makefile_text)
+
+    def test_ci_runs_full_quality_gate(self) -> None:
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        self.assertIn("make release", workflow)
+        self.assertIn("make quality", workflow)
+        self.assertNotIn("run: make test\n", workflow)
+        self.assertNotIn("run: make lint\n", workflow)
 
     def test_published_release_artifacts_exist(self) -> None:
         graph_files = sorted((ROOT / "outputs/graphs").glob("*.png"))
@@ -334,6 +349,43 @@ print(hashlib.sha256(payments.to_csv(index=False).encode("utf-8")).hexdigest())
         self.assertTrue(
             (ROOT / "outputs/dashboard/executive-retention-command-center.html").exists()
         )
+
+    def test_dashboard_json_payload_escapes_script_breakout_strings(self) -> None:
+        from churn.dashboard import build_html
+
+        payload = json.dumps(
+            {
+                "hostile": "</script><img src=x onerror=alert(1)>",
+                "line_separator": "\u2028",
+                "paragraph_separator": "\u2029",
+                "ampersand": "a&b",
+            },
+            ensure_ascii=False,
+        )
+
+        html = build_html(payload, "console.log('ok');")
+
+        self.assertNotIn("</script><img", html)
+        self.assertNotIn("<img src=x onerror", html)
+        self.assertIn("\\u003c/script\\u003e", html)
+        self.assertIn("\\u0026", html)
+        self.assertIn("\\u2028", html)
+        self.assertIn("\\u2029", html)
+
+    def test_vendored_assets_match_declared_manifest(self) -> None:
+        manifest_path = ROOT / "config/vendor_assets.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["version"], 1)
+
+        for asset in manifest["assets"]:
+            path = ROOT / asset["path"]
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            header = path.read_text(encoding="utf-8", errors="ignore")[:500]
+
+            self.assertEqual(digest, asset["sha256"])
+            self.assertIn(asset["package"], header)
+            self.assertIn(asset["version"], header)
+            self.assertEqual(asset["license"], "MIT")
 
 
 if __name__ == "__main__":

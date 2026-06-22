@@ -20,14 +20,19 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
-    "numpy>=2.0",
-    "pandas>=2.2",
-    "PyYAML>=6.0",
+    "numpy>=2.0,<3",
+    "pandas>=2.2,<4",
+    "PyYAML>=6.0,<7",
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.15"]
-charts = ["matplotlib>=3.9", "reportlab>=4.0"]
+dev = [
+    "bandit[toml]>=1.8,<2",
+    "coverage[toml]>=7.6,<8",
+    "pip-audit>=2.7,<3",
+    "ruff>=0.15,<1",
+]
+charts = ["matplotlib>=3.9,<4", "reportlab>=4.0,<5"]
 
 [project.urls]
 Homepage = "https://mfidalgomartins.github.io/churn-retention-intelligence/"
@@ -52,3 +57,26 @@ ignore = [
     "RUF002",
     "RUF003",
 ]
+
+[tool.coverage.run]
+branch = true
+source = ["churn"]
+omit = [
+    "src/churn/report.py",
+    "src/churn/graphs.py",
+    "src/churn/generate.py",
+    "src/churn/profile.py",
+    "src/churn/validate.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if __name__ == .__main__.:",
+]
+
+[tool.bandit]
+exclude_dirs = [".venv", "build", "dist", "outputs", "tests"]
+skips = ["B101"]

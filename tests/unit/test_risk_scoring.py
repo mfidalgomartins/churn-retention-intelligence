@@ -1,18 +1,27 @@
 """Unit tests for risk scoring."""
 from __future__ import annotations
 
+import contextlib
+import io
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import pandas as pd
 
+from churn import risk
 from churn.risk import (
+    SCORE_OUTPUT_COLUMNS,
     SIGNAL_WEIGHTS,
+    TIER_SUMMARY_COLUMNS,
     assign_tiers,
     churn_risk_score,
     compute_scores,
     customer_value_score,
     main_risk_driver,
     normalize_signals,
+    risk_tier_summary,
 )
 
 
@@ -214,6 +223,120 @@ class TestComputeScoresContract(unittest.TestCase):
                     "retention_priority_score", "risk_tier", "main_risk_driver",
                     "recommended_action"}
         self.assertTrue(required.issubset(scored.columns))
+
+    def test_missing_required_columns_fail_fast(self) -> None:
+        df = _frame(_baseline_row()).drop(columns=["usage_trend"])
+        with self.assertRaisesRegex(ValueError, "missing required columns"):
+            compute_scores(df)
+
+    def test_all_churned_population_returns_empty_stable_schema(self) -> None:
+        df = _frame(
+            _baseline_row(customer_id="A", churn_flag=1),
+            _baseline_row(customer_id="B", churn_flag=1),
+        )
+        scored = compute_scores(df)
+        self.assertEqual(scored.empty, True)
+        self.assertEqual(scored.columns.tolist(), SCORE_OUTPUT_COLUMNS)
+
+
+class TestRiskTierSummary(unittest.TestCase):
+    def test_empty_summary_keeps_all_tiers_and_columns(self) -> None:
+        summary = risk_tier_summary(pd.DataFrame(columns=SCORE_OUTPUT_COLUMNS))
+        self.assertEqual(summary.columns.tolist(), TIER_SUMMARY_COLUMNS)
+        self.assertEqual(summary["risk_tier"].tolist(), ["critical", "high", "medium", "low"])
+        self.assertEqual(summary["customers"].sum(), 0)
+
+    def test_non_empty_summary_orders_tiers_and_rounds_metrics(self) -> None:
+        scored = compute_scores(_frame(
+            _baseline_row(
+                customer_id="critical",
+                current_mrr=2000,
+                avg_monthly_revenue=2000,
+                lifetime_revenue=100000,
+                failed_payments_90d=2,
+                usage_trend=-5,
+                nps_score_recent=-5,
+                feature_adoption_score_recent=10,
+            ),
+            _baseline_row(
+                customer_id="high",
+                current_mrr=1000,
+                avg_monthly_revenue=1000,
+                lifetime_revenue=50000,
+                failed_payments_90d=2,
+                nps_score_recent=0,
+            ),
+            _baseline_row(customer_id="low", current_mrr=100, avg_monthly_revenue=100),
+        ))
+
+        summary = risk_tier_summary(scored)
+
+        self.assertEqual(summary["risk_tier"].tolist(), ["critical", "high", "low"])
+        self.assertEqual(summary["customers"].sum(), 3)
+        self.assertAlmostEqual(float(summary["share_of_scored_base"].sum()), 1.0, places=5)
+        self.assertTrue((summary["total_current_mrr"] >= 0).all())
+
+
+class TestRiskMain(unittest.TestCase):
+    def test_main_writes_scores_summary_and_methodology_note(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            processed = root / "processed"
+            outputs = root / "outputs"
+            docs = root / "docs"
+            processed.mkdir()
+            pd.DataFrame([
+                _baseline_row(
+                    customer_id="A",
+                    failed_payments_90d=2,
+                    nps_score_recent=0,
+                    feature_adoption_score_recent=20,
+                    usage_trend=-4,
+                ),
+                _baseline_row(customer_id="B", churn_flag=1),
+            ]).to_csv(processed / "customer_retention_features.csv", index=False)
+
+            with (
+                mock.patch.object(risk, "processed_dir", return_value=processed),
+                mock.patch.object(risk, "outputs_tables_dir", return_value=outputs),
+                mock.patch.object(risk, "docs_dir", return_value=docs),
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+            ):
+                risk.main()
+
+            scored = pd.read_csv(processed / "customer_risk_scores.csv")
+            summary = pd.read_csv(outputs / "risk_tier_summary.csv")
+            note = docs / "methodology" / "risk_scoring_methodology.md"
+
+            self.assertEqual(scored["customer_id"].tolist(), ["A"])
+            self.assertEqual(summary["customers"].sum(), 1)
+            self.assertIn("Top priority: A", stdout.getvalue())
+            self.assertIn("Risk Scoring Methodology", note.read_text(encoding="utf-8"))
+
+    def test_main_handles_no_open_customers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            processed = root / "processed"
+            outputs = root / "outputs"
+            docs = root / "docs"
+            processed.mkdir()
+            pd.DataFrame([
+                _baseline_row(customer_id="A", churn_flag=1),
+                _baseline_row(customer_id="B", churn_flag=1),
+            ]).to_csv(processed / "customer_retention_features.csv", index=False)
+
+            with (
+                mock.patch.object(risk, "processed_dir", return_value=processed),
+                mock.patch.object(risk, "outputs_tables_dir", return_value=outputs),
+                mock.patch.object(risk, "docs_dir", return_value=docs),
+                contextlib.redirect_stdout(io.StringIO()) as stdout,
+            ):
+                risk.main()
+
+            scored = pd.read_csv(processed / "customer_risk_scores.csv")
+            self.assertEqual(scored.columns.tolist(), SCORE_OUTPUT_COLUMNS)
+            self.assertTrue(scored.empty)
+            self.assertIn("Top priority: none", stdout.getvalue())
 
 
 if __name__ == "__main__":

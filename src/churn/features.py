@@ -241,24 +241,75 @@ def build_cohort_table(subscriptions: pd.DataFrame, snapshot: pd.Timestamp) -> p
         freq="M",
     ).to_timestamp()
 
-    rows: list[dict] = []
-    for cohort_month, group in subs.groupby("cohort_month"):
-        cohort_size = len(group)
-        cohort_mrr = float(group["monthly_revenue"].sum())
-        for obs_month in all_months[all_months >= cohort_month]:
-            month_end = obs_month + pd.offsets.MonthEnd(1)
-            retained = group["subscription_end_date"].isna() | (group["subscription_end_date"] > month_end)
-            retained_n = int(retained.sum())
-            retained_mrr = float(group.loc[retained, "monthly_revenue"].sum())
-            rows.append({
-                "cohort_month": cohort_month.date().isoformat(),
-                "observation_month": obs_month.date().isoformat(),
-                "active_customers": cohort_size,
-                "retained_customers": retained_n,
-                "retention_rate": round(retained_n / cohort_size, 6) if cohort_size else 0.0,
-                "revenue_retention": round(retained_mrr / cohort_mrr, 6) if cohort_mrr else 0.0,
-            })
-    return pd.DataFrame(rows).sort_values(["cohort_month", "observation_month"]).reset_index(drop=True)
+    cohort_summary = (
+        subs.groupby("cohort_month", as_index=False)
+        .agg(
+            active_customers=("subscription_start_date", "size"),
+            cohort_mrr=("monthly_revenue", "sum"),
+        )
+    )
+    month_grid = pd.DataFrame({"observation_month": all_months})
+    cohort_months = cohort_summary.merge(month_grid, how="cross")
+    cohort_months = cohort_months[
+        cohort_months["observation_month"] >= cohort_months["cohort_month"]
+    ].copy()
+
+    ended = subs[subs["subscription_end_date"].notna()].copy()
+    if ended.empty:
+        losses = pd.DataFrame(columns=[
+            "cohort_month",
+            "observation_month",
+            "churned_customers",
+            "churned_mrr",
+        ])
+    else:
+        ended["observation_month"] = ended["subscription_end_date"].dt.to_period("M").dt.to_timestamp()
+        ended["observation_month"] = ended[["observation_month", "cohort_month"]].max(axis=1)
+        losses = (
+            ended.groupby(["cohort_month", "observation_month"], as_index=False)
+            .agg(
+                churned_customers=("subscription_start_date", "size"),
+                churned_mrr=("monthly_revenue", "sum"),
+            )
+        )
+
+    out = (
+        cohort_months.merge(
+            losses,
+            on=["cohort_month", "observation_month"],
+            how="left",
+            validate="one_to_one",
+        )
+        .sort_values(["cohort_month", "observation_month"])
+        .reset_index(drop=True)
+    )
+    out["churned_customers"] = out["churned_customers"].fillna(0).astype(int)
+    out["churned_mrr"] = out["churned_mrr"].fillna(0.0).astype(float)
+
+    cumulative_loss = out.groupby("cohort_month", sort=False)[
+        ["churned_customers", "churned_mrr"]
+    ].cumsum()
+    out["retained_customers"] = out["active_customers"] - cumulative_loss["churned_customers"]
+    retained_mrr = out["cohort_mrr"] - cumulative_loss["churned_mrr"]
+    out["retention_rate"] = (
+        out["retained_customers"].div(out["active_customers"]).fillna(0.0).round(6)
+    )
+    out["revenue_retention"] = np.where(
+        out["cohort_mrr"] != 0,
+        (retained_mrr / out["cohort_mrr"]).round(6),
+        0.0,
+    )
+
+    out["cohort_month"] = out["cohort_month"].dt.date.astype(str)
+    out["observation_month"] = out["observation_month"].dt.date.astype(str)
+    return out[[
+        "cohort_month",
+        "observation_month",
+        "active_customers",
+        "retained_customers",
+        "retention_rate",
+        "revenue_retention",
+    ]]
 
 
 def build_segment_summary(features: pd.DataFrame) -> pd.DataFrame:

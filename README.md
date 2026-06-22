@@ -29,12 +29,22 @@ works without a server or network connection.
 ```bash
 make install
 make release
-make test
+make quality
 ```
 
 `make release` rebuilds the raw simulation, analytical outputs, validated
-dashboard, chart pack, and PDF report. `make test` runs unit and end-to-end
-checks.
+dashboard, chart pack, and PDF report. `make quality` runs lint, coverage, and
+security/dependency checks.
+
+## Governance
+
+Production-facing release rules are documented under `docs/governance/`:
+
+- `qa_release_framework.md` defines readiness states, severities, and gate outputs.
+- `quality_security_gates.md` defines local and CI quality/security checks.
+- `release_runbook.md` defines release verification and rollback steps.
+
+Security reporting and support policy are in `SECURITY.md`.
 
 ## What the pipeline produces
 
@@ -61,6 +71,7 @@ checks.
 src/churn/        pipeline modules (generate, profile, features, analyze, risk, dashboard, contracts, validate)
 src/churn/common  shared constants and helpers (REFERENCE_DATE, SEED, snapshot inference, paths)
 config/           data contracts and release policy
+config/vendor_assets.json  vendored frontend asset versions and hashes
 sql/              PostgreSQL 15+ reference models
 docs/             methodology, governance, decision memo
 outputs/          published dashboard, chart pack, and PDF report

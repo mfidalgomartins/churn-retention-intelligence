@@ -8,11 +8,37 @@ from pathlib import Path
 
 import pandas as pd
 
-REFERENCE_DATE: pd.Timestamp = pd.Timestamp(
-    os.environ.get("CHURN_REFERENCE_DATE", "2026-03-01")
-)
+DEFAULT_REFERENCE_DATE = "2026-03-01"
+DEFAULT_SEED = "42"
 
-SEED: int = int(os.environ.get("CHURN_SEED", "42"))
+
+def _parse_reference_date(value: str | None) -> pd.Timestamp:
+    raw = value or DEFAULT_REFERENCE_DATE
+    try:
+        parsed = pd.Timestamp(raw).normalize()
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"CHURN_REFERENCE_DATE must be a valid date, got {raw!r}"
+        ) from exc
+    if pd.isna(parsed):
+        raise ValueError(f"CHURN_REFERENCE_DATE must be a valid date, got {raw!r}")
+    return parsed
+
+
+def _parse_seed(value: str | None) -> int:
+    raw = value or DEFAULT_SEED
+    try:
+        seed = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"CHURN_SEED must be an integer, got {raw!r}") from exc
+    if seed < 0:
+        raise ValueError(f"CHURN_SEED must be non-negative, got {seed}")
+    return seed
+
+
+REFERENCE_DATE: pd.Timestamp = _parse_reference_date(os.environ.get("CHURN_REFERENCE_DATE"))
+
+SEED: int = _parse_seed(os.environ.get("CHURN_SEED"))
 
 
 def project_root() -> Path:

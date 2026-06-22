@@ -35,11 +35,8 @@ jobs:
             outputs/graphs \
             outputs/reports
 
-      - name: Tests
-        run: make test
-
-      - name: Lint
-        run: make lint
+      - name: Quality gates
+        run: make quality
 
       - name: Package and dependency check
         run: |

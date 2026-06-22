@@ -1,4 +1,4 @@
-.PHONY: install data profile features analyze risk dashboard charts report validate test lint all release clean
+.PHONY: install data profile features analyze risk dashboard charts report validate test coverage lint security quality all release clean
 
 PY ?= ./.venv/bin/python
 MOD = $(PY) -m churn
@@ -41,8 +41,18 @@ validate:
 test:
 	$(PY) -m unittest discover -s tests -p "test_*.py" -v
 
+coverage:
+	$(PY) -m coverage run -m unittest discover -s tests -p "test_*.py"
+	$(PY) -m coverage report
+
 lint:
 	$(PY) -m ruff check src tests
+
+security:
+	$(PY) -m bandit -q -r src -c pyproject.toml
+	$(PY) -m pip_audit --skip-editable
+
+quality: lint coverage security
 
 # Validate inspects the first render; the recipe then publishes a final render
 # with the current validation summary embedded.

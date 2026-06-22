@@ -10,7 +10,13 @@
       "required_columns": [
         "customer_id", "signup_date", "segment", "region",
         "acquisition_channel", "plan_type"
-      ]
+      ],
+      "allowed_values": {
+        "segment": ["Startup", "SMB", "Mid-Market", "Enterprise"],
+        "region": ["North America", "Europe", "LATAM", "APAC"],
+        "acquisition_channel": ["Organic", "Referral", "Partner", "Paid Search", "Affiliate", "Outbound"],
+        "plan_type": ["Basic", "Growth", "Pro", "Enterprise"]
+      }
     },
     "raw_subscriptions": {
       "path": "data/raw/subscriptions.csv",
@@ -20,6 +26,28 @@
         "subscription_id", "customer_id",
         "subscription_start_date", "subscription_end_date",
         "monthly_revenue", "contract_type", "billing_cycle", "status"
+      ],
+      "allowed_values": {
+        "contract_type": ["Annual", "Monthly"],
+        "billing_cycle": ["Annual", "Quarterly", "Monthly"],
+        "status": ["active", "at_risk", "churned"]
+      },
+      "numeric_ranges": {
+        "monthly_revenue": { "min": 0 }
+      },
+      "date_order_checks": [
+        {
+          "start_column": "subscription_start_date",
+          "end_column": "subscription_end_date",
+          "allow_blank_end": true
+        }
+      ],
+      "foreign_keys": [
+        {
+          "column": "customer_id",
+          "references_dataset": "raw_customers",
+          "references_column": "customer_id"
+        }
       ]
     },
     "raw_product_usage": {
@@ -29,6 +57,19 @@
       "required_columns": [
         "usage_id", "customer_id", "usage_date",
         "sessions", "feature_adoption_score", "support_tickets", "nps_score"
+      ],
+      "numeric_ranges": {
+        "sessions": { "min": 0 },
+        "feature_adoption_score": { "min": 0, "max": 100 },
+        "support_tickets": { "min": 0 },
+        "nps_score": { "min": -100, "max": 100 }
+      },
+      "foreign_keys": [
+        {
+          "column": "customer_id",
+          "references_dataset": "raw_customers",
+          "references_column": "customer_id"
+        }
       ]
     },
     "raw_payments": {
@@ -37,6 +78,19 @@
       "primary_key": "payment_id",
       "required_columns": [
         "payment_id", "customer_id", "payment_date", "amount", "payment_status"
+      ],
+      "allowed_values": {
+        "payment_status": ["paid", "failed"]
+      },
+      "numeric_ranges": {
+        "amount": { "min": 0 }
+      },
+      "foreign_keys": [
+        {
+          "column": "customer_id",
+          "references_dataset": "raw_customers",
+          "references_column": "customer_id"
+        }
       ]
     },
     "processed_customer_features": {
@@ -48,6 +102,35 @@
         "current_mrr", "avg_monthly_revenue",
         "usage_trend", "support_tickets_90d", "nps_score_recent",
         "payment_failure_flag"
+      ],
+      "allowed_values": {
+        "segment": ["Startup", "SMB", "Mid-Market", "Enterprise"],
+        "region": ["North America", "Europe", "LATAM", "APAC"],
+        "acquisition_channel": ["Organic", "Referral", "Partner", "Paid Search", "Affiliate", "Outbound"],
+        "plan_type": ["Basic", "Growth", "Pro", "Enterprise"],
+        "churn_flag": ["0", "1"],
+        "at_risk_flag": ["0", "1"],
+        "payment_failure_flag": ["0", "1"]
+      },
+      "numeric_ranges": {
+        "tenure_days": { "min": 0 },
+        "current_mrr": { "min": 0 },
+        "avg_monthly_revenue": { "min": 0 },
+        "lifetime_revenue": { "min": 0 },
+        "recent_sessions_30d": { "min": 0 },
+        "recent_sessions_90d": { "min": 0 },
+        "feature_adoption_score_recent": { "min": 0, "max": 100 },
+        "support_tickets_30d": { "min": 0 },
+        "support_tickets_90d": { "min": 0 },
+        "nps_score_recent": { "min": -100, "max": 100 },
+        "failed_payments_90d": { "min": 0 }
+      },
+      "foreign_keys": [
+        {
+          "column": "customer_id",
+          "references_dataset": "raw_customers",
+          "references_column": "customer_id"
+        }
       ]
     },
     "processed_risk_scores": {
@@ -58,6 +141,44 @@
         "customer_id", "churn_risk_score", "customer_value_score",
         "retention_priority_score", "risk_tier",
         "main_risk_driver", "recommended_action"
+      ],
+      "allowed_values": {
+        "segment": ["Startup", "SMB", "Mid-Market", "Enterprise"],
+        "region": ["North America", "Europe", "LATAM", "APAC"],
+        "acquisition_channel": ["Organic", "Referral", "Partner", "Paid Search", "Affiliate", "Outbound"],
+        "plan_type": ["Basic", "Growth", "Pro", "Enterprise"],
+        "risk_tier": ["critical", "high", "medium", "low"],
+        "main_risk_driver": [
+          "usage decline", "failed payments", "low NPS",
+          "low adoption", "support burden", "no material signal"
+        ],
+        "recommended_action": [
+          "executive save motion", "billing intervention", "product adoption campaign",
+          "renewal conversation", "customer success outreach", "monitor only"
+        ],
+        "at_risk_flag": ["0", "1"],
+        "payment_failure_flag": ["0", "1"],
+        "renewal_near_flag": ["0", "1"]
+      },
+      "numeric_ranges": {
+        "tenure_days": { "min": 0 },
+        "current_mrr": { "min": 0 },
+        "avg_monthly_revenue": { "min": 0 },
+        "lifetime_revenue": { "min": 0 },
+        "churn_risk_score": { "min": 0, "max": 100 },
+        "customer_value_score": { "min": 0, "max": 100 },
+        "retention_priority_score": { "min": 0, "max": 100 },
+        "support_tickets_90d": { "min": 0 },
+        "nps_score_recent": { "min": -100, "max": 100 },
+        "feature_adoption_score_recent": { "min": 0, "max": 100 },
+        "failed_payments_90d": { "min": 0 }
+      },
+      "foreign_keys": [
+        {
+          "column": "customer_id",
+          "references_dataset": "processed_customer_features",
+          "references_column": "customer_id"
+        }
       ]
     }
   },
