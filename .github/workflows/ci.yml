@@ -33,7 +33,7 @@ jobs:
       - name: Build release (includes validation gates)
         run: make release
 
-      - name: Verify generated artifacts
+      - name: Verify deterministic generated artifacts
         run: |
           git diff --exit-code -- \
             docs/index.html \
@@ -41,10 +41,51 @@ jobs:
             docs/methodology/feature_dictionary.md \
             docs/methodology/risk_scoring_methodology.md \
             index.html \
-            outputs/dashboard \
-            outputs/graphs \
-            outputs/models \
-            outputs/reports
+            outputs/dashboard
+
+      - name: Verify portable binary artifacts
+        run: |
+          ./.venv/bin/python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          import joblib
+          from PIL import Image
+
+          graph_paths = sorted(Path("outputs/graphs").glob("*.png"))
+          if len(graph_paths) != 18:
+              raise SystemExit(f"Expected 18 graphs, found {len(graph_paths)}")
+          for graph_path in graph_paths:
+              with Image.open(graph_path) as image:
+                  if image.format != "PNG" or min(image.size) < 600:
+                      raise SystemExit(f"Invalid graph artifact: {graph_path} ({image.size})")
+                  image.verify()
+
+          model_path = Path("outputs/models/churn_probability_model.joblib")
+          metadata_path = Path("outputs/models/model_metadata.json")
+          model_bundle = joblib.load(model_path)
+          required_keys = {
+              "base_model",
+              "calibrator",
+              "categorical_features",
+              "numeric_features",
+              "probability_tiers",
+              "outcome_horizon_days",
+          }
+          if set(model_bundle) != required_keys:
+              raise SystemExit("Model bundle contract does not match the published schema")
+          metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+          model_sha256 = hashlib.sha256(model_path.read_bytes()).hexdigest()
+          if metadata.get("model_sha256") != model_sha256:
+              raise SystemExit("Model metadata checksum does not match the model artifact")
+
+          report = Path("outputs/reports/churn-retention-intelligence-report.pdf").read_bytes()
+          if not report.startswith(b"%PDF-") or not report.rstrip().endswith(b"%%EOF"):
+              raise SystemExit("Report does not have a valid PDF envelope")
+          if report.count(b"/Type /Page") < 30:
+              raise SystemExit("Report is missing expected pages")
+          PY
 
       - name: Quality gates
         run: make quality
