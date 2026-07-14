@@ -4,6 +4,7 @@ import hashlib
 import json
 from itertools import product
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -18,9 +19,17 @@ def _json_records(df: pd.DataFrame) -> list[dict]:
     return clean.to_dict(orient="records")
 
 
-def _build_version(inputs: list[Path]) -> str:
+def _build_version(payload: dict, static_inputs: list[Path]) -> str:
     h = hashlib.sha256()
-    for p in sorted(inputs):
+    h.update(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    )
+    for p in sorted(static_inputs):
         h.update(p.name.encode("utf-8"))
         h.update(p.read_bytes())
     return h.hexdigest()[:12]
@@ -342,29 +351,9 @@ def load_data(project_root: Path) -> dict:
         ["retention_priority_score", "current_mrr"], ascending=[False, False]
     ).copy()
 
-    processed = project_root / "data" / "processed"
-    outputs = project_root / "outputs" / "tables"
-    source_inputs = [
-        processed / "customer_retention_features.csv",
-        processed / "customer_risk_scores.csv",
-        processed / "cohort_retention_table.csv",
-        outputs / "monthly_dimensional_trend.csv",
-        outputs / "final_validation_checks.csv",
-        outputs / "final_validation_issues.csv",
-        project_root / "config" / "contracts" / "data_contracts.json",
-        project_root / "config" / "governance" / "release_policy.yml",
-        project_root / "config" / "governance" / "score_stability_baseline.json",
-        project_root / "config" / "vendor_assets.json",
-        *sorted((project_root / "src" / "churn").glob("*.py")),
-        TEMPLATE_PATH,
-        project_root / "assets" / "vendor" / "chart.umd.min.js",
-    ]
-    version = _build_version([path for path in source_inputs if path.exists()])
-
-    data = {
+    data: dict[str, Any] = {
         "meta": {
             "project": "Churn & Retention Intelligence System",
-            "dashboard_version": version,
             "coverage_start_month": coverage_start_month,
             "coverage_end_month": months[-1],
             "data_snapshot_month": months[-1],
@@ -378,6 +367,13 @@ def load_data(project_root: Path) -> dict:
         "scored_customers": _json_records(scored),
         "cohort_rows": _json_records(cohort_rows),
     }
+    data["meta"]["dashboard_version"] = _build_version(
+        data,
+        [
+            TEMPLATE_PATH,
+            project_root / "assets" / "vendor" / "chart.umd.min.js",
+        ],
+    )
     return data
 
 

@@ -35,11 +35,12 @@ the monthly facts, looks up risk KPIs, and filters the snapshot rows.
   most 300 matching rows at once to keep interaction responsive.
 
 ### Content-hash versioning
-`_build_version` hashes the governed dashboard inputs, Python module sources,
-template, configuration, and vendored runtime into a short digest.
+`_build_version` hashes the canonical rendered-data payload, template, and
+vendored runtime into a short digest.
 
-- **Why:** the digest changes when an input changes. CI separately rebuilds the
-  release and uses `git diff --exit-code` to detect artifact drift.
+- **Why:** the digest changes when the delivered dashboard changes, while
+  ignoring byte-level differences in intermediate CSV serialization. CI
+  rebuilds the release and uses `git diff --exit-code` to detect artifact drift.
 
 ### Single official artifact
 `_enforce_single_official_html` deletes any HTML in the dashboard directory that
