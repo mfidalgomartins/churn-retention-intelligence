@@ -43,7 +43,7 @@ dev = [
 charts = [
     "matplotlib>=3.9,<4",
     "Pillow>=12.3,<13",
-    "reportlab>=4.0,<5",
+    "reportlab>=4.0,<6",
 ]
 warehouse = [
     "psycopg[binary]>=3.2,<4",
