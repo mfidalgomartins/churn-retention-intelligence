@@ -1,53 +1,67 @@
 # Release Runbook
 
-## Release verification
+## Build and verify
 
 ```bash
-make install     # one-time setup
-make release     # regenerate dashboard, chart pack, report, and validation
-make quality     # lint, coverage, and security/dependency checks
+make install
+make release
+make quality
+git diff --exit-code -- docs/index.html docs/decision_memo.md index.html outputs/dashboard outputs/graphs outputs/models outputs/reports
 ```
 
-`make release` rebuilds data, features, analysis tables, risk scores, the
-dashboard, validation outputs, chart pack, and PDF report. `make quality` runs
-Ruff, coverage, Bandit, and dependency audit.
+`make release` rebuilds the synthetic reference, economics, model, experiment,
+monitoring, dashboard, report, release gates, and immutable snapshot. `make
+quality` runs lint, formatting, typing, branch coverage, static security, and
+dependency vulnerability checks.
 
-## Inspect before publish
+## Required evidence
 
-- `outputs/tables/release_readiness_matrix.csv` — readiness state
-- `outputs/tables/final_validation_issues.csv` — open warnings or failures
-- `outputs/dashboard/executive-retention-command-center.html` — the deliverable
-- `outputs/reports/churn-retention-intelligence-report.pdf` — narrative report
-- CI result for the final commit — release and quality gates passed
+- `data_contract_checks.csv`: no FAIL rows.
+- `final_validation_checks.csv`: no FAIL or WARN rows.
+- `release_readiness_matrix.csv`: `publish-blocked=False`.
+- `model_performance.csv`: all configured out-of-time gates pass.
+- `intervention_balance.csv`: randomization balance passes.
+- `monitoring_alerts.csv`: alerts reviewed and owned.
+- Local release and quality commands pass from a clean checkout.
+- Pull-request CI and subsequent `main` CI both pass.
+
+## Publish
+
+1. Commit the final generated artifacts and source changes on a release branch.
+2. Open a pull request and wait for every required check.
+3. Merge without bypassing CI.
+4. Confirm the `main` workflow passes on the merge commit.
+5. Create an annotated semantic-version tag on that merge commit.
+6. Publish a GitHub release with the PDF, dashboard, snapshot archive, and
+   snapshot manifest attached.
+7. Record tag, commit SHA, CI URL, readiness state, and accepted alerts in the
+   release notes.
 
 ## Block release when
 
-- `make release` or `make quality` fails.
-- Any FAIL exists in `data_contract_checks.csv` or `final_validation_checks.csv`.
-- `release_readiness_matrix.csv` reports `publish-blocked`.
-- The generated artifacts differ from the committed artifacts after CI rebuild.
-- A security finding is unresolved or accepted without owner approval.
-
-## Evidence
-
-Record the final commit SHA, CI run URL, readiness state, accepted WARN rows,
-and published artifact paths. Keep this evidence with the release notes or
-ticket.
+- Any build, contract, validation, quality, or security command fails.
+- Generated tracked artifacts differ after a second build.
+- Model gates, probability bounds, experiment assignment integrity, baseline
+  balance, saved-MRR identity, or complete-period transition checks fail.
+- A security finding or monitoring alert lacks an explicit owner and decision.
 
 ## Rollback
 
 ```bash
 git revert <bad-commit>
-make release && make quality
+make release
+make quality
 ```
 
-After rollback, verify the dashboard and report open from the reverted commit
-and that CI is green.
+Publish a patch release from the reverted state. Keep the failed release and
+its snapshot available for audit; never move or reuse an existing tag.
 
 ## Ownership
 
 | Area | Owner |
 |---|---|
-| Data contracts, QA policy, security triage | Analytics Engineering |
-| Dashboard and report artifacts | BI / Analytics |
-| Final release approval | Project owner |
+| Source contracts and ingestion | Analytics Engineering |
+| Revenue definitions and model governance | Analytics / Data Science |
+| Experiment delivery and holdout integrity | Customer Success Operations |
+| Dashboard and report | BI / Analytics |
+| Release approval and security acceptance | Project owner |

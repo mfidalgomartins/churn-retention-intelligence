@@ -21,6 +21,7 @@ class TestIntegration(unittest.TestCase):
             "src",
             "outputs/tables",
             "outputs/dashboard",
+            "outputs/models",
             "assets",
             "assets/vendor",
             "docs",
@@ -37,9 +38,15 @@ class TestIntegration(unittest.TestCase):
             "pyproject.toml",
             ".gitignore",
             "Makefile",
+            "requirements.lock",
             "config/contracts/data_contracts.json",
             "config/governance/release_policy.yml",
             "config/governance/score_stability_baseline.json",
+            "config/pipeline.yml",
+            "config/economics.yml",
+            "config/modeling.yml",
+            "config/experiments.yml",
+            "config/monitoring.yml",
         ]
 
         for rel in required_dirs:
@@ -49,18 +56,31 @@ class TestIntegration(unittest.TestCase):
 
     def test_sql_reference_models_are_temporally_aligned_postgresql(self) -> None:
         readme = (ROOT / "sql/README.md").read_text(encoding="utf-8").lower()
-        features = (ROOT / "sql/marts/customer_retention_features.sql").read_text(
-            encoding="utf-8"
-        ).lower()
+        features = (
+            (ROOT / "sql/marts/customer_retention_features.sql").read_text(encoding="utf-8").lower()
+        )
         kpis = (ROOT / "sql/marts/churn_kpis.sql").read_text(encoding="utf-8").lower()
+        bridge = (
+            (ROOT / "sql/marts/revenue_movement_bridge.sql").read_text(encoding="utf-8").lower()
+        )
         combined = "\n".join((features, kpis))
 
         self.assertIn("postgresql 15+", readme)
         self.assertIn("observation_date", features)
+        self.assertIn("support_tickets_30d", features)
+        self.assertIn("renewal_near_flag", features)
+        self.assertIn("contract_type", features)
+        self.assertIn("generate_series", features)
         self.assertIn("complete calendar months", kpis)
+        self.assertGreaterEqual(kpis.count("s.subscription_start_date <= m.month_start"), 2)
         self.assertEqual(combined.count("with params as"), 2)
         self.assertNotIn("datediff(", combined)
         self.assertNotIn("current_date", combined)
+        self.assertIn(":observation_date", bridge)
+        self.assertIn("reconciliation_diff", bridge)
+        self.assertIn("reactivation_mrr", bridge)
+        self.assertIn("is_complete_month", bridge)
+        self.assertNotIn("current_date", bridge)
 
     def test_no_invalid_subscription_date_ranges(self) -> None:
         path = ROOT / "data/raw/subscriptions.csv"
@@ -90,6 +110,11 @@ class TestIntegration(unittest.TestCase):
             f"Validation has FAIL rows: {[r.get('check_name') for r in fail_rows]}",
         )
 
+    def test_validation_pipeline_is_reproducible(self) -> None:
+        from churn.validate import main
+
+        self.assertEqual(main(), 0)
+
     def test_risk_scores_are_bounded(self) -> None:
         path = ROOT / "data/processed/customer_risk_scores.csv"
         with path.open("r", encoding="utf-8", newline="") as f:
@@ -107,7 +132,10 @@ class TestIntegration(unittest.TestCase):
 
     def test_risk_score_output_is_canonical(self) -> None:
         duplicate_path = ROOT / "data/processed/customer_risk_priority_ranked.csv"
-        self.assertFalse(duplicate_path.exists(), "Risk scores are already priority-ranked; duplicate ranked export should not exist.")
+        self.assertFalse(
+            duplicate_path.exists(),
+            "Risk scores are already priority-ranked; duplicate ranked export should not exist.",
+        )
 
     def test_validation_schema_and_blockers(self) -> None:
         checks_path = ROOT / "outputs/tables/final_validation_checks.csv"
@@ -118,14 +146,37 @@ class TestIntegration(unittest.TestCase):
         with issues_path.open("r", encoding="utf-8", newline="") as f:
             issues = list(csv.DictReader(f))
 
-        required_check_cols = {"category", "check_name", "status", "severity", "gate_level", "is_blocker", "evidence"}
-        required_issue_cols = {"category", "check_name", "severity", "gate_level", "is_blocker", "status", "evidence", "fix_applied"}
+        required_check_cols = {
+            "category",
+            "check_name",
+            "status",
+            "severity",
+            "gate_level",
+            "is_blocker",
+            "evidence",
+        }
+        required_issue_cols = {
+            "category",
+            "check_name",
+            "severity",
+            "gate_level",
+            "is_blocker",
+            "status",
+            "evidence",
+            "fix_applied",
+        }
         self.assertTrue(required_check_cols.issubset(set(checks[0].keys())))
         if issues:
             self.assertTrue(required_issue_cols.issubset(set(issues[0].keys())))
 
-        blocker_fails = [r for r in issues if r.get("is_blocker") == "True" and r.get("status") == "FAIL"]
-        self.assertEqual(len(blocker_fails), 0, f"Blocker failures detected: {[r.get('check_name') for r in blocker_fails]}")
+        blocker_fails = [
+            r for r in issues if r.get("is_blocker") == "True" and r.get("status") == "FAIL"
+        ]
+        self.assertEqual(
+            len(blocker_fails),
+            0,
+            f"Blocker failures detected: {[r.get('check_name') for r in blocker_fails]}",
+        )
 
     def test_data_contract_validation_outputs(self) -> None:
         checks_path = ROOT / "outputs/tables/data_contract_checks.csv"
@@ -142,7 +193,11 @@ class TestIntegration(unittest.TestCase):
             self.assertTrue(required_cols.issubset(set(issues[0].keys())))
 
         fail_rows = [r for r in checks if r.get("status") == "FAIL"]
-        self.assertEqual(len(fail_rows), 0, f"Data contract failures found: {[r.get('check_name') for r in fail_rows]}")
+        self.assertEqual(
+            len(fail_rows),
+            0,
+            f"Data contract failures found: {[r.get('check_name') for r in fail_rows]}",
+        )
 
     def test_release_readiness_matrix(self) -> None:
         path = ROOT / "outputs/tables/release_readiness_matrix.csv"
@@ -162,7 +217,9 @@ class TestIntegration(unittest.TestCase):
 
         publish_blocked = next(r for r in rows if r.get("state") == "publish-blocked")
         self.assertEqual(publish_blocked.get("active"), "False")
-        analytically_acceptable = next(r for r in rows if r.get("state") == "analytically acceptable")
+        analytically_acceptable = next(
+            r for r in rows if r.get("state") == "analytically acceptable"
+        )
         decision_support = next(r for r in rows if r.get("state") == "decision-support only")
         self.assertIn("limit=1", analytically_acceptable["evidence"])
         self.assertIn("limit=3", decision_support["evidence"])
@@ -183,6 +240,10 @@ class TestIntegration(unittest.TestCase):
             'id="filterChannel"',
             'id="filterRiskTier"',
             'type="date"',
+            '<div class="sr-only">',
+            '<h3 id="trendTitle">',
+            '<h3 id="cohortTitle">',
+            '<h3 id="queueTitle">',
         ):
             self.assertIn(marker, html_text)
 
@@ -204,22 +265,25 @@ class TestIntegration(unittest.TestCase):
     def test_dashboard_output_is_unique_and_self_contained(self) -> None:
         dashboard_dir = ROOT / "outputs/dashboard"
         html_files = sorted(dashboard_dir.glob("*.html"))
-        self.assertEqual(len(html_files), 1, f"Expected one official dashboard HTML, found {[p.name for p in html_files]}")
+        self.assertEqual(
+            len(html_files),
+            1,
+            f"Expected one official dashboard HTML, found {[p.name for p in html_files]}",
+        )
         self.assertEqual(html_files[0].name, "executive-retention-command-center.html")
 
         html_text = html_files[0].read_text(encoding="utf-8")
-        self.assertNotIn("src=\"http://", html_text)
-        self.assertNotIn("src=\"https://", html_text)
-        self.assertNotIn("href=\"http://", html_text)
-        self.assertNotIn("href=\"https://", html_text)
+        self.assertNotIn('src="http://', html_text)
+        self.assertNotIn('src="https://', html_text)
+        self.assertNotIn('href="http://', html_text)
+        self.assertNotIn('href="https://', html_text)
         self.assertIn('id="periodLabel"', html_text)
         self.assertIn('id="filterPeriodPreset"', html_text)
         self.assertIn("const DATA =", html_text)
 
     def test_only_one_project_html_outside_virtualenv(self) -> None:
         html_files = [
-            p for p in ROOT.rglob("*.html")
-            if not {".venv", "build", "src"}.intersection(p.parts)
+            p for p in ROOT.rglob("*.html") if not {".venv", "build", "src"}.intersection(p.parts)
         ]
         rel = sorted(str(p.relative_to(ROOT)) for p in html_files)
         self.assertEqual(
@@ -235,7 +299,7 @@ class TestIntegration(unittest.TestCase):
         html_path = ROOT / "outputs/dashboard/executive-retention-command-center.html"
         size_bytes = html_path.stat().st_size
         self.assertGreaterEqual(size_bytes, 250_000)
-        self.assertLessEqual(size_bytes, 3_000_000)
+        self.assertLessEqual(size_bytes, 5_000_000)
 
     def test_dashboard_build_is_deterministic(self) -> None:
         from churn.dashboard import build_html, load_data
@@ -247,6 +311,16 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(build_html(first, chart_js), build_html(second, chart_js))
         self.assertNotIn("generated_at_utc", first)
+
+    def test_dashboard_embeds_complete_scored_population(self) -> None:
+        import pandas as pd
+
+        from churn.dashboard import load_data
+
+        payload = load_data(ROOT)
+        scored = pd.read_csv(ROOT / "data/processed/customer_risk_scores.csv")
+
+        self.assertEqual(len(payload["scored_customers"]), len(scored))
 
     def test_dashboard_priority_scope_count_matches_priority_mrr_scope(self) -> None:
         import pandas as pd
@@ -269,9 +343,7 @@ class TestIntegration(unittest.TestCase):
             )
         )
         scored = pd.read_csv(ROOT / "data/processed/customer_risk_scores.csv")
-        priority = (scored["at_risk_flag"] == 1) | scored["risk_tier"].isin(
-            ["high", "critical"]
-        )
+        priority = (scored["at_risk_flag"] == 1) | scored["risk_tier"].isin(["high", "critical"])
 
         self.assertEqual(all_row["priority_accounts"], int(priority.sum()))
         self.assertAlmostEqual(
@@ -300,23 +372,27 @@ print(hashlib.sha256(payments.to_csv(index=False).encode("utf-8")).hexdigest())
                 "PATH": os.environ.get("PATH", ""),
                 "PYTHONHASHSEED": hash_seed,
             }
-            hashes.append(subprocess.check_output(
-                [sys.executable, "-c", code],
-                cwd=ROOT,
-                env=env,
-                text=True,
-                timeout=30,
-            ).strip())
+            hashes.append(
+                subprocess.check_output(
+                    [sys.executable, "-c", code],
+                    cwd=ROOT,
+                    env=env,
+                    text=True,
+                    timeout=30,
+                ).strip()
+            )
         self.assertEqual(hashes[0], hashes[1])
 
     def test_pages_entrypoints_redirect_to_official_dashboard(self) -> None:
         root_index = (ROOT / "index.html").read_text(encoding="utf-8")
         docs_index = (ROOT / "docs/index.html").read_text(encoding="utf-8")
-        dashboard_html = (ROOT / "outputs/dashboard/executive-retention-command-center.html").read_text(encoding="utf-8")
+        dashboard_html = (
+            ROOT / "outputs/dashboard/executive-retention-command-center.html"
+        ).read_text(encoding="utf-8")
 
-        self.assertIn("http-equiv=\"refresh\"", root_index)
+        self.assertIn('http-equiv="refresh"', root_index)
         self.assertIn("./outputs/dashboard/executive-retention-command-center.html", root_index)
-        self.assertIn("http-equiv=\"refresh\"", docs_index)
+        self.assertIn('http-equiv="refresh"', docs_index)
         self.assertIn("../outputs/dashboard/executive-retention-command-center.html", docs_index)
 
         self.assertNotIn("const DATA =", root_index)
@@ -329,26 +405,36 @@ print(hashlib.sha256(payments.to_csv(index=False).encode("utf-8")).hexdigest())
         self.assertIn("$(MOD).validate", makefile_text)
         self.assertIn("coverage:", makefile_text)
         self.assertIn("security:", makefile_text)
-        self.assertIn("quality: lint coverage security", makefile_text)
-        self.assertIn("all: data profile features analyze risk dashboard validate\n\t$(MOD).dashboard", makefile_text)
-        self.assertIn("release: all report", makefile_text)
+        self.assertIn("typecheck:", makefile_text)
+        self.assertIn("quality: lint format-check typecheck coverage security", makefile_text)
+        self.assertIn(
+            "pipeline: profile economics features analyze risk training-snapshots model experiments monitor dashboard validate",
+            makefile_text,
+        )
+        self.assertIn("production: ingest pipeline", makefile_text)
+        self.assertIn("all: data pipeline", makefile_text)
+        self.assertIn("release: all memo report snapshot", makefile_text)
 
     def test_ci_runs_full_quality_gate(self) -> None:
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         self.assertIn("make release", workflow)
         self.assertIn("make quality", workflow)
+        self.assertIn("make all", workflow)
+        self.assertIn("-c requirements.lock", workflow)
+        self.assertIn('python-version: ["3.11", "3.14"]', workflow)
+        self.assertRegex(workflow, r"actions/checkout@[0-9a-f]{40}")
+        self.assertRegex(workflow, r"actions/setup-python@[0-9a-f]{40}")
         self.assertNotIn("run: make test\n", workflow)
         self.assertNotIn("run: make lint\n", workflow)
 
     def test_published_release_artifacts_exist(self) -> None:
         graph_files = sorted((ROOT / "outputs/graphs").glob("*.png"))
         self.assertEqual(len(graph_files), 18)
-        self.assertTrue(
-            (ROOT / "outputs/reports/churn-retention-intelligence-report.pdf").exists()
-        )
+        self.assertTrue((ROOT / "outputs/reports/churn-retention-intelligence-report.pdf").exists())
         self.assertTrue(
             (ROOT / "outputs/dashboard/executive-retention-command-center.html").exists()
         )
+        self.assertTrue((ROOT / "docs/decision_memo.md").exists())
 
     def test_dashboard_json_payload_escapes_script_breakout_strings(self) -> None:
         from churn.dashboard import build_html

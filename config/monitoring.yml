@@ -1,0 +1,16 @@
+version: 1
+risk_tier_order:
+  - low
+  - medium
+  - high
+  - critical
+alerts:
+  critical_portfolio_share: 0.08
+  monthly_critical_entry_share: 0.04
+  monthly_probability_increase: 0.02
+  absolute_calibration_gap: 0.02
+  brier_score: 0.06
+  feature_psi_warning: 0.10
+  feature_psi_critical: 0.25
+expected_drift_features:
+  - tenure_days

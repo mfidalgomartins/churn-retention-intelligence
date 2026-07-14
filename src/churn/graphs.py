@@ -6,6 +6,7 @@ outputs/graphs/. Run directly:
 
     python -m churn.graphs
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,79 +21,88 @@ import numpy as np
 import pandas as pd
 
 # ── Paths ──────────────────────────────────────────────────
-ROOT    = Path(__file__).resolve().parents[2]
-OUT     = ROOT / "outputs" / "graphs"
-TABLES  = ROOT / "outputs" / "tables"
-PROC    = ROOT / "data" / "processed"
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / "outputs" / "graphs"
+TABLES = ROOT / "outputs" / "tables"
+PROC = ROOT / "data" / "processed"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # ── Design system ──────────────────────────────────────────
-LOSS    = "#B83530"
+LOSS = "#B83530"
 LOSS_LT = "#E8A09A"
-GAIN    = "#1B6640"
-SLATE   = "#1E293B"
-ACCENT  = "#1B3A6B"
-MUTED   = "#94A3B8"
+GAIN = "#1B6640"
+SLATE = "#1E293B"
+ACCENT = "#1B3A6B"
+MUTED = "#94A3B8"
 NEUTRAL = "#475569"
-FIG_BG  = "#FAFAFA"
-AX_BG   = "#FFFFFF"
+FIG_BG = "#FAFAFA"
+AX_BG = "#FFFFFF"
 
 SEG_COLORS = {
     "Enterprise": "#1B3A6B",
     "Mid-Market": "#2E6B9E",
-    "SMB":        "#B83530",
-    "Startup":    "#C9860A",
+    "SMB": "#B83530",
+    "Startup": "#C9860A",
 }
 
 TIER_COLORS = {
     "critical": "#B83530",
-    "high":     "#D4715A",
-    "medium":   "#C9860A",
-    "low":      "#94A3B8",
+    "high": "#D4715A",
+    "medium": "#C9860A",
+    "low": "#94A3B8",
 }
 
-matplotlib.rcParams.update({
-    "font.family":        "sans-serif",
-    "font.sans-serif":    ["Helvetica Neue", "Helvetica", "Arial", "DejaVu Sans"],
-    "axes.facecolor":     AX_BG,
-    "figure.facecolor":   FIG_BG,
-    "axes.edgecolor":     "#CBD5E1",
-    "axes.linewidth":     0.7,
-    "axes.spines.top":    False,
-    "axes.spines.right":  False,
-    "axes.grid":          True,
-    "axes.grid.axis":     "y",
-    "grid.color":         "#E2E8F0",
-    "grid.linewidth":     0.55,
-    "xtick.color":        NEUTRAL,
-    "ytick.color":        NEUTRAL,
-    "xtick.labelsize":    9.5,
-    "ytick.labelsize":    9.5,
-    "axes.labelsize":     10.5,
-    "axes.labelcolor":    SLATE,
-    "axes.titlesize":     12.5,
-    "axes.titleweight":   "bold",
-    "axes.titlecolor":    SLATE,
-    "axes.titlepad":      13,
-    "figure.titlesize":   13.5,
-    "figure.titleweight": "bold",
-    "legend.fontsize":    9.5,
-    "legend.framealpha":  0.0,
-    "lines.linewidth":    2.0,
-    "savefig.dpi":        180,
-    "savefig.bbox":       "tight",
-    "savefig.facecolor":  FIG_BG,
-    "figure.constrained_layout.use": False,
-    "text.parse_math": False,  # keep literal "$" in labels — never treat $...$ as math
-})
+matplotlib.rcParams.update(
+    {
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Helvetica Neue", "Helvetica", "Arial", "DejaVu Sans"],
+        "axes.facecolor": AX_BG,
+        "figure.facecolor": FIG_BG,
+        "axes.edgecolor": "#CBD5E1",
+        "axes.linewidth": 0.7,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "axes.grid": True,
+        "axes.grid.axis": "y",
+        "grid.color": "#E2E8F0",
+        "grid.linewidth": 0.55,
+        "xtick.color": NEUTRAL,
+        "ytick.color": NEUTRAL,
+        "xtick.labelsize": 9.5,
+        "ytick.labelsize": 9.5,
+        "axes.labelsize": 10.5,
+        "axes.labelcolor": SLATE,
+        "axes.titlesize": 12.5,
+        "axes.titleweight": "bold",
+        "axes.titlecolor": SLATE,
+        "axes.titlepad": 13,
+        "figure.titlesize": 13.5,
+        "figure.titleweight": "bold",
+        "legend.fontsize": 9.5,
+        "legend.framealpha": 0.0,
+        "lines.linewidth": 2.0,
+        "savefig.dpi": 180,
+        "savefig.bbox": "tight",
+        "savefig.facecolor": FIG_BG,
+        "figure.constrained_layout.use": False,
+        "text.parse_math": False,  # keep literal "$" in labels — never treat $...$ as math
+    }
+)
+
 
 # Acronyms that .str.title() would otherwise mangle (Smb → SMB, Nps → NPS, …)
 def fix_acronyms(s: pd.Series) -> pd.Series:
     out = s
-    for bad, good in {"Smb": "SMB", "Nps": "NPS", "Latam": "LATAM",
-                      "Apac": "APAC", "Mrr": "MRR"}.items():
+    for bad, good in {
+        "Smb": "SMB",
+        "Nps": "NPS",
+        "Latam": "LATAM",
+        "Apac": "APAC",
+        "Mrr": "MRR",
+    }.items():
         out = out.str.replace(bad, good, regex=False)
     return out
+
 
 PCT = mticker.FuncFormatter(lambda x, _: f"{x:.0f}%")
 USD_K = mticker.FuncFormatter(lambda x, _: f"${x:,.0f}k")
@@ -110,8 +120,12 @@ def label_hbar(ax: plt.Axes, bars, fmt: str = "{:.1f}%", pad: float = 0.3) -> No
     for bar in bars:
         w = bar.get_width()
         ax.text(
-            w + pad, bar.get_y() + bar.get_height() / 2,
-            fmt.format(w), va="center", fontsize=9, color=SLATE,
+            w + pad,
+            bar.get_y() + bar.get_height() / 2,
+            fmt.format(w),
+            va="center",
+            fontsize=9,
+            color=SLATE,
         )
 
 
@@ -122,12 +136,20 @@ def chart_churn_rate_trend() -> None:
     df = pd.read_csv(TABLES / "overall_retention_trend_monthly.csv", parse_dates=["month"])
     df = df[df["active_customers_start"] >= 50].copy()
     df["cust_pct"] = df["customer_churn_rate"] * 100
-    df["rev_pct"]  = df["revenue_churn_rate"]  * 100
+    df["rev_pct"] = df["revenue_churn_rate"] * 100
 
     fig, ax = plt.subplots(figsize=(12, 5))
     ax.plot(df["month"], df["cust_pct"], color=LOSS, lw=2.2, label="Customer churn rate", zorder=3)
     ax.fill_between(df["month"], df["cust_pct"], alpha=0.09, color=LOSS)
-    ax.plot(df["month"], df["rev_pct"],  color=SLATE, lw=1.6, ls="--", label="Revenue churn rate", zorder=3)
+    ax.plot(
+        df["month"],
+        df["rev_pct"],
+        color=SLATE,
+        lw=1.6,
+        ls="--",
+        label="Revenue churn rate",
+        zorder=3,
+    )
     ax.set_title("Monthly Churn Rate: Customer vs Revenue")
     ax.set_ylabel("Churn rate (%)")
     ax.yaxis.set_major_formatter(PCT)
@@ -146,8 +168,15 @@ def chart_mrr_trend() -> None:
     df["mrr_k"] = df["active_mrr_start"] / 1_000
 
     fig, ax = plt.subplots(figsize=(12, 5))
-    ax.bar(df["month"], df["mrr_k"], color=ACCENT, alpha=0.82,
-           width=25, edgecolor="white", linewidth=0.3)
+    ax.bar(
+        df["month"],
+        df["mrr_k"],
+        color=ACCENT,
+        alpha=0.82,
+        width=25,
+        edgecolor="white",
+        linewidth=0.3,
+    )
     ax.set_title("Active MRR by Month")
     ax.set_ylabel("MRR ($000s)")
     ax.yaxis.set_major_formatter(USD_K)
@@ -166,11 +195,12 @@ def chart_churn_by_segment() -> None:
     colors = [SEG_COLORS.get(s, MUTED) for s in df["segment"]]
 
     fig, ax = plt.subplots(figsize=(9, 4))
-    bars = ax.barh(df["segment"], df["pct"], color=colors,
-                   edgecolor="white", linewidth=0.3, height=0.5)
+    bars = ax.barh(
+        df["segment"], df["pct"], color=colors, edgecolor="white", linewidth=0.3, height=0.5
+    )
     label_hbar(ax, bars, "{:.1f}%", pad=0.5)
-    ax.set_title("Cumulative Churn Share by Customer Segment")
-    ax.set_xlabel("Cumulative churn share (%)")
+    ax.set_title("Historical Logo Churn Rate by Customer Segment")
+    ax.set_xlabel("Historical logo churn rate (%)")
     ax.xaxis.set_major_formatter(PCT)
     ax.set_xlim(0, df["pct"].max() * 1.18)
     ax.grid(axis="x")
@@ -190,11 +220,17 @@ def chart_churn_by_channel() -> None:
     colors = [GAIN if i < n // 3 else (MUTED if i < 2 * n // 3 else LOSS) for i in range(n)]
 
     fig, ax = plt.subplots(figsize=(9, 4.5))
-    bars = ax.barh(df["acquisition_channel"], df["pct"], color=colors,
-                   edgecolor="white", linewidth=0.3, height=0.5)
+    bars = ax.barh(
+        df["acquisition_channel"],
+        df["pct"],
+        color=colors,
+        edgecolor="white",
+        linewidth=0.3,
+        height=0.5,
+    )
     label_hbar(ax, bars, "{:.1f}%", pad=0.5)
-    ax.set_title("Cumulative Churn Share by Acquisition Channel")
-    ax.set_xlabel("Cumulative churn share (%)")
+    ax.set_title("Historical Logo Churn Rate by Acquisition Channel")
+    ax.set_xlabel("Historical logo churn rate (%)")
     ax.xaxis.set_major_formatter(PCT)
     ax.set_xlim(0, df["pct"].max() * 1.18)
     ax.grid(axis="x")
@@ -214,8 +250,9 @@ def chart_churn_by_plan() -> None:
     colors = [GAIN if i < n // 2 else LOSS for i in range(n)]
 
     fig, ax = plt.subplots(figsize=(9, 4))
-    bars = ax.barh(df["plan_type"], df["pct"], color=colors,
-                   edgecolor="white", linewidth=0.3, height=0.5)
+    bars = ax.barh(
+        df["plan_type"], df["pct"], color=colors, edgecolor="white", linewidth=0.3, height=0.5
+    )
     label_hbar(ax, bars, "{:.1f}%", pad=0.5)
     ax.set_title("Cumulative Churn Share by Plan Type")
     ax.set_xlabel("Cumulative churn share (%)")
@@ -240,22 +277,36 @@ def chart_risk_tier_breakdown() -> None:
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
 
-    b1 = ax1.barh(tiers_title, df["customers"], color=colors,
-                  edgecolor="white", linewidth=0.3, height=0.5)
+    b1 = ax1.barh(
+        tiers_title, df["customers"], color=colors, edgecolor="white", linewidth=0.3, height=0.5
+    )
     for bar, val in zip(b1, df["customers"], strict=False):
-        ax1.text(bar.get_width() + 5, bar.get_y() + bar.get_height() / 2,
-                 f"{val:,}", va="center", fontsize=9, color=SLATE)
+        ax1.text(
+            bar.get_width() + 5,
+            bar.get_y() + bar.get_height() / 2,
+            f"{val:,}",
+            va="center",
+            fontsize=9,
+            color=SLATE,
+        )
     ax1.set_title("Customers by Risk Tier")
     ax1.set_xlabel("Customers")
     ax1.grid(axis="x")
     ax1.grid(axis="y", visible=False)
     ax1.set_xlim(0, df["customers"].max() * 1.15)
 
-    b2 = ax2.barh(tiers_title, df["mrr_k"], color=colors,
-                  edgecolor="white", linewidth=0.3, height=0.5)
+    b2 = ax2.barh(
+        tiers_title, df["mrr_k"], color=colors, edgecolor="white", linewidth=0.3, height=0.5
+    )
     for bar, val in zip(b2, df["mrr_k"], strict=False):
-        ax2.text(bar.get_width() + 1, bar.get_y() + bar.get_height() / 2,
-                 f"${val:,.0f}k", va="center", fontsize=9, color=SLATE)
+        ax2.text(
+            bar.get_width() + 1,
+            bar.get_y() + bar.get_height() / 2,
+            f"${val:,.0f}k",
+            va="center",
+            fontsize=9,
+            color=SLATE,
+        )
     ax2.set_title("MRR Exposure by Risk Tier")
     ax2.set_xlabel("Current MRR ($000s)")
     ax2.xaxis.set_major_formatter(USD_K)
@@ -276,19 +327,33 @@ def chart_risk_tier_breakdown() -> None:
 def chart_revenue_at_risk_by_segment() -> None:
     df = pd.read_csv(TABLES / "segment_revenue_risk_contribution.csv")
     df = df.sort_values("current_mrr_at_risk", ascending=False)
-    df["at_risk_k"]  = df["current_mrr_at_risk"] / 1_000
-    df["churned_k"]  = df["churned_monthly_value_proxy"] / 1_000
+    df["at_risk_k"] = df["current_mrr_at_risk"] / 1_000
+    df["churned_k"] = df["churned_monthly_value_proxy"] / 1_000
     x = np.arange(len(df))
     w = 0.38
 
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.bar(x - w / 2, df["at_risk_k"],  width=w, color=LOSS,   alpha=0.85, label="MRR at risk (current)",
-           edgecolor="white", linewidth=0.3)
-    ax.bar(x + w / 2, df["churned_k"],  width=w, color=ACCENT, alpha=0.85, label="Churned monthly-value proxy",
-           edgecolor="white", linewidth=0.3)
-    ax.set_title(
-        "Revenue Exposure by Segment: Current At-Risk MRR vs Churned Monthly-Value Proxy"
+    ax.bar(
+        x - w / 2,
+        df["at_risk_k"],
+        width=w,
+        color=LOSS,
+        alpha=0.85,
+        label="MRR at risk (current)",
+        edgecolor="white",
+        linewidth=0.3,
     )
+    ax.bar(
+        x + w / 2,
+        df["churned_k"],
+        width=w,
+        color=ACCENT,
+        alpha=0.85,
+        label="Churned monthly-value proxy",
+        edgecolor="white",
+        linewidth=0.3,
+    )
+    ax.set_title("Revenue Exposure by Segment: Current At-Risk MRR vs Churned Monthly-Value Proxy")
     ax.set_ylabel("Revenue ($000s)")
     ax.set_xticks(x)
     ax.set_xticklabels(df["segment"])
@@ -316,11 +381,23 @@ def chart_behavioral_drivers() -> None:
     colors = [LOSS if v >= 5.0 else MUTED for v in df["churn_rate_lift"]]
 
     fig, ax = plt.subplots(figsize=(10, 4.5))
-    bars = ax.barh(df["label"], df["churn_rate_lift"], color=colors,
-                   edgecolor="white", linewidth=0.3, height=0.5)
+    bars = ax.barh(
+        df["label"],
+        df["churn_rate_lift"],
+        color=colors,
+        edgecolor="white",
+        linewidth=0.3,
+        height=0.5,
+    )
     for bar, val in zip(bars, df["churn_rate_lift"], strict=False):
-        ax.text(bar.get_width() + 0.2, bar.get_y() + bar.get_height() / 2,
-                f"{val:.1f}×", va="center", fontsize=9, color=SLATE)
+        ax.text(
+            bar.get_width() + 0.2,
+            bar.get_y() + bar.get_height() / 2,
+            f"{val:.1f}×",
+            va="center",
+            fontsize=9,
+            color=SLATE,
+        )
     ax.set_title(
         "Churn Rate Lift by Behavioral Signal\n"
         "(lift = churn rate inside signal ÷ churn rate outside signal)"
@@ -331,8 +408,15 @@ def chart_behavioral_drivers() -> None:
     ax.grid(axis="y", visible=False)
     # Reference line at 1× (no lift)
     ax.axvline(1.0, color=MUTED, lw=0.9, ls=":", zorder=0)
-    ax.text(1.05, 0.02, "No lift", transform=ax.get_xaxis_transform(),
-            fontsize=8, color=MUTED, va="bottom")
+    ax.text(
+        1.05,
+        0.02,
+        "No lift",
+        transform=ax.get_xaxis_transform(),
+        fontsize=8,
+        color=MUTED,
+        va="bottom",
+    )
     fig.tight_layout()
     save(fig, "behavioral_churn_drivers.png")
 
@@ -347,9 +431,13 @@ def chart_risk_score_distribution() -> None:
     for tier in ["low", "medium", "high", "critical"]:
         subset = df[df["risk_tier"] == tier]["churn_risk_score"]
         ax.hist(
-            subset, bins=28, alpha=0.72, color=TIER_COLORS[tier],
+            subset,
+            bins=28,
+            alpha=0.72,
+            color=TIER_COLORS[tier],
             label=f"{tier.title()}  ({len(subset):,})",
-            edgecolor="white", linewidth=0.3,
+            edgecolor="white",
+            linewidth=0.3,
         )
     ax.set_title("Churn Risk Score Distribution by Tier")
     ax.set_xlabel("Churn risk score")
@@ -365,14 +453,15 @@ def chart_risk_score_distribution() -> None:
 # 10. Cohort retention heatmap (last 24 cohorts × 12 months)
 # ──────────────────────────────────────────────────────────
 def chart_cohort_heatmap() -> None:
-    df = pd.read_csv(PROC / "cohort_retention_table.csv",
-                     parse_dates=["cohort_month", "observation_month"])
-    df["age"] = (
-        (df["observation_month"].dt.year  - df["cohort_month"].dt.year) * 12
-        + (df["observation_month"].dt.month - df["cohort_month"].dt.month)
+    df = pd.read_csv(
+        PROC / "cohort_retention_table.csv", parse_dates=["cohort_month", "observation_month"]
     )
-    pivot = df.pivot_table(index="cohort_month", columns="age",
-                           values="retention_rate", aggfunc="mean")
+    df["age"] = (df["observation_month"].dt.year - df["cohort_month"].dt.year) * 12 + (
+        df["observation_month"].dt.month - df["cohort_month"].dt.month
+    )
+    pivot = df.pivot_table(
+        index="cohort_month", columns="age", values="retention_rate", aggfunc="mean"
+    )
     pivot = pivot.loc[:, pivot.columns <= 12]
 
     # Keep the most recent 24 cohorts
@@ -381,8 +470,9 @@ def chart_cohort_heatmap() -> None:
 
     nrows = len(pivot)
     fig, ax = plt.subplots(figsize=(14, max(5.5, nrows * 0.32 + 2.5)))
-    im = ax.imshow(pivot.values, aspect="auto", cmap="RdYlGn",
-                   vmin=0, vmax=1, interpolation="nearest")
+    im = ax.imshow(
+        pivot.values, aspect="auto", cmap="RdYlGn", vmin=0, vmax=1, interpolation="nearest"
+    )
 
     ax.set_xticks(range(len(pivot.columns)))
     ax.set_xticklabels([f"M{c}" for c in pivot.columns], fontsize=9)
@@ -400,13 +490,21 @@ def chart_cohort_heatmap() -> None:
             if np.isnan(val):
                 continue
             text_color = "black" if 0.25 < val < 0.82 else "white"
-            ax.text(j, i, f"{val:.0%}", ha="center", va="center",
-                    fontsize=8, color=text_color, fontweight="normal")
+            ax.text(
+                j,
+                i,
+                f"{val:.0%}",
+                ha="center",
+                va="center",
+                fontsize=8,
+                color=text_color,
+                fontweight="normal",
+            )
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.018, pad=0.02)
     cbar.set_label("Retention rate")
     cbar.ax.yaxis.set_major_formatter(mticker.PercentFormatter(1.0, decimals=0))
-    cbar.outline.set_visible(False)
+    cbar.outline.set_visible(False)  # type: ignore[operator]  # Colorbar.outline under-typed in stubs
 
     fig.tight_layout()
     save(fig, "cohort_retention_heatmap.png")
@@ -416,33 +514,33 @@ def chart_cohort_heatmap() -> None:
 # 11. Cohort retention curves (last 8 cohorts)
 # ──────────────────────────────────────────────────────────
 def chart_cohort_curves() -> None:
-    df = pd.read_csv(PROC / "cohort_retention_table.csv",
-                     parse_dates=["cohort_month", "observation_month"])
-    df["age"] = (
-        (df["observation_month"].dt.year  - df["cohort_month"].dt.year) * 12
-        + (df["observation_month"].dt.month - df["cohort_month"].dt.month)
+    df = pd.read_csv(
+        PROC / "cohort_retention_table.csv", parse_dates=["cohort_month", "observation_month"]
+    )
+    df["age"] = (df["observation_month"].dt.year - df["cohort_month"].dt.year) * 12 + (
+        df["observation_month"].dt.month - df["cohort_month"].dt.month
     )
     recent = sorted(df["cohort_month"].unique())[-8:]
     n = len(recent)
 
     # Blues gradient: older cohorts muted, most recent prominent
-    blues = plt.cm.Blues(np.linspace(0.35, 0.90, n))
+    blues = plt.cm.Blues(np.linspace(0.35, 0.90, n))  # type: ignore[attr-defined]  # colormap names not enumerated in stubs
 
     fig, ax = plt.subplots(figsize=(11, 5.5))
     for i, cm in enumerate(recent):
         sub = df[df["cohort_month"] == cm].sort_values("age")
-        lw  = 2.4 if i == n - 1 else (1.8 if i == n - 2 else 1.1)
+        lw = 2.4 if i == n - 1 else (1.8 if i == n - 2 else 1.1)
         lbl = pd.Timestamp(cm).strftime("%Y-%m")
-        ax.plot(sub["age"], sub["retention_rate"] * 100,
-                color=blues[i], lw=lw, label=lbl, zorder=i + 1)
+        ax.plot(
+            sub["age"], sub["retention_rate"] * 100, color=blues[i], lw=lw, label=lbl, zorder=i + 1
+        )
 
     ax.set_title("Customer Retention by Cohort Age (8 most recent cohorts)")
     ax.set_xlabel("Months since acquisition")
     ax.set_ylabel("Retention rate (%)")
     ax.yaxis.set_major_formatter(PCT)
     ax.set_ylim(0, 108)
-    ax.legend(title="Cohort", loc="lower left", fontsize=9, ncol=2,
-              title_fontsize=9)
+    ax.legend(title="Cohort", loc="lower left", fontsize=9, ncol=2, title_fontsize=9)
     ax.grid(axis="y")
     ax.grid(axis="x", visible=False)
     fig.tight_layout()
@@ -456,7 +554,11 @@ def chart_segment_health() -> None:
     df = pd.read_csv(PROC / "segment_retention_summary.csv")
     df["churn_pct"] = df["cumulative_churn_share"] * 100
     seg_order = ["Enterprise", "Mid-Market", "SMB", "Startup"]
-    df = df.set_index("segment").loc[[s for s in seg_order if s in df["segment"].values]].reset_index()
+    df = (
+        df.set_index("segment")
+        .loc[[s for s in seg_order if s in df["segment"].values]]
+        .reset_index()
+    )
     colors = [SEG_COLORS.get(s, MUTED) for s in df["segment"]]
     x = np.arange(len(df))
     bar_w = 0.55
@@ -517,12 +619,20 @@ def chart_churn_by_region() -> None:
     colors = [LOSS if v >= base else MUTED for v in df["pct"]]
 
     fig, ax = plt.subplots(figsize=(9, 4))
-    bars = ax.barh(df["region"], df["pct"], color=colors,
-                   edgecolor="white", linewidth=0.3, height=0.5)
+    bars = ax.barh(
+        df["region"], df["pct"], color=colors, edgecolor="white", linewidth=0.3, height=0.5
+    )
     label_hbar(ax, bars, "{:.1f}%", pad=0.5)
     ax.axvline(base, color=SLATE, lw=0.9, ls=":", zorder=0)
-    ax.text(base + 0.3, 0.02, f"Book average {base:.1f}%",
-            transform=ax.get_xaxis_transform(), fontsize=8, color=SLATE, va="bottom")
+    ax.text(
+        base + 0.3,
+        0.02,
+        f"Book average {base:.1f}%",
+        transform=ax.get_xaxis_transform(),
+        fontsize=8,
+        color=SLATE,
+        va="bottom",
+    )
     ax.set_title("Cumulative Churn Share by Region")
     ax.set_xlabel("Cumulative churn share (%)")
     ax.xaxis.set_major_formatter(PCT)
@@ -556,13 +666,16 @@ def chart_driver_ranking() -> None:
     colors = [LOSS if b else NEUTRAL for b in behavioural]
 
     fig, ax = plt.subplots(figsize=(11, 6))
-    bars = ax.barh(labels, df["mrr_k"], color=colors,
-                   edgecolor="white", linewidth=0.3, height=0.62)
+    bars = ax.barh(labels, df["mrr_k"], color=colors, edgecolor="white", linewidth=0.3, height=0.62)
     for bar, lift in zip(bars, df["churn_rate_lift"], strict=False):
-        ax.text(bar.get_width() + df["mrr_k"].max() * 0.012,
-                bar.get_y() + bar.get_height() / 2,
-                f"${bar.get_width():,.0f}k   ({lift:.1f}× churn)",
-                va="center", fontsize=8.5, color=SLATE)
+        ax.text(
+            bar.get_width() + df["mrr_k"].max() * 0.012,
+            bar.get_y() + bar.get_height() / 2,
+            f"${bar.get_width():,.0f}k   ({lift:.1f}× churn)",
+            va="center",
+            fontsize=8.5,
+            color=SLATE,
+        )
     ax.set_title(
         "Churn Driver Ranking by Excess MRR Association\n"
         "(monthly revenue tied to churned accounts carrying each signal, above baseline)"
@@ -574,10 +687,15 @@ def chart_driver_ranking() -> None:
     ax.grid(axis="y", visible=False)
     # Legend for the colour encoding
     from matplotlib.patches import Patch
-    ax.legend(handles=[
-        Patch(facecolor=LOSS, label="Behavioural signal"),
-        Patch(facecolor=NEUTRAL, label="Structural attribute"),
-    ], loc="lower right", frameon=False)
+
+    ax.legend(
+        handles=[
+            Patch(facecolor=LOSS, label="Behavioural signal"),
+            Patch(facecolor=NEUTRAL, label="Structural attribute"),
+        ],
+        loc="lower right",
+        frameon=False,
+    )
     fig.tight_layout()
     save(fig, "churn_driver_ranking.png")
 
@@ -606,8 +724,13 @@ def chart_revenue_concentration() -> None:
     ax.scatter([20], [y20], color=SLATE, s=28, zorder=4)
     ax.plot([20, 20], [0, y20], color=SLATE, lw=0.8, ls=":", zorder=1)
     ax.plot([0, 20], [y20, y20], color=SLATE, lw=0.8, ls=":", zorder=1)
-    ax.text(22, y20 - 7, f"Top 20% of churned accounts\ncarry {y20:.0f}% of lost monthly value",
-            fontsize=9, color=SLATE)
+    ax.text(
+        22,
+        y20 - 7,
+        f"Top 20% of churned accounts\ncarry {y20:.0f}% of lost monthly value",
+        fontsize=9,
+        color=SLATE,
+    )
 
     ax.set_title("Concentration of Lost Monthly Value Across Churned Accounts")
     ax.set_xlabel("Cumulative share of churned accounts (%, ranked by value)")
@@ -634,7 +757,7 @@ def chart_signal_separation() -> None:
     )
     df["label"] = fix_acronyms(df["label"])
     df = df.sort_values("churn_rate_in_group", ascending=True)
-    y = np.arange(len(df))
+    y = np.arange(len(df), dtype=float)
     inside = df["churn_rate_in_group"] * 100
     outside = df["churn_rate_out_group"] * 100
 
@@ -673,15 +796,23 @@ def chart_intervention_priorities() -> None:
 
     fig, ax = plt.subplots(figsize=(10.5, 5))
     # Scope as light backdrop bar, weighted exposure as accent foreground
-    ax.barh(df["opportunity"], df["scope_k"], color="#E2E8F0",
-            height=0.55, label="MRR in scope")
-    bars = ax.barh(df["opportunity"], df["exp_k"], color=LOSS,
-                   height=0.55, label="Weighted MRR exposure (proxy)")
+    ax.barh(df["opportunity"], df["scope_k"], color="#E2E8F0", height=0.55, label="MRR in scope")
+    bars = ax.barh(
+        df["opportunity"],
+        df["exp_k"],
+        color=LOSS,
+        height=0.55,
+        label="Weighted MRR exposure (proxy)",
+    )
     for bar, cand, scope in zip(bars, df["candidate_customers"], df["scope_k"], strict=False):
-        ax.text(scope + df["scope_k"].max() * 0.012,
-                bar.get_y() + bar.get_height() / 2,
-                f"${bar.get_width():,.0f}k weighted  ·  {cand:,} accounts  ·  ${scope:,.0f}k scope",
-                va="center", fontsize=8.3, color=SLATE)
+        ax.text(
+            scope + df["scope_k"].max() * 0.012,
+            bar.get_y() + bar.get_height() / 2,
+            f"${bar.get_width():,.0f}k weighted  ·  {cand:,} accounts  ·  ${scope:,.0f}k scope",
+            va="center",
+            fontsize=8.3,
+            color=SLATE,
+        )
     ax.set_title("Retention Plays Ranked by Weighted MRR Exposure")
     ax.set_xlabel("Monthly revenue ($000s)")
     ax.xaxis.set_major_formatter(USD_K)
@@ -706,15 +837,21 @@ def chart_recent_acceleration() -> None:
     colors = [LOSS if v > thresh else MUTED for v in df["pct"]]
 
     fig, ax = plt.subplots(figsize=(11, 5))
-    bars = ax.bar(df["mlabel"], df["pct"], color=colors,
-                  edgecolor="white", linewidth=0.3, width=0.7)
+    bars = ax.bar(
+        df["mlabel"], df["pct"], color=colors, edgecolor="white", linewidth=0.3, width=0.7
+    )
     for bar, val in zip(bars, df["pct"], strict=False):
-        ax.text(bar.get_x() + bar.get_width() / 2, val + 0.15,
-                f"{val:.1f}%", ha="center", fontsize=8.5, color=SLATE)
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            val + 0.15,
+            f"{val:.1f}%",
+            ha="center",
+            fontsize=8.5,
+            color=SLATE,
+        )
     base = df["pct"].iloc[:-3].mean()
     ax.axhline(base, color=SLATE, lw=0.9, ls=":", zorder=0)
-    ax.text(0.2, base + 0.15, f"Prior 9-month average {base:.1f}%",
-            fontsize=8.5, color=SLATE)
+    ax.text(0.2, base + 0.15, f"Prior 9-month average {base:.1f}%", fontsize=8.5, color=SLATE)
     ax.set_title("Monthly Customer Churn Rate — Last 12 Months")
     ax.set_ylabel("Customer churn rate (%)")
     ax.yaxis.set_major_formatter(PCT)

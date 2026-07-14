@@ -1,0 +1,25 @@
+version: 1
+default_adapter: csv
+csv:
+  source_directory_env: CHURN_SOURCE_DIR
+postgresql:
+  dsn_env: CHURN_DATABASE_URL
+  schema: analytics
+  tables:
+    customers: customers
+    subscriptions: subscriptions
+    product_usage: product_usage
+    payments: payments
+    revenue_movements: revenue_movements
+    acquisition_spend: acquisition_spend
+    service_costs: service_costs
+snapshot:
+  include:
+    - data/raw/*.csv
+    - data/raw/_ingestion_manifest.json
+    - data/processed/*.csv
+    - outputs/models/*
+    - outputs/tables/*.csv
+  exclude:
+    - outputs/tables/validation_issues.csv
+  retention_days: 90

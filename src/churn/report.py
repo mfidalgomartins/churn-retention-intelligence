@@ -11,14 +11,16 @@ The report is a single deliverable: flowing prose, charts inline, a cover page,
 a linked table of contents, and a running footer. Every figure is read from the
 governed pipeline artifacts so the report stays in lockstep with the dashboard.
 """
+
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 import pandas as pd
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
@@ -39,27 +41,29 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.tableofcontents import TableOfContents
 
+from churn.common import REFERENCE_DATE as SNAPSHOT_DATE
+
 # ── Paths ──────────────────────────────────────────────────
-ROOT   = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[2]
 GRAPHS = ROOT / "outputs" / "graphs"
 TABLES = ROOT / "outputs" / "tables"
-PROC   = ROOT / "data" / "processed"
-OUT    = ROOT / "outputs" / "reports"
+PROC = ROOT / "data" / "processed"
+OUT = ROOT / "outputs" / "reports"
 OUT.mkdir(parents=True, exist_ok=True)
 
 REPORT_PATH = OUT / "churn-retention-intelligence-report.pdf"
 
 # ── Palette (matches the chart pack and dashboard) ─────────
-INK     = colors.HexColor("#1E293B")   # body text
-SLATE   = colors.HexColor("#334155")
-MUTED   = colors.HexColor("#64748B")
-HAIR    = colors.HexColor("#CBD5E1")
-PALE    = colors.HexColor("#E2E8F0")
-PAPER   = colors.HexColor("#FFFFFF")
-NAVY    = colors.HexColor("#1B3A6B")   # accent
-LOSS    = colors.HexColor("#B83530")   # emphasis / risk
-GAIN    = colors.HexColor("#1B6640")
-CREAM   = colors.HexColor("#FAF8F4")
+INK = colors.HexColor("#1E293B")  # body text
+SLATE = colors.HexColor("#334155")
+MUTED = colors.HexColor("#64748B")
+HAIR = colors.HexColor("#CBD5E1")
+PALE = colors.HexColor("#E2E8F0")
+PAPER = colors.HexColor("#FFFFFF")
+NAVY = colors.HexColor("#1B3A6B")  # accent
+LOSS = colors.HexColor("#B83530")  # emphasis / risk
+GAIN = colors.HexColor("#1B6640")
+CREAM = colors.HexColor("#FAF8F4")
 
 PAGE_W, PAGE_H = A4
 LMARGIN = 2.4 * cm
@@ -68,7 +72,7 @@ TMARGIN = 2.3 * cm
 BMARGIN = 2.2 * cm
 CONTENT_W = PAGE_W - LMARGIN - RMARGIN
 
-REFERENCE_DATE = "1 March 2026"
+REFERENCE_DATE = f"{SNAPSHOT_DATE.day} {SNAPSHOT_DATE.strftime('%B %Y')}"
 BUILD_DATE = os.getenv("CHURN_REPORT_DATE", REFERENCE_DATE)
 
 
@@ -83,21 +87,27 @@ def load_metrics() -> dict:
     """Read every number the narrative cites, so prose tracks the data."""
     feats = pd.read_csv(PROC / "customer_retention_features.csv")
     risk = pd.read_csv(PROC / "customer_risk_scores.csv")
-    seg  = _csv("churn_by_segment.csv").set_index("segment")
+    seg = _csv("churn_by_segment.csv").set_index("segment")
     chan = _csv("churn_by_acquisition_channel.csv").set_index("acquisition_channel")
     plan = _csv("churn_by_plan_type.csv").set_index("plan_type")
-    reg  = _csv("churn_by_region.csv").set_index("region")
-    beh  = _csv("behavioral_churn_relationships.csv").set_index("relationship")
+    reg = _csv("churn_by_region.csv").set_index("region")
+    beh = _csv("behavioral_churn_relationships.csv").set_index("relationship")
     tier = _csv("risk_tier_summary.csv").set_index("risk_tier")
-    drv  = _csv("main_analysis_churn_driver_ranking.csv")
-    itv  = _csv("main_analysis_intervention_priorities.csv")
+    drv = _csv("main_analysis_churn_driver_ranking.csv")
+    itv = _csv("main_analysis_intervention_priorities.csv")
     segr = _csv("segment_revenue_risk_contribution.csv").set_index("segment")
-    trend = pd.read_csv(TABLES / "overall_retention_trend_monthly.csv",
-                        parse_dates=["month"])
+    economics = _csv("unit_economics_summary.csv").set_index("metric")
+    model = _csv("model_performance.csv").set_index("split")
+    incrementality = _csv("intervention_incrementality.csv").set_index("metric")
+    balance = _csv("intervention_balance.csv")
+    monitoring = _csv("monitoring_summary.csv").iloc[0]
+    trend = pd.read_csv(TABLES / "overall_retention_trend_monthly.csv", parse_dates=["month"])
     trend = trend[trend["active_customers_start"] >= 50].copy()
     val = pd.read_csv(TABLES / "final_validation_checks.csv")
-    gov = [[cat, f"{int((g['status'] == 'PASS').sum())} / {len(g)}"]
-           for cat, g in val.groupby("category")]
+    gov = [
+        [cat, f"{int((g['status'] == 'PASS').sum())} / {len(g)}"]
+        for cat, g in val.groupby("category")
+    ]
     gov_total = len(val)
     gov_pass = int((val["status"] == "PASS").sum())
 
@@ -106,9 +116,13 @@ def load_metrics() -> dict:
     active = total - churned
 
     # Revenue concentration of lost monthly value
-    lost = feats.loc[feats["churn_flag"] == 1, "avg_monthly_revenue"] \
-        .sort_values(ascending=False).reset_index(drop=True)
+    lost = (
+        feats.loc[feats["churn_flag"] == 1, "avg_monthly_revenue"]
+        .sort_values(ascending=False)
+        .reset_index(drop=True)
+    )
     cum = lost.cumsum() / lost.sum()
+
     def conc(q):
         k = max(int(len(lost) * q) - 1, 0)
         return float(cum.iloc[k]) * 100
@@ -121,29 +135,37 @@ def load_metrics() -> dict:
     prior9_rev_churn = trend["revenue_churn_rate"].iloc[-12:-3].mean() * 100
     t12 = trend.tail(12)
     trend12 = [
-        [r["month"].strftime("%b %Y"),
-         f"{int(r['active_customers_start']):,}",
-         usd(r["active_mrr_start"], k=True),
-         f"{int(r['churned_customers']):,}",
-         f"{r['customer_churn_rate']*100:.1f}%",
-         f"{r['revenue_churn_rate']*100:.1f}%"]
+        [
+            r["month"].strftime("%b %Y"),
+            f"{int(r['active_customers_start']):,}",
+            usd(r["active_mrr_start"], k=True),
+            f"{int(r['churned_customers']):,}",
+            f"{r['customer_churn_rate'] * 100:.1f}%",
+            f"{r['revenue_churn_rate'] * 100:.1f}%",
+        ]
         for _, r in t12.iterrows()
     ]
 
-    cohort = pd.read_csv(PROC / "cohort_retention_table.csv",
-                         parse_dates=["cohort_month", "observation_month"])
+    cohort = pd.read_csv(
+        PROC / "cohort_retention_table.csv", parse_dates=["cohort_month", "observation_month"]
+    )
     cohort["age_months"] = (
         (cohort["observation_month"].dt.year - cohort["cohort_month"].dt.year) * 12
-        + cohort["observation_month"].dt.month - cohort["cohort_month"].dt.month
+        + cohort["observation_month"].dt.month
+        - cohort["cohort_month"].dt.month
     )
 
     def cohort_age_delta(age: int) -> dict:
         aged = cohort[cohort["age_months"] == age].sort_values("cohort_month")
         if len(aged) < 6:
             return {
-                "age": age, "n": len(aged), "early_logo": float("nan"),
-                "recent_logo": float("nan"), "logo_delta": float("nan"),
-                "early_rev": float("nan"), "recent_rev": float("nan"),
+                "age": age,
+                "n": len(aged),
+                "early_logo": float("nan"),
+                "recent_logo": float("nan"),
+                "logo_delta": float("nan"),
+                "early_rev": float("nan"),
+                "recent_rev": float("nan"),
                 "rev_delta": float("nan"),
             }
         w = min(6, len(aged) // 2)
@@ -154,15 +176,15 @@ def load_metrics() -> dict:
             "early_logo": float(early["retention_rate"].mean()) * 100,
             "recent_logo": float(recent["retention_rate"].mean()) * 100,
             "logo_delta": (
-                float(recent["retention_rate"].mean())
-                - float(early["retention_rate"].mean())
-            ) * 100,
+                float(recent["retention_rate"].mean()) - float(early["retention_rate"].mean())
+            )
+            * 100,
             "early_rev": float(early["revenue_retention"].mean()) * 100,
             "recent_rev": float(recent["revenue_retention"].mean()) * 100,
             "rev_delta": (
-                float(recent["revenue_retention"].mean())
-                - float(early["revenue_retention"].mean())
-            ) * 100,
+                float(recent["revenue_retention"].mean()) - float(early["revenue_retention"].mean())
+            )
+            * 100,
         }
 
     cohort_deltas = {age: cohort_age_delta(age) for age in [3, 6, 9, 12]}
@@ -176,20 +198,24 @@ def load_metrics() -> dict:
     high_crit = tier.loc[["critical", "high"]]
 
     active_feats = feats[feats["churn_flag"] == 0].copy()
-    signal_flags = pd.DataFrame({
-        "payment_failure": active_feats["payment_failure_flag"] == 1,
-        "usage_decline": active_feats["usage_trend"] < 0,
-        "low_nps": (
-            active_feats["nps_score_recent"] <= feats["nps_score_recent"].quantile(0.25)
-        ),
-        "high_support": (
-            active_feats["support_tickets_90d"] >= feats["support_tickets_90d"].quantile(0.75)
-        ),
-        "low_adoption": (
-            active_feats["feature_adoption_score_recent"]
-            <= feats["feature_adoption_score_recent"].quantile(0.25)
-        ),
-    }, index=active_feats.index)
+    active_current_mrr = float(active_feats["current_mrr"].sum())
+    signal_flags = pd.DataFrame(
+        {
+            "payment_failure": active_feats["payment_failure_flag"] == 1,
+            "usage_decline": active_feats["usage_trend"] < 0,
+            "low_nps": (
+                active_feats["nps_score_recent"] <= feats["nps_score_recent"].quantile(0.25)
+            ),
+            "high_support": (
+                active_feats["support_tickets_90d"] >= feats["support_tickets_90d"].quantile(0.75)
+            ),
+            "low_adoption": (
+                active_feats["feature_adoption_score_recent"]
+                <= feats["feature_adoption_score_recent"].quantile(0.25)
+            ),
+        },
+        index=active_feats.index,
+    )
     active_feats["distress_signal_count"] = signal_flags.sum(axis=1)
     multi_signal = active_feats["distress_signal_count"] >= 2
 
@@ -197,9 +223,13 @@ def load_metrics() -> dict:
         return float(n / d * 100) if d else 0.0
 
     return {
-        "total": total, "active": active, "churned": churned,
+        "total": total,
+        "active": active,
+        "churned": churned,
         "cum_churn_pct": churned / total * 100,
-        "active_mrr": float(last["active_mrr_start"]),
+        "active_mrr": active_current_mrr,
+        "active_current_mrr": active_current_mrr,
+        "cum_revenue_loss_pct": share(lost.sum(), feats["avg_monthly_revenue"].sum()),
         "window_start": trend["month"].min().strftime("%b %Y"),
         "window_end": trend["month"].max().strftime("%b %Y"),
         "avg_cust_churn": trend["customer_churn_rate"].mean() * 100,
@@ -213,18 +243,29 @@ def load_metrics() -> dict:
         "last3_churn_delta_pp": last3_churn - prior9,
         "last3_rev_churn_delta_pp": last3_rev_churn - prior9_rev_churn,
         "trend12": trend12,
-        "gov": gov, "gov_total": gov_total, "gov_pass": gov_pass,
+        "gov": gov,
+        "gov_total": gov_total,
+        "gov_pass": gov_pass,
         # segments
-        "seg": seg, "chan": chan, "plan": plan, "reg": reg,
-        "beh": beh, "tier": tier, "drv": drv, "itv": itv, "segr": segr,
+        "seg": seg,
+        "chan": chan,
+        "plan": plan,
+        "reg": reg,
+        "beh": beh,
+        "tier": tier,
+        "drv": drv,
+        "itv": itv,
+        "segr": segr,
         "risk_mean": float(risk["churn_risk_score"].mean()),
         "scored": len(risk),
         "rec_counts": risk["recommended_action"].value_counts().to_dict(),
         "driver_counts": risk["main_risk_driver"].value_counts().to_dict(),
         # concentration
         "conc5": conc(0.05),
-        "conc10": conc(0.10), "conc20": conc(0.20),
-        "conc30": conc(0.30), "conc50": conc(0.50),
+        "conc10": conc(0.10),
+        "conc20": conc(0.20),
+        "conc30": conc(0.30),
+        "conc50": conc(0.50),
         "lost_mrr_total": float(lost.sum()),
         # cohort and mix diagnostics
         "cohort_deltas": cohort_deltas,
@@ -267,13 +308,59 @@ def load_metrics() -> dict:
         ),
         "play_scope_mrr": float(itv["current_mrr_scope"].sum()),
         "play_weighted_exposure": float(itv["mrr_exposure_proxy"].sum()),
+        "average_monthly_nrr": float(economics.loc["average_monthly_nrr", "value"]),
+        "gross_margin_rate": float(economics.loc["gross_margin_rate", "value"]),
+        "blended_cac": float(economics.loc["blended_cac", "value"]),
+        "model_roc_auc": float(model.loc["test", "roc_auc"]),
+        "model_average_precision": float(model.loc["test", "average_precision"]),
+        "model_brier_score": float(model.loc["test", "brier_score"]),
+        "experiment_eligible": int(
+            incrementality.loc["churned_90d", "treatment_n"]
+            + incrementality.loc["churned_90d", "control_n"]
+        ),
+        "experiment_treatment": int(incrementality.loc["churned_90d", "treatment_n"]),
+        "experiment_control": int(incrementality.loc["churned_90d", "control_n"]),
+        "simulated_saved_mrr": float(incrementality.loc["lost_mrr_90d", "incremental_saved_mrr"]),
+        "simulated_saved_mrr_ci_lower": float(
+            -incrementality.loc["lost_mrr_90d", "ci_95_upper"]
+            * incrementality.loc["lost_mrr_90d", "treatment_n"]
+        ),
+        "simulated_saved_mrr_ci_upper": float(
+            -incrementality.loc["lost_mrr_90d", "ci_95_lower"]
+            * incrementality.loc["lost_mrr_90d", "treatment_n"]
+        ),
+        "maximum_experiment_smd": float(
+            balance.loc[
+                balance["statistic_name"] == "standardized_mean_difference",
+                "balance_statistic",
+            ]
+            .abs()
+            .max()
+        ),
+        "monitoring_alerts": int(monitoring["open_alerts"]),
     }
 
 
 def usd(x: float, k: bool = False) -> str:
+    sign = "-" if x < 0 else ""
     if k:
-        return f"${x/1000:,.0f}k"
-    return f"${x:,.0f}"
+        return f"{sign}${abs(x) / 1000:,.0f}k"
+    return f"{sign}${abs(x):,.0f}"
+
+
+_ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+
+
+def floor_multiple(x: float) -> str:
+    """Floor a lift ratio to a whole multiple, spelled out under ten to match report prose style."""
+    n = int(x)
+    return _ONES[n] if 0 <= n < 10 else str(n)
+
+
+def code(text: str) -> str:
+    """Mark a literal field, file, or path name so it reads as a system
+    identifier rather than prose, wherever it appears inline or in a table."""
+    return f'<font face="Courier" size="8">{text}</font>'
 
 
 # ════════════════════════════════════════════════════════════
@@ -281,76 +368,165 @@ def usd(x: float, k: bool = False) -> str:
 # ════════════════════════════════════════════════════════════
 def build_styles() -> dict:
     body = ParagraphStyle(
-        "Body", fontName="Times-Roman", fontSize=10.5, leading=15.5,
-        textColor=INK, alignment=TA_JUSTIFY, spaceAfter=8, firstLineIndent=0,
+        "Body",
+        fontName="Times-Roman",
+        fontSize=10.5,
+        leading=15.5,
+        textColor=INK,
+        alignment=TA_JUSTIFY,
+        spaceAfter=8,
+        firstLineIndent=0,
     )
     styles = {
         "body": body,
         "lead": ParagraphStyle(
-            "Lead", parent=body, fontSize=11.5, leading=17, spaceAfter=10,
+            "Lead",
+            parent=body,
+            fontSize=11.5,
+            leading=17,
+            spaceAfter=10,
             textColor=SLATE,
         ),
         "h1": ParagraphStyle(
-            "H1", fontName="Helvetica-Bold", fontSize=19, leading=22,
-            textColor=NAVY, spaceBefore=4, spaceAfter=4,
+            "H1",
+            fontName="Helvetica-Bold",
+            fontSize=19,
+            leading=22,
+            textColor=NAVY,
+            spaceBefore=4,
+            spaceAfter=4,
         ),
         "h1num": ParagraphStyle(
-            "H1num", fontName="Helvetica-Bold", fontSize=10, leading=12,
-            textColor=LOSS, spaceAfter=2,
+            "H1num",
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=12,
+            textColor=LOSS,
+            spaceAfter=2,
         ),
         "h2": ParagraphStyle(
-            "H2", fontName="Helvetica-Bold", fontSize=13, leading=16,
-            textColor=INK, spaceBefore=14, spaceAfter=5,
+            "H2",
+            fontName="Helvetica-Bold",
+            fontSize=13,
+            leading=16,
+            textColor=INK,
+            spaceBefore=14,
+            spaceAfter=5,
         ),
         "h3": ParagraphStyle(
-            "H3", fontName="Helvetica-Bold", fontSize=11, leading=14,
-            textColor=SLATE, spaceBefore=10, spaceAfter=3,
+            "H3",
+            fontName="Helvetica-Bold",
+            fontSize=11,
+            leading=14,
+            textColor=SLATE,
+            spaceBefore=10,
+            spaceAfter=3,
         ),
         "caption": ParagraphStyle(
-            "Caption", fontName="Helvetica", fontSize=8.5, leading=11.5,
-            textColor=MUTED, alignment=TA_LEFT, spaceBefore=4, spaceAfter=16,
+            "Caption",
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=11.5,
+            textColor=MUTED,
+            alignment=TA_LEFT,
+            spaceBefore=4,
+            spaceAfter=16,
         ),
         "pull": ParagraphStyle(
-            "Pull", fontName="Times-Italic", fontSize=13, leading=18,
-            textColor=NAVY, alignment=TA_LEFT, spaceBefore=6, spaceAfter=12,
-            leftIndent=14, rightIndent=14, borderColor=HAIR,
+            "Pull",
+            fontName="Times-Italic",
+            fontSize=13.5,
+            leading=19,
+            textColor=NAVY,
+            alignment=TA_LEFT,
         ),
         "kicker": ParagraphStyle(
-            "Kicker", fontName="Helvetica-Bold", fontSize=9, leading=12,
-            textColor=LOSS, spaceAfter=3,
+            "Kicker",
+            fontName="Helvetica-Bold",
+            fontSize=9,
+            leading=12,
+            textColor=LOSS,
+            spaceAfter=3,
         ),
         "toc1": ParagraphStyle(
-            "TOC1", fontName="Helvetica-Bold", fontSize=10.5, leading=20,
+            "TOC1",
+            fontName="Helvetica-Bold",
+            fontSize=10.5,
+            leading=20,
             textColor=INK,
         ),
         "toc2": ParagraphStyle(
-            "TOC2", fontName="Times-Roman", fontSize=10, leading=16,
-            textColor=SLATE, leftIndent=16,
+            "TOC2",
+            fontName="Helvetica",
+            fontSize=9.5,
+            leading=16,
+            textColor=SLATE,
+            leftIndent=16,
         ),
         # cover
         "cover_kick": ParagraphStyle(
-            "CK", fontName="Helvetica-Bold", fontSize=11, leading=15,
-            textColor=LOSS, alignment=TA_LEFT,
+            "CK",
+            fontName="Helvetica-Bold",
+            fontSize=11,
+            leading=15,
+            textColor=LOSS,
+            alignment=TA_LEFT,
         ),
         "cover_title": ParagraphStyle(
-            "CT", fontName="Helvetica-Bold", fontSize=33, leading=37,
-            textColor=NAVY, alignment=TA_LEFT, spaceBefore=10, spaceAfter=8,
+            "CT",
+            fontName="Helvetica-Bold",
+            fontSize=33,
+            leading=37,
+            textColor=NAVY,
+            alignment=TA_LEFT,
+            spaceBefore=10,
+            spaceAfter=8,
         ),
         "cover_sub": ParagraphStyle(
-            "CS", fontName="Times-Italic", fontSize=15, leading=21,
-            textColor=SLATE, alignment=TA_LEFT,
+            "CS",
+            fontName="Times-Italic",
+            fontSize=15,
+            leading=21,
+            textColor=SLATE,
+            alignment=TA_LEFT,
         ),
         "cover_meta": ParagraphStyle(
-            "CM", fontName="Helvetica", fontSize=9.5, leading=15,
-            textColor=MUTED, alignment=TA_LEFT,
+            "CM",
+            fontName="Helvetica",
+            fontSize=9.5,
+            leading=15,
+            textColor=MUTED,
+            alignment=TA_LEFT,
         ),
         "tbl": ParagraphStyle(
-            "Tbl", fontName="Times-Roman", fontSize=9, leading=12,
+            "Tbl",
+            fontName="Times-Roman",
+            fontSize=9,
+            leading=12,
             textColor=INK,
         ),
+        "tbl_r": ParagraphStyle(
+            "TblR",
+            fontName="Times-Roman",
+            fontSize=9,
+            leading=12,
+            textColor=INK,
+            alignment=TA_RIGHT,
+        ),
         "tblh": ParagraphStyle(
-            "Tblh", fontName="Helvetica-Bold", fontSize=8.5, leading=11,
+            "Tblh",
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            leading=11,
             textColor=PAPER,
+        ),
+        "tblh_r": ParagraphStyle(
+            "TblhR",
+            fontName="Helvetica-Bold",
+            fontSize=8.5,
+            leading=11,
+            textColor=PAPER,
+            alignment=TA_RIGHT,
         ),
     }
     return styles
@@ -361,6 +537,7 @@ def build_styles() -> dict:
 # ════════════════════════════════════════════════════════════
 class SectionHeading(Paragraph):
     """A Heading1/Heading2 paragraph that registers itself in the TOC."""
+
     def __init__(self, text, style, level, key):
         super().__init__(text, style)
         self._toc_level = level
@@ -368,8 +545,7 @@ class SectionHeading(Paragraph):
         self._toc_text = text
 
 
-def fig(name: str, caption: str, styles: dict, width_frac: float = 1.0,
-        max_h: float = 11.5 * cm):
+def fig(name: str, caption: str, styles: dict, width_frac: float = 1.0, max_h: float = 11.5 * cm):
     """Inline figure scaled to the content width, with a numbered caption."""
     path = GRAPHS / name
     iw, ih = ImageReader(str(path)).getSize()
@@ -386,46 +562,120 @@ def fig(name: str, caption: str, styles: dict, width_frac: float = 1.0,
 
 def rule(color=HAIR, thickness=0.6, space_before=2, space_after=8, width=None):
     t = Table([[""]], colWidths=[width or CONTENT_W], rowHeights=[0.1])
-    t.setStyle(TableStyle([
-        ("LINEABOVE", (0, 0), (-1, 0), thickness, color),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
+    t.setStyle(
+        TableStyle(
+            [
+                ("LINEABOVE", (0, 0), (-1, 0), thickness, color),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
     return KeepTogether([Spacer(1, space_before), t, Spacer(1, space_after)])
+
+
+def pull_quote(text: str, styles: dict) -> KeepTogether:
+    """A callout box for a single load-bearing sentence, used sparingly to
+    break up dense text pages and signal which line matters most."""
+    p = Paragraph(text, styles["pull"])
+    t = Table([[p]], colWidths=[CONTENT_W])
+    t.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), CREAM),
+                ("LINEBEFORE", (0, 0), (0, -1), 3, LOSS),
+                ("TOPPADDING", (0, 0), (-1, -1), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+                ("LEFTPADDING", (0, 0), (-1, -1), 18),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 16),
+            ]
+        )
+    )
+    return KeepTogether([Spacer(1, 6), t, Spacer(1, 10)])
 
 
 def stat_band(items, styles):
     """A row of headline statistics used in the executive summary."""
     cells = []
     for value, label in items:
-        v = Paragraph(value, ParagraphStyle(
-            "sv", fontName="Helvetica-Bold", fontSize=17, leading=19,
-            textColor=NAVY, alignment=TA_CENTER))
-        lab = Paragraph(label, ParagraphStyle(
-            "sl", fontName="Helvetica", fontSize=7.8, leading=10,
-            textColor=MUTED, alignment=TA_CENTER))
+        v = Paragraph(
+            value,
+            ParagraphStyle(
+                "sv",
+                fontName="Helvetica-Bold",
+                fontSize=17,
+                leading=19,
+                textColor=NAVY,
+                alignment=TA_CENTER,
+            ),
+        )
+        lab = Paragraph(
+            label,
+            ParagraphStyle(
+                "sl",
+                fontName="Helvetica",
+                fontSize=7.8,
+                leading=10,
+                textColor=MUTED,
+                alignment=TA_CENTER,
+            ),
+        )
         inner = Table([[v], [lab]], colWidths=[CONTENT_W / len(items) - 6])
-        inner.setStyle(TableStyle([
-            ("TOPPADDING", (0, 0), (-1, -1), 2),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ]))
+        inner.setStyle(
+            TableStyle(
+                [
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ]
+            )
+        )
         cells.append(inner)
     t = Table([cells], colWidths=[CONTENT_W / len(items)] * len(items))
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), CREAM),
-        ("BOX", (0, 0), (-1, -1), 0.6, HAIR),
-        ("LINEBEFORE", (1, 0), (-1, -1), 0.5, HAIR),
-        ("TOPPADDING", (0, 0), (-1, -1), 12),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
+    t.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), CREAM),
+                ("BOX", (0, 0), (-1, -1), 0.6, HAIR),
+                ("LINEBEFORE", (1, 0), (-1, -1), 0.5, HAIR),
+                ("TOPPADDING", (0, 0), (-1, -1), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     return KeepTogether([Spacer(1, 6), t, Spacer(1, 14)])
 
 
-def data_table(header, rows, styles, col_widths, emphasize_last=False):
-    head = [Paragraph(h, styles["tblh"]) for h in header]
-    body = [[Paragraph(str(c), styles["tbl"]) for c in r] for r in rows]
+_NUMERIC_CELL = re.compile(r"^-?\$?[\d,]+(\.\d+)?\s?(%|×|pp|k)?$")
+
+
+def _is_numeric_column(rows: list, col_idx: int) -> bool:
+    """A column reads as a magnitude to compare, not a label, when every
+    non-blank cell is a bare number, currency, percentage, or multiple."""
+    values = [str(r[col_idx]).strip() for r in rows]
+    non_empty = [v for v in values if v]
+    return bool(non_empty) and all(_NUMERIC_CELL.match(v) for v in non_empty)
+
+
+def data_table(header, rows, styles, col_widths):
+    # Numeric columns are magnitudes to compare down the column, so they read
+    # better right-aligned; label columns stay left-aligned. Alignment has to
+    # be set on the cell Paragraph's own style: a Table's ALIGN command only
+    # positions a flowable within its cell, and a Paragraph already fills the
+    # full column width, so it would have no visible effect here.
+    numeric_col = [bool(rows) and _is_numeric_column(rows, i) for i in range(len(header))]
+    head = [
+        Paragraph(h, styles["tblh_r"] if numeric_col[i] else styles["tblh"])
+        for i, h in enumerate(header)
+    ]
+    body = [
+        [
+            Paragraph(str(c), styles["tbl_r"] if numeric_col[i] else styles["tbl"])
+            for i, c in enumerate(r)
+        ]
+        for r in rows
+    ]
     t = Table([head, *body], colWidths=col_widths, repeatRows=1)
     style = [
         ("BACKGROUND", (0, 0), (-1, 0), NAVY),
@@ -451,36 +701,59 @@ class ReportDoc(BaseDocTemplate):
         self.allowSplitting = 1
         cover = PageTemplate(
             id="cover",
-            frames=[Frame(LMARGIN, BMARGIN, CONTENT_W, PAGE_H - TMARGIN - BMARGIN,
-                          id="cf", leftPadding=0, rightPadding=0,
-                          topPadding=0, bottomPadding=0)],
+            frames=[
+                Frame(
+                    LMARGIN,
+                    BMARGIN,
+                    CONTENT_W,
+                    PAGE_H - TMARGIN - BMARGIN,
+                    id="cf",
+                    leftPadding=0,
+                    rightPadding=0,
+                    topPadding=0,
+                    bottomPadding=0,
+                )
+            ],
             onPage=self._cover_bg,
         )
         content = PageTemplate(
             id="content",
-            frames=[Frame(LMARGIN, BMARGIN, CONTENT_W, PAGE_H - TMARGIN - BMARGIN,
-                          id="nf", leftPadding=0, rightPadding=0,
-                          topPadding=0, bottomPadding=0)],
+            frames=[
+                Frame(
+                    LMARGIN,
+                    BMARGIN,
+                    CONTENT_W,
+                    PAGE_H - TMARGIN - BMARGIN,
+                    id="nf",
+                    leftPadding=0,
+                    rightPadding=0,
+                    topPadding=0,
+                    bottomPadding=0,
+                )
+            ],
             onPage=self._footer,
         )
         self.addPageTemplates([cover, content])
 
     def afterFlowable(self, flowable):
         if isinstance(flowable, SectionHeading):
-            self.notify("TOCEntry",
-                        (flowable._toc_level, flowable._toc_text,
-                         self.page, flowable._toc_key))
+            self.notify(
+                "TOCEntry", (flowable._toc_level, flowable._toc_text, self.page, flowable._toc_key)
+            )
             self.canv.bookmarkPage(flowable._toc_key)
             self.canv.addOutlineEntry(
-                _strip_tags(flowable._toc_text), flowable._toc_key,
-                level=flowable._toc_level, closed=(flowable._toc_level > 0))
+                _strip_tags(flowable._toc_text),
+                flowable._toc_key,
+                level=flowable._toc_level,
+                closed=(flowable._toc_level > 0),
+            )
 
     def _cover_bg(self, canvas, doc):
         canvas.saveState()
         canvas.setFillColor(NAVY)
         canvas.rect(0, PAGE_H - 1.0 * cm, PAGE_W, 1.0 * cm, fill=1, stroke=0)
         canvas.setFillColor(LOSS)
-        canvas.rect(0, PAGE_H - 1.0 * cm, 6 * cm, 1.0 * cm, fill=1, stroke=0)
+        canvas.rect(0, PAGE_H - 1.0 * cm, 0.35 * cm, 1.0 * cm, fill=1, stroke=0)
         canvas.setFillColor(NAVY)
         canvas.rect(0, 0, PAGE_W, 0.55 * cm, fill=1, stroke=0)
         canvas.restoreState()
@@ -494,15 +767,13 @@ class ReportDoc(BaseDocTemplate):
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MUTED)
         canvas.drawString(LMARGIN, y, "Churn & Retention Intelligence")
-        canvas.drawRightString(PAGE_W - RMARGIN, y,
-                               f"Retention Review  ·  Page {doc.page}")
+        canvas.drawRightString(PAGE_W - RMARGIN, y, f"Retention Review  ·  Page {doc.page}")
         canvas.setFont("Helvetica", 7)
         canvas.drawCentredString(PAGE_W / 2, y, "")
         canvas.restoreState()
 
 
 def _strip_tags(s: str) -> str:
-    import re
     return re.sub(r"<[^>]+>", "", s)
 
 
@@ -532,26 +803,40 @@ def build_story(styles: dict, M: dict) -> list:
     story.append(Spacer(1, 3.2 * cm))
     story.append(P("RETENTION INTELLIGENCE REVIEW", styles, "cover_kick"))
     story.append(P("Churn &amp; Retention<br/>Intelligence", styles, "cover_title"))
-    story.append(P("Where the subscription book is losing customers and revenue, "
-                   "why those losses cluster where they do, and which accounts to "
-                   "defend first.", styles, "cover_sub"))
+    story.append(
+        P(
+            "Where the subscription book is losing customers and revenue, "
+            "why those losses cluster where they do, and which accounts to "
+            "defend first.",
+            styles,
+            "cover_sub",
+        )
+    )
     story.append(Spacer(1, 1.0 * cm))
     story.append(rule(HAIR, 0.6, 0, 12))
-    story.append(P(
-        f"Analytical period {M['window_start']} to {M['window_end']}  ·  "
-        f"snapshot reference date {REFERENCE_DATE}<br/>"
-        f"Book of {M['total']:,} lifetime accounts  ·  "
-        f"{M['active']:,} active at snapshot  ·  "
-        f"{usd(M['active_mrr'])} active monthly recurring revenue",
-        styles, "cover_meta"))
-    story.append(Spacer(1, 5.4 * cm))
+    story.append(
+        P(
+            f"Analytical period {M['window_start']} to {M['window_end']}  ·  "
+            f"snapshot reference date {REFERENCE_DATE}<br/>"
+            f"Book of {M['total']:,} lifetime accounts  ·  "
+            f"{M['active']:,} active at snapshot  ·  "
+            f"{usd(M['active_mrr'])} active monthly recurring revenue",
+            styles,
+            "cover_meta",
+        )
+    )
+    story.append(Spacer(1, 9.4 * cm))
     story.append(rule(HAIR, 0.6, 0, 8))
-    story.append(P(
-        "Retention Analytics  ·  "
-        "Companion deliverable to the self-contained executive dashboard "
-        "(executive-retention-command-center.html).<br/>"
-        "Findings are decision-support only, not audited financial results.",
-        styles, "cover_meta"))
+    story.append(
+        P(
+            "Retention Analytics  ·  "
+            "Companion deliverable to the self-contained executive dashboard "
+            f"({code('executive-retention-command-center.html')}).<br/>"
+            "Findings are decision-support only, not audited financial results.",
+            styles,
+            "cover_meta",
+        )
+    )
     story.append(NextPageTemplate("content"))
     story.append(PageBreak())
 
@@ -568,160 +853,234 @@ def build_story(styles: dict, M: dict) -> list:
     # 1. EXECUTIVE SUMMARY
     # ════════════════════════════════════════════════════════
     H1("Executive summary", "SECTION 01", "s1", styles, story)
-    story.append(P(
-        f"This review reads the full subscription history of a {M['total']:,}-account "
-        f"software book. Of those accounts, {M['churned']:,} have churned and "
-        f"{M['active']:,} are still active at the {REFERENCE_DATE} snapshot, a "
-        f"cumulative customer loss of {M['cum_churn_pct']:.1f} percent of every "
-        "account the business has ever signed. The active book carries "
-        f"{usd(M['active_mrr'])} of monthly recurring revenue. The question this "
-        "report answers is not whether churn exists, which every subscription "
-        "business lives with, but where it concentrates, what separates the "
-        "accounts that leave from the accounts that stay, and how much current "
-        "revenue sits behind each pattern.", styles))
+    story.append(
+        P(
+            f"The book carries {M['total']:,} accounts. As of the {REFERENCE_DATE} "
+            f"snapshot, {M['churned']:,} have churned and {M['active']:,} remain active, "
+            f"billing {usd(M['active_mrr'])} of monthly recurring revenue. The headline "
+            f"customer churn rate is {M['cum_churn_pct']:.1f} percent; the monthly-value "
+            f"loss share is materially lower at {M['cum_revenue_loss_pct']:.1f} percent. "
+            "That spread is the story. The book is losing too many logos, but the loss "
+            "is skewed toward lower-value accounts. The response should therefore be "
+            "selective, not universal.",
+            styles,
+        )
+    )
 
-    story.append(stat_band([
-        (f"{M['cum_churn_pct']:.1f}%", "CUMULATIVE CUSTOMER CHURN"),
-        (usd(M['active_mrr'], k=True), "ACTIVE MRR AT SNAPSHOT"),
-        (f"{M['high_n'] + M['crit_n']:,}", "CRITICAL + HIGH-RISK ACCOUNTS"),
-        (usd(itv['mrr_exposure_proxy'].sum(), k=True), "WEIGHTED MRR EXPOSURE"),
-    ], styles))
+    story.append(
+        stat_band(
+            [
+                (f"{M['cum_churn_pct']:.1f}%", "CUMULATIVE CUSTOMER CHURN"),
+                (f"{M['cum_revenue_loss_pct']:.1f}%", "CUMULATIVE REVENUE-LOSS SHARE"),
+                (f"{M['high_n'] + M['crit_n']:,}", "CRITICAL + HIGH-RISK ACCOUNTS"),
+                (usd(itv["mrr_exposure_proxy"].sum(), k=True), "WEIGHTED MRR EXPOSURE"),
+            ],
+            styles,
+        )
+    )
 
-    story.append(P(
-        "The decision read is clear. The business should not respond with a broad, "
-        "undifferentiated save programme. It should run two motions in parallel: a "
-        "targeted defence of the critical and high-risk revenue already on the book, "
-        "and an upstream mix correction that reduces the inflow of fragile accounts. "
-        f"The first motion is narrow enough to manage, {M['high_n'] + M['crit_n']:,} "
-        f"named accounts holding {usd(M['crit_mrr'] + M['high_mrr'])} of monthly "
-        "revenue. The second is material enough to matter, because Affiliate and "
-        f"Paid Search supply {M['weak_channel_acct_share']:.1f} percent of all "
-        f"accounts but {M['weak_channel_churn_share']:.1f} percent of all churned "
-        "accounts. In plain terms, the book is defensible, but the acquisition mix "
-        "is making retention work harder than it needs to.", styles))
+    story.append(
+        P(
+            "Management has two jobs. First, protect the open accounts where behavioural "
+            f"risk and revenue matter: {M['high_n'] + M['crit_n']:,} named critical and "
+            f"high-risk accounts holding {usd(M['crit_mrr'] + M['high_mrr'])} of MRR. "
+            "Second, reduce the inflow of fragile demand. Affiliate and Paid Search "
+            f"generate {M['weak_channel_acct_share']:.1f} percent of all accounts but "
+            f"{M['weak_channel_churn_share']:.1f} percent of churned accounts. Customer "
+            "Success can work the first problem. Revenue leadership owns the second.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "Three findings carry the report. First, churn is not spread evenly. It "
-        f"concentrates sharply by who the customer is and how they were acquired. "
-        f"Startup-segment accounts have lost {seg.loc['Startup','cumulative_churn_share']*100:.1f} "
-        f"percent of their number against {seg.loc['Enterprise','cumulative_churn_share']*100:.1f} "
-        "percent for Enterprise, a gap of more than six to one. Affiliate-sourced "
-        f"accounts churn at {chan.loc['Affiliate','cumulative_churn_share']*100:.1f} "
-        f"percent against {chan.loc['Partner','cumulative_churn_share']*100:.1f} "
-        "percent for Partner-sourced accounts. Basic-plan accounts churn at "
-        f"{plan.loc['Basic','cumulative_churn_share']*100:.1f} percent against "
-        f"{plan.loc['Enterprise','cumulative_churn_share']*100:.1f} percent for "
-        "Enterprise plans. The book does not have a churn problem so much as it "
-        "has a low-end acquisition problem that turns into a churn problem.",
-        styles))
+    story.append(
+        pull_quote(
+            "Customer Success can work the first problem. Revenue leadership owns the second.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "Second, pre-churn account health separates leavers from stayers with "
-        "unusual clarity. Accounts that carry a low net promoter score churn at "
-        f"{beh.loc['low_nps_flag','churn_rate_in_group']*100:.0f} percent against "
-        f"{beh.loc['low_nps_flag','churn_rate_out_group']*100:.0f} percent for "
-        "accounts without that flag. Accounts with a heavy recent support burden "
-        f"churn at {beh.loc['high_support_ticket_flag','churn_rate_in_group']*100:.0f} "
-        "percent. Failed payments, weak feature adoption, and declining usage each "
-        "mark out populations that leave at several times the book rate. These "
-        "signals are observed before the account closes, which is what makes them "
-        "useful for prevention rather than only for post-mortem accounting.",
-        styles))
+    story.append(
+        P(
+            "Three findings drive the recommendation. First, churn is concentrated in "
+            "the low-commitment end of the book. Startup accounts churn at "
+            f"{seg.loc['Startup', 'cumulative_churn_share'] * 100:.1f} percent versus "
+            f"{seg.loc['Enterprise', 'cumulative_churn_share'] * 100:.1f} percent for "
+            "Enterprise. Affiliate-sourced accounts churn at "
+            f"{chan.loc['Affiliate', 'cumulative_churn_share'] * 100:.1f} percent versus "
+            f"{chan.loc['Partner', 'cumulative_churn_share'] * 100:.1f} percent for "
+            "Partner. Basic-plan accounts churn at "
+            f"{plan.loc['Basic', 'cumulative_churn_share'] * 100:.1f} percent versus "
+            f"{plan.loc['Enterprise', 'cumulative_churn_share'] * 100:.1f} percent for "
+            "Enterprise plans. These descriptive cuts make acquisition mix and entry-tier "
+            "economics the first commercial hypotheses to test; they do not isolate "
+            "causal effects.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "Third, the revenue at stake is concentrated enough to act on without a "
-        f"broad campaign. The top 5 percent of churned accounts by value account "
-        f"for {M['conc5']:.0f} percent of all lost monthly revenue, and the top "
-        f"20 percent account for {M['conc20']:.0f} percent. On the "
-        f"forward book, {M['crit_n']:,} accounts sit in the critical risk tier and "
-        f"{M['high_n']:,} more in the high tier, together holding "
-        f"{usd(M['crit_mrr'] + M['high_mrr'])} of monthly recurring revenue. Four "
-        "intervention queues, ranked by weighted exposure, cover the material risk: "
-        f"a renewal save desk ({usd(itv.iloc[0]['mrr_exposure_proxy'], k=True)} "
-        f"weighted exposure across {int(itv.iloc[0]['candidate_customers']):,} "
-        "accounts) leads, followed by payment rescue, adoption reactivation, and "
-        "service recovery.", styles))
+    story.append(
+        P(
+            "Second, pre-churn account health separates leavers from stayers with "
+            "commercially useful clarity. Accounts carrying a low net promoter score "
+            "churn at "
+            f"{beh.loc['low_nps_flag', 'churn_rate_in_group'] * 100:.0f} percent against "
+            f"{beh.loc['low_nps_flag', 'churn_rate_out_group'] * 100:.0f} percent for "
+            "accounts without that flag. A heavy recent support burden lifts churn to "
+            f"{beh.loc['high_support_ticket_flag', 'churn_rate_in_group'] * 100:.0f} "
+            "percent. Failed payments, weak feature adoption, and declining usage each "
+            "mark out populations that leave at several times the book rate. These "
+            "signals surface before the account closes. That is what makes them useful "
+            "for prevention, not just for post-mortem accounting.",
+            styles,
+        )
+    )
 
-    story.append(fig("intervention_priorities.png",
-                     "Figure 1. Retention plays ranked by weighted MRR exposure. The "
-                     "shaded bar is the monthly revenue in scope for each play; the "
-                     "solid bar is that revenue weighted by the historical churn rate "
-                     "of the accounts it targets.", styles))
+    story.append(
+        P(
+            "Third, the revenue exposure is concentrated enough for named-account "
+            f"management. The top 5 percent of churned accounts by value account for "
+            f"{M['conc5']:.0f} percent of lost monthly revenue; the top 20 percent "
+            f"account for {M['conc20']:.0f} percent. On the forward book, the critical "
+            f"and high tiers hold {usd(M['crit_mrr'] + M['high_mrr'])} of MRR. Four "
+            "intervention queues cover the material exposure: Renewal Save Desk, Payment "
+            "Rescue, Adoption Reactivation, and Service Recovery. Sequence them by "
+            "weighted exposure; payment rescue can run in parallel as a distinct billing "
+            "workflow.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "The recommended sequence follows directly from these three findings and "
-        "is set out in full in Section 11. In short: stand up the renewal save desk "
-        "first because it carries the largest weighted exposure and the accounts are "
-        "already identifiable; fix the payment-failure path second because it is "
-        "cheap to run and the affected accounts churn at more than seven times the "
-        "rate of accounts that pay cleanly; and rebalance acquisition spend away "
-        "from the Affiliate and Paid Search channels third, because the cheapest "
-        "lasting reduction in churn is to stop acquiring the accounts most likely "
-        "to leave.", styles))
+    story.append(
+        data_table(
+            ["Executive decision", "Evidence", "Required move"],
+            [
+                [
+                    "Do not run a base-wide save campaign",
+                    f"{M['high_n'] + M['crit_n']:,} high/critical accounts hold "
+                    f"{usd(M['crit_mrr'] + M['high_mrr'])} of MRR.",
+                    "Assign named owners to the high-risk queue and protect capacity from "
+                    "low-signal accounts.",
+                ],
+                [
+                    "Treat acquisition mix as a retention lever",
+                    f"Affiliate + Paid Search: {M['weak_channel_acct_share']:.1f}% of "
+                    f"accounts, {M['weak_channel_churn_share']:.1f}% of churned accounts.",
+                    "Test a marginal channel-mix shift and retain it only if live cohort "
+                    "retention improves without weakening acquisition economics.",
+                ],
+                [
+                    "Separate human and automated motions",
+                    f"{M['multi_signal_active']:,} active accounts carry multiple distress "
+                    f"signals; {M['zero_signal_active']:,} carry none.",
+                    "Use human outreach for multi-signal value accounts; use scaled nudges "
+                    "for single-signal usage decline.",
+                ],
+                [
+                    "Govern by outcomes, not activity",
+                    f"Intervention queues cover {usd(M['play_scope_mrr'])} of MRR in scope.",
+                    "Track saved MRR versus control, recovered payment MRR, and 6-month "
+                    "retention by source.",
+                ],
+            ],
+            styles,
+            [4.0 * cm, 5.5 * cm, CONTENT_W - 9.5 * cm],
+        )
+    )
 
-    story.append(P(
-        "The practical implication is a change in governance cadence. Retention "
-        "should be reviewed as a portfolio, not as a stream of escalations. The "
-        "weekly operating view should show new critical and high-risk accounts, "
-        "payment-failure recoveries, usage-decline recoveries, and six-month "
-        "retention by acquisition channel. The monthly executive view should show "
-        "whether the two programme levers are moving: lower weighted exposure in "
-        "the open-account queue and lower weak-channel mix in new cohorts. Those are "
-        "the two conditions under which churn should fall durably rather than "
-        "temporarily.", styles))
+    story.append(
+        fig(
+            "intervention_priorities.png",
+            "Figure 1. Retention plays ranked by weighted MRR exposure. The "
+            "shaded bar is the monthly revenue in scope for each play; the "
+            "solid bar is that revenue weighted by the historical churn rate "
+            "of the accounts it targets.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "One caveat frames everything that follows. This analysis runs on "
-        "deterministic synthetic data and the risk score is a transparent "
-        "prioritisation index, not a calibrated churn probability. The patterns are "
-        "internally consistent, but the exact magnitudes are illustrative. Section "
-        "10 states the limitations in full.", styles))
+    story.append(
+        P(
+            "The sequence follows weighted exposure and operational separability. Stand "
+            "up the renewal save desk first: "
+            "it carries the largest weighted exposure and the accounts are identifiable "
+            "now. Fix the payment-failure path at the same time: the queue is small, the "
+            "implementation is low-complexity, and affected accounts churn at more than "
+            f"{floor_multiple(beh.loc['failed_payment_flag', 'churn_rate_lift'])} times the "
+            "rate of accounts that pay cleanly. Next, test whether a marginal channel-mix "
+            "shift away from Affiliate and Paid Search improves retention after controlling "
+            "for segment, plan, and acquisition economics.",
+            styles,
+        )
+    )
+
+    story.append(
+        P(
+            "The weekly operating view should "
+            "track new critical and high-risk accounts, payment recoveries, usage-trend "
+            "recoveries, and queue aging. The monthly executive view should track two "
+            "portfolio levers: lower weighted exposure in the open-account queue and a "
+            "lower weak-channel share in new cohorts. Held-out outcomes, not activity "
+            "volume, should determine whether either intervention scales.",
+            styles,
+        )
+    )
+
+    story.append(
+        P(
+            "One caveat governs everything that follows. This analysis runs on "
+            "deterministic synthetic data. The transparent policy score prioritises "
+            "operations, while a separate calibrated model estimates 90-day churn "
+            "probability on held-out time periods. Both are internally consistent; their "
+            "magnitudes remain illustrative until live outcomes replace the simulation. "
+            "Section 10 states the limitations in full.",
+            styles,
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
     # 2. CONTEXT AND OBJECTIVES
     # ════════════════════════════════════════════════════════
     H1("Context and objectives", "SECTION 02", "s2", styles, story)
-    story.append(P(
-        "A subscription business lives or dies on the difference between the revenue "
-        "it adds and the revenue it loses. New logos and expansion get the attention, "
-        "but retention sets the ceiling on everything else: a book that loses a "
-        "quarter of its accounts over its life has to refill that quarter before it "
-        "grows a single point. The purpose of this work is to give the people who "
-        "own that problem, the revenue leadership and the customer success "
-        "organisation, a clear and defensible picture of where the book is leaking "
-        "and a ranked list of where to put their hands first.", styles))
-
-    story.append(P(
-        "The economics make the case on their own. Acquiring a replacement account "
-        "costs a multiple of what it costs to keep an existing one, and the "
-        "replacement starts at zero tenure with none of the expansion that a "
-        "retained account accrues over time. A point of churn avoided is therefore "
-        "worth more than a point of new logo growth at equal cost, because the "
-        "retained account is already past its acquisition spend and its riskiest "
-        "early months. This is the lens the report applies throughout: every "
-        "avoidable departure is measured not only as lost monthly revenue but as "
-        "acquisition spend the business will have to repeat to stand still.", styles))
+    story.append(
+        P(
+            "This review gives revenue leadership and customer success a common retention "
+            "baseline: the scale and timing of loss, the populations where it concentrates, "
+            "the observable signals that precede it, and a value-adjusted queue of open "
+            "accounts. A reconciled MRR movement ledger, acquisition spend, direct service "
+            "cost, calibrated probabilities, and randomized holdouts extend that baseline "
+            "into unit economics and controlled measurement. The values remain analytical "
+            "proxies rather than audited accounts or observed treatment effects.",
+            styles,
+        )
+    )
 
     H2("The book under review", "s2a", styles, story)
-    story.append(P(
-        f"The dataset is the complete account history of a business-to-business "
-        f"software company: {M['total']:,} accounts acquired across four customer "
-        "segments (Enterprise, Mid-Market, SMB, and Startup), four regions (North "
-        "America, Europe, APAC, and LATAM), six acquisition channels, and four plan "
-        f"tiers. Monthly activity runs from {M['window_start']} to {M['window_end']}. "
-        f"At the snapshot date, {M['active']:,} accounts are active and "
-        f"{M['churned']:,} have closed. The active book bills {usd(M['active_mrr'])} "
-        "per month. Each account carries the behavioural signals a real customer "
-        "success team would have in front of it: recent product usage and its trend, "
-        "feature adoption, support ticket volume, net promoter score, and payment "
-        "history.", styles))
+    story.append(
+        P(
+            f"The dataset is the complete account history of a business-to-business "
+            f"software company: {M['total']:,} accounts acquired across four customer "
+            "segments (Enterprise, Mid-Market, SMB, and Startup), four regions (North "
+            "America, Europe, APAC, and LATAM), six acquisition channels, and four plan "
+            f"tiers. Monthly activity runs from {M['window_start']} to {M['window_end']}. "
+            f"At the snapshot date, {M['active']:,} accounts are active and "
+            f"{M['churned']:,} have closed. The active book bills {usd(M['active_mrr'])} "
+            "per month. Each account carries the behavioural signals a real customer "
+            "success team would have in front of it: recent product usage and its trend, "
+            "feature adoption, support ticket volume, net promoter score, and payment "
+            "history.",
+            styles,
+        )
+    )
 
     H2("The decisions this report supports", "s2b", styles, story)
-    story.append(P(
-        "The work is built to answer five questions that a retention owner actually "
-        "has to make calls on, rather than to produce a general description of the "
-        "data:", styles))
+    story.append(
+        P(
+            "This work answers five questions a retention owner has to make calls on. "
+            "It does not produce a general description of the data:",
+            styles,
+        )
+    )
     for q in [
         "<b>How is the book trending?</b> Are monthly customer and revenue churn "
         "rising, flat, or falling, and is the loss weighted toward high-value or "
@@ -739,1154 +1098,1647 @@ def build_story(styles: dict, M: dict) -> list:
         "largest weighted exposure, and in what order should they be resourced?",
     ]:
         story.append(P("•&nbsp;&nbsp;" + q, styles))
-    story.append(P(
-        "Everything in the findings maps back to one of these five questions. Where "
-        "the data can only support an associative answer rather than a causal one, "
-        "the report says so plainly rather than dressing a correlation as a cause.",
-        styles))
+    story.append(
+        P(
+            "Everything in the findings maps back to one of these five questions. Where "
+            "the evidence is associative rather than causal, the report says so plainly "
+            "instead of dressing a correlation as a cause.",
+            styles,
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
     # 3. DATA AND METHODOLOGY
     # ════════════════════════════════════════════════════════
     H1("Data and methodology", "SECTION 03", "s3", styles, story)
-    story.append(P(
-        "This section describes where the numbers come from and how each metric is "
-        "defined, so that any figure in the report can be traced back to a rule "
-        "rather than a judgement call. The pipeline is deterministic: it runs from a "
-        "fixed seed, every artifact is reconstructible, and the analytical tables "
-        "are governed by data contracts that are checked before any output is "
-        "released.", styles))
+    story.append(
+        P(
+            "This section describes where the numbers come from and how each metric is "
+            "defined, so that any figure in the report can be traced back to a rule "
+            "rather than a judgement call. The pipeline is deterministic: it runs from a "
+            "fixed seed, every artifact is reconstructible, and the analytical tables "
+            "are governed by data contracts that are checked before any output is "
+            "released.",
+            styles,
+        )
+    )
 
     H2("Data sources", "s3a", styles, story)
-    story.append(P(
-        "Four raw tables feed the analysis. A customer table holds the acquisition "
-        "attributes (segment, region, channel, signup date). A subscription table "
-        "holds the plan, the monthly recurring revenue, and the start and end dates "
-        "that define whether and when an account churned. A weekly product-usage "
-        "table records sessions and feature interactions. A payment table records "
-        "billing events and failures. These are joined into one per-account feature "
-        "row measured either at the account's churn date or, for active accounts, at "
-        "the snapshot reference date, so that every account is observed at a "
-        "comparable point in its own life rather than at an arbitrary calendar date.",
-        styles))
+    story.append(
+        P(
+            "Four raw tables feed the analysis. A customer table holds the acquisition "
+            "attributes (segment, region, channel, signup date). A subscription table "
+            "holds the plan, the monthly recurring revenue, and the start and end dates "
+            "that define whether and when an account churned. A weekly product-usage "
+            "table records sessions and feature interactions. A payment table records "
+            "billing events and failures. These are joined into one per-account feature "
+            "row measured either at the account's churn date or, for active accounts, at "
+            "the snapshot reference date, so that every account is observed at a "
+            "comparable point in its own life rather than at an arbitrary calendar date.",
+            styles,
+        )
+    )
 
-    story.append(data_table(
-        ["Layer", "Artifact", "Grain", "Role in this report"],
-        [
-            ["Raw", "customers, subscriptions, usage, payments",
-             "event / account", "Source of truth for all downstream tables"],
-            ["Features", "customer_retention_features.csv",
-             "one row per account", "Behavioural signals at churn or snapshot"],
-            ["Analysis", "main_analysis_*, churn_by_*",
-             "aggregate", "Trends, driver ranking, revenue at risk"],
-            ["Risk", "customer_risk_scores.csv",
-             "active account", "Tiered priority queue and recommended action"],
-            ["Cohort", "cohort_retention_table.csv",
-             "cohort × month", "Retention curves and heatmap"],
-        ],
-        styles,
-        [2.6 * cm, 5.2 * cm, 3.0 * cm, CONTENT_W - 10.8 * cm],
-    ))
+    story.append(
+        data_table(
+            ["Layer", "Artifact", "Grain", "Role in this report"],
+            [
+                [
+                    "Raw",
+                    "customers, subscriptions, usage, payments",
+                    "event / account",
+                    "Source of truth for all downstream tables",
+                ],
+                [
+                    "Features",
+                    code("customer_retention_features.csv"),
+                    "one row per account",
+                    "Behavioural signals at churn or snapshot",
+                ],
+                [
+                    "Analysis",
+                    code("main_analysis_*, churn_by_*"),
+                    "aggregate",
+                    "Trends, driver ranking, revenue at risk",
+                ],
+                [
+                    "Risk",
+                    code("customer_risk_scores.csv"),
+                    "active account",
+                    "Tiered priority queue and recommended action",
+                ],
+                [
+                    "Cohort",
+                    code("cohort_retention_table.csv"),
+                    "cohort × month",
+                    "Retention curves and heatmap",
+                ],
+            ],
+            styles,
+            [2.0 * cm, 6.1 * cm, 2.7 * cm, CONTENT_W - 10.8 * cm],
+        )
+    )
 
     H2("How the synthetic data is built", "s3b", styles, story)
-    story.append(P(
-        "The data is generated, not collected, and it matters that the reader knows "
-        "exactly what that means for the findings. The generator assigns each account "
-        "a latent churn propensity driven by its segment, plan, channel, and a set of "
-        "behavioural processes, then simulates usage, support, payment, and survey "
-        "events consistent with that propensity. The result is a book in which the "
-        "relationships between account health and churn are real and stable but "
-        "designed rather than discovered. The report treats the magnitudes as "
-        "illustrative; the metric definitions, the analytical framework, and the "
-        "prioritisation logic are the transferable outputs.",
-        styles))
+    story.append(
+        P(
+            "The data is generated, not collected, and it matters that the reader knows "
+            "what that means for the findings. The generator assigns each account "
+            "a latent churn propensity driven by its segment, plan, channel, and a set of "
+            "behavioural processes, then simulates usage, support, payment, and survey "
+            "events consistent with that propensity. The result is a book in which the "
+            "relationships between account health and churn are real and stable but "
+            "designed, not discovered. The report treats the magnitudes as illustrative. "
+            "What transfers to a real book is the metric definitions, the analytical "
+            "framework, and the prioritisation logic.",
+            styles,
+        )
+    )
 
     H2("Metric definitions", "s3c", styles, story)
-    story.append(P(
-        "Several numbers in this report look similar and are easily confused, so each "
-        "is pinned to an explicit definition here and used consistently throughout.",
-        styles))
-    story.append(data_table(
-        ["Metric", "Definition"],
-        [
-            ["Cumulative customer churn",
-             "Closed accounts as a share of all accounts ever acquired. A lifetime, "
-             "stock measure. Reads 27 percent here."],
-            ["Monthly customer churn rate",
-             "Accounts that close in a month divided by accounts active at the start "
-             "of that month. A flow measure, averaging near 1 percent over the window."],
-            ["Cumulative churn share (by group)",
-             "Within a segment, plan, channel, or region, the share of that group's "
-             "accounts that have closed."],
-            ["MRR at risk",
-             "Current monthly recurring revenue billed by active accounts that carry "
-             "the at-risk flag at the snapshot."],
-            ["Churn rate lift",
-             "Churn rate inside a signal divided by churn rate outside it. A multiple, "
-             "not a percentage."],
-            ["Weighted MRR exposure",
-             "Revenue in an intervention queue multiplied by the historical churn rate "
-             "of the accounts it targets. A heuristic for sizing, not a forecast."],
-            ["Retention priority score",
-             "A transparent index combining behavioural risk and customer value, used "
-             "only to rank the queue."],
-        ],
-        styles,
-        [4.6 * cm, CONTENT_W - 4.6 * cm],
-    ))
-    story.append(P(
-        "Two of these deserve emphasis. Cumulative customer churn and the monthly "
-        "churn rate are different lenses on the same book and will not match: the "
-        "first asks what share of everyone ever signed has left, the second asks how "
-        "fast the active book is losing accounts right now. Both appear in this "
-        "report and neither is wrong. Revenue loss throughout uses a monthly-value "
-        "proxy, the account's recurring monthly revenue at the point it left, rather "
-        "than a full contract or lifetime value, which the synthetic data does not "
-        "model.", styles))
+    story.append(
+        P(
+            "Several numbers in this report look similar and are easily confused, so each "
+            "is pinned to an explicit definition here and used consistently throughout.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            ["Metric", "Definition"],
+            [
+                [
+                    "Cumulative customer churn",
+                    "Closed accounts as a share of all accounts ever acquired. A lifetime, "
+                    f"stock measure. Reads {M['cum_churn_pct']:.0f} percent here.",
+                ],
+                [
+                    "Monthly customer churn rate",
+                    "Accounts that close in a month divided by accounts active at the start "
+                    "of that month. A flow measure, averaging "
+                    f"{M['avg_cust_churn']:.1f} percent over the window.",
+                ],
+                [
+                    "Cumulative churn share (by group)",
+                    "Within a segment, plan, channel, or region, the share of that group's "
+                    "accounts that have closed.",
+                ],
+                [
+                    "MRR at risk",
+                    "Current monthly recurring revenue billed by active accounts that carry "
+                    "the at-risk flag at the snapshot.",
+                ],
+                [
+                    "Churn rate lift",
+                    "Churn rate inside a signal divided by churn rate outside it. A multiple, "
+                    "not a percentage.",
+                ],
+                [
+                    "Weighted MRR exposure",
+                    "Revenue in an intervention queue multiplied by the historical churn rate "
+                    "of the accounts it targets. A heuristic for sizing, not a forecast.",
+                ],
+                [
+                    "Retention priority score",
+                    "A transparent index combining behavioural risk and customer value, used "
+                    "only to rank the queue.",
+                ],
+            ],
+            styles,
+            [4.6 * cm, CONTENT_W - 4.6 * cm],
+        )
+    )
+    story.append(
+        P(
+            "Two of these deserve emphasis. Cumulative customer churn and the monthly "
+            "churn rate are different lenses on the same book and will not match: the "
+            "first asks what share of everyone ever signed has left, the second asks how "
+            "fast the active book is losing accounts right now. Both appear in this "
+            "report and neither is wrong. Revenue loss throughout uses a monthly-value "
+            "proxy, the account's recurring monthly revenue at the point it left, rather "
+            "than a full contract or lifetime value, which the synthetic data does not "
+            "model.",
+            styles,
+        )
+    )
 
     H2("Governance and release gates", "s3d", styles, story)
-    story.append(P(
-        "No figure in this report or the dashboard is released until the pipeline "
-        "passes its governance gates. The artifacts are checked against data "
-        "contracts that assert the shape, types, ranges, and referential integrity "
-        "of every table, and against a final validation suite covering data quality, "
-        "metric correctness, analytical integrity, the dashboard render, and release "
-        f"policy. At the current build all {M['gov_pass']} of {M['gov_total']} checks "
-        "pass, which is what licenses the report to make decision-support claims "
-        "rather than screening-grade ones. The gate breakdown is below; the full "
-        "check log lives in outputs/tables and is regenerated on every run.", styles))
-    story.append(data_table(
-        ["Validation gate", "Checks passing"],
-        M["gov"], styles,
-        [CONTENT_W - 4.5 * cm, 4.5 * cm],
-    ))
-    story.append(P(
-        "The release policy is deliberately conservative about what these passes "
-        "entitle the analysis to claim. Clearing every gate makes the output "
-        "technically valid and analytically acceptable for decision support with "
-        "explicit caveats. It does not make it committee-grade, because the "
-        "synthetic-data limitation in Section 10 is an unresolved caveat by "
-        "construction. The governance layer encodes that distinction rather than "
-        "leaving it to the reader's goodwill.", styles))
+    story.append(
+        P(
+            "No figure in this report or the dashboard is released until the pipeline "
+            "passes its governance gates. The artifacts are checked against data "
+            "contracts that assert the shape, types, ranges, and referential integrity "
+            "of every table, and against a final validation suite covering data quality, "
+            "metric correctness, analytical integrity, the dashboard render, and release "
+            f"policy. At the current build, all {M['gov_pass']} of {M['gov_total']} checks "
+            "pass. That is what licenses decision-support claims instead of "
+            "screening-grade ones. The gate breakdown follows. The full check log lives "
+            f"in {code('outputs/tables')} and regenerates on every run.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            ["Validation gate", "Checks passing"],
+            M["gov"],
+            styles,
+            [CONTENT_W - 4.5 * cm, 4.5 * cm],
+        )
+    )
+    story.append(
+        P(
+            "The release policy is deliberately conservative about what these passes "
+            "entitle the analysis to claim. Clearing every gate makes the output "
+            "technically valid and analytically acceptable for decision support with "
+            "explicit caveats. It does not make it committee-grade, because the "
+            "synthetic-data limitation in Section 10 is an unresolved caveat by "
+            "construction. The governance layer encodes that distinction rather than "
+            "leaving it to the reader's goodwill.",
+            styles,
+        )
+    )
 
     H2("Evidence standard applied in the body", "s3e", styles, story)
-    story.append(P(
-        "The body of the report uses three levels of evidence. Descriptive cuts are "
-        "decision-useful when the same pattern repeats across segment, plan, channel, "
-        "and value. Behavioural signals are decision-useful when they separate "
-        "leavers from stayers and also identify active accounts that can still be "
-        "worked. Recommendations are decision-useful only when they combine both: a "
-        "population the business can identify, a revenue stake large enough to "
-        "matter, and a metric that can validate whether the intervention changed "
-        "outcomes rather than activity.", styles))
-    story.append(data_table(
-        ["Evidence question", "Report test", "What would weaken the read"],
-        [
-            ["Is the pattern real?",
-             "The finding repeats across rate, revenue, and mix cuts rather than "
-             "appearing in one chart only.",
-             "A single small segment, a right-censored period, or a mix effect that "
-             "disappears when read at fixed cohort age."],
-            ["Is the pattern actionable?",
-             "The affected accounts can be named before churn and routed to a clear "
-             "commercial owner.",
-             "A signal that is visible only after churn, or a population too broad "
-             "for the team to treat differently."],
-            ["Is the value material?",
-             "The queue carries current MRR or lost monthly value large enough to "
-             "change prioritisation.",
-             "High churn rate with negligible account count or revenue scope."],
-            ["Can the action be validated?",
-             "The recommendation names a success measure and admits where a control "
-             "or holdout is needed.",
-             "ROI asserted from historical association without an experiment or "
-             "before/after design."],
-        ],
-        styles,
-        [3.8 * cm, 6.4 * cm, CONTENT_W - 10.2 * cm],
-    ))
+    story.append(
+        P(
+            "The body of the report uses three levels of evidence. Descriptive cuts are "
+            "decision-useful when the same pattern repeats across segment, plan, channel, "
+            "and value. Behavioural signals are decision-useful when they separate "
+            "leavers from stayers and also identify active accounts that can still be "
+            "worked. Recommendations are decision-useful only when they combine both: a "
+            "population the business can identify, a revenue stake large enough to "
+            "matter, and a metric that can validate whether the intervention changed "
+            "outcomes rather than activity.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            ["Evidence question", "Report test", "What would weaken the read"],
+            [
+                [
+                    "Is the pattern real?",
+                    "The finding repeats across rate, revenue, and mix cuts rather than "
+                    "appearing in one chart only.",
+                    "A single small segment, a right-censored period, or a mix effect that "
+                    "disappears when read at fixed cohort age.",
+                ],
+                [
+                    "Is the pattern actionable?",
+                    "The affected accounts can be named before churn and routed to a clear "
+                    "commercial owner.",
+                    "A signal that is visible only after churn, or a population too broad "
+                    "for the team to treat differently.",
+                ],
+                [
+                    "Is the value material?",
+                    "The queue carries current MRR or lost monthly value large enough to "
+                    "change prioritisation.",
+                    "High churn rate with negligible account count or revenue scope.",
+                ],
+                [
+                    "Can the action be validated?",
+                    "The recommendation names a success measure and admits where a control "
+                    "or holdout is needed.",
+                    "ROI asserted from historical association without an experiment or "
+                    "before/after design.",
+                ],
+            ],
+            styles,
+            [3.8 * cm, 6.4 * cm, CONTENT_W - 10.2 * cm],
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
     # 4. ANALYTICAL FRAMEWORK
     # ════════════════════════════════════════════════════════
     H1("Analytical framework", "SECTION 04", "s4", styles, story)
-    story.append(P(
-        "The analysis moves through four lenses in a deliberate order, each one "
-        "narrowing the question. It begins with the trend, which tells you whether "
-        "the book is getting better or worse in aggregate. It then decomposes the "
-        "loss by commercial attribute and by acquisition cohort, which tells you "
-        "where the loss lives. It then turns to account-level behaviour, which tells "
-        "you what the leaving accounts had in common before they left. Finally it "
-        "attaches revenue and a priority score to each pattern, which turns a "
-        "diagnosis into a queue of accounts a team can work on Monday morning.",
-        styles))
+    story.append(
+        P(
+            "The analysis moves through six lenses, each narrowing the question. The "
+            "trend shows whether the book is getting better or worse in aggregate. "
+            "Decomposing the loss by commercial attribute and by acquisition cohort "
+            "shows where it lives. Account-level behaviour reveals what the leaving "
+            "accounts had in common before they left. Attaching revenue and a priority "
+            "score to each pattern turns the diagnosis into a ranked operating queue. A "
+            "reconciled MRR bridge adds retention-adjusted economics; a calibrated model, "
+            "randomized holdout, and transition monitor add prediction, measurement, and "
+            "operational control.",
+            styles,
+        )
+    )
 
     H2("Associative, not causal", "s4a", styles, story)
-    story.append(P(
-        "Every relationship in this report is associative. When the report says that "
-        "accounts with a low net promoter score churn at a far higher rate, it means "
-        "the two co-occur in the data, not that a low score causes the departure. The "
-        "low score and the departure may both be downstream of a third thing, a poor "
-        "onboarding or a product gap, and the data here cannot separate those. "
-        "Establishing cause would require controlled experiments, holding out a "
-        "population from an intervention and measuring the difference. The framework "
-        "is built so that its outputs are the right inputs to exactly those "
-        "experiments: the driver ranking tells you what to test, and the weighted "
-        "exposure tells you what to test first.", styles))
+    story.append(
+        P(
+            "Every relationship in this report is associative. When the report says that "
+            "accounts with a low net promoter score churn at a far higher rate, it means "
+            "the two co-occur in the data, not that a low score causes the departure. The "
+            "low score and the departure may both be downstream of a third thing, a poor "
+            "onboarding or a product gap, and the data here cannot separate those. "
+            "Establishing cause requires controlled experiments, holding out a population "
+            "from an intervention and measuring the difference. The reference pipeline "
+            "implements that assignment and estimator, but its forward outcomes remain "
+            "simulated. The driver ranking tells the operator what to test, weighted "
+            "exposure sets priority, and live holdout outcomes must settle efficacy.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "The decomposition step is not cosmetic. A single book-wide churn rate can "
-        "move in the opposite direction to every one of its parts if the mix of "
-        "those parts is shifting, the trap known as Simpson's paradox. A business "
-        "whose every segment is improving can post a worsening aggregate simply by "
-        "acquiring more of its weakest segment. Cutting the rate by segment, plan, "
-        "channel, and region guards against reading a mix shift as a performance "
-        "change, and it is why the cohort and concentration findings are presented "
-        "next to the aggregate trend rather than in place of it.", styles))
+    story.append(
+        P(
+            "The decomposition step is not cosmetic. A single book-wide churn rate can "
+            "move in the opposite direction to every one of its parts if the mix of "
+            "those parts is shifting, the trap known as Simpson's paradox. A business "
+            "whose every segment is improving can post a worsening aggregate simply by "
+            "acquiring more of its weakest segment. Cutting the rate by segment, plan, "
+            "channel, and region guards against reading a mix shift as a performance "
+            "change, and it is why the cohort and concentration findings are presented "
+            "next to the aggregate trend rather than in place of it.",
+            styles,
+        )
+    )
 
     H2("The risk index", "s4b", styles, story)
-    story.append(P(
-        "Active accounts are scored on two axes and ranked on their product. The "
-        "first axis is behavioural risk, built from the same pre-churn signals "
-        "examined in Section 07: usage trend, feature adoption, support burden, net "
-        "promoter score, and payment failures. The second axis is customer value, "
-        "built from current monthly revenue and tenure. An account is worth working "
-        "when it scores high on both, a high-value account showing real distress, "
-        f"rather than on either alone. The mean risk score across the {M['scored']:,} "
-        "scored accounts is "
-        f"{M['risk_mean']:.1f} on a 0-to-100 scale, which is deliberately low: most "
-        "of the book is healthy, and the index exists to surface the minority that "
-        "is not. Accounts fall into four tiers, critical, high, medium, and low, and "
-        "each carries a single recommended action so the output is a worklist rather "
-        "than a chart.", styles))
-    story.append(P(
-        "The index is transparent by design. Every input is a named, inspectable "
-        "signal and the combination rule is a documented formula, not a black-box "
-        "model. That transparency is a deliberate trade against predictive power: a "
-        "trained classifier might rank marginally better, but a customer success "
-        "manager can read this score, see why an account surfaced, and act on it "
-        "without a data scientist in the room. For a prioritisation queue that "
-        "property is worth more than a few points of accuracy.", styles))
+    story.append(
+        P(
+            "Active accounts are scored on two axes and ranked on their product. The "
+            "first axis is behavioural risk, built from the same pre-churn signals "
+            "examined in Section 08: usage trend, feature adoption, support burden, net "
+            "promoter score, and payment failures. The second axis is customer value, "
+            "built from current monthly revenue and tenure. An account is worth working "
+            "when it scores high on both, a high-value account showing real distress, "
+            f"rather than on either alone. The mean risk score across the {M['scored']:,} "
+            "scored accounts is "
+            f"{M['risk_mean']:.1f} on a 0-to-100 scale, which is deliberately low: most "
+            "of the book carries no material distress signal, and the index exists to "
+            "surface the minority that does. Accounts fall into four tiers, critical, "
+            "high, medium, and low, and each carries a single recommended action so the "
+            "output is a worklist rather than a chart.",
+            styles,
+        )
+    )
+    story.append(
+        P(
+            "The index is transparent by design. Every input is a named, inspectable "
+            "signal and the combination rule is a documented formula, not a black-box "
+            "model. An operator can inspect why an account surfaced and challenge the "
+            "underlying signal. Predictive accuracy has not been estimated here, so the "
+            "index cannot be compared with a trained classifier until both are tested "
+            "on time-separated outcomes.",
+            styles,
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
     # 5. FINDINGS — RETENTION HEALTH AND TREND
     # ════════════════════════════════════════════════════════
     H1("Findings: retention health and trend", "SECTION 05", "s5", styles, story)
-    story.append(P(
-        f"Across the analytical window the book lost an average of "
-        f"{M['avg_cust_churn']:.1f} percent of its active accounts per month and "
-        f"{M['avg_rev_churn']:.1f} percent of its active revenue per month. That "
-        "revenue churn runs below customer churn is the single most reassuring "
-        "number in the report: it means the accounts leaving are worth less, on "
-        "average, than the accounts staying. The book is shedding its low end and "
-        "keeping its high end, which is the favourable shape of churn to have. The "
-        "later sections show exactly where that low end sits.", styles))
+    story.append(
+        P(
+            f"Across the analytical window the book lost an average of "
+            f"{M['avg_cust_churn']:.1f} percent of its active accounts per month and "
+            f"{M['avg_rev_churn']:.1f} percent of its active revenue per month. Revenue "
+            "churn running below customer churn is the important signal: the average "
+            "departing account is worth less than the average retained account. The book "
+            "is losing the low end faster than the revenue spine. That is a better loss "
+            "shape than the reverse, but it still creates avoidable acquisition demand. "
+            "The later sections locate that low-end pressure.",
+            styles,
+        )
+    )
 
-    story.append(fig("churn_rate_trend.png",
-                     "Figure 2. Monthly customer and revenue churn rates across the "
-                     "analytical window. The revenue line sits consistently below the "
-                     "customer line, the signature of low-value accounts leading the "
-                     "losses.", styles))
+    story.append(
+        fig(
+            "churn_rate_trend.png",
+            "Figure 2. Monthly customer and revenue churn rates across the "
+            "analytical window. The revenue line sits consistently below the "
+            "customer line, the signature of low-value accounts leading the "
+            "losses.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "The level is healthy but the recent direction is not. Monthly customer "
-        f"churn in the final observed month reads {M['last_cust_churn']:.1f} percent "
-        f"against a prior nine-month average of {M['prior9_churn']:.1f} percent. The "
-        "last three months break clearly above the trend that preceded them. Two "
-        "readings are possible and the report holds both. The operational reading is "
-        "that something real has shifted in the most recent quarter and the book is "
-        "losing accounts faster than it was. The measurement reading is that accounts "
-        "closing near the snapshot date are mechanically over-represented because the "
-        "window is right-censored, so the final months are not yet fully comparable "
-        "to settled history. Section 10 returns to this. Either way the recent "
-        "months warrant attention rather than alarm.", styles))
+    story.append(
+        P(
+            "The average level is manageable; the recent direction needs attention. "
+            "Monthly customer "
+            f"churn in the final observed month reads {M['last_cust_churn']:.1f} percent "
+            f"against a prior nine-month average of {M['prior9_churn']:.1f} percent. The "
+            "last three months sit above the trend that preceded them. Two readings are "
+            "possible, and both matter. Operationally, the most recent quarter may be "
+            "losing accounts faster than the settled baseline. From a measurement "
+            "perspective, accounts closing near the snapshot date are mechanically "
+            "over-represented because the window is right-censored, so the final months "
+            "are not fully comparable to settled history. Section 10 returns to this. "
+            "The right posture is weekly monitoring, not a broad emergency response.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        f"The quantified acceleration is material on both count and value. The final "
-        f"three observed months average {M['last3_churn']:.1f} percent customer churn, "
-        f"{M['last3_churn_delta_pp']:.1f} percentage points above the prior nine "
-        f"months; revenue churn averages {M['last3_rev_churn']:.1f} percent, "
-        f"{M['last3_rev_churn_delta_pp']:.1f} points above its prior nine-month "
-        "baseline. Because the revenue increase is smaller than the customer-count "
-        "increase, the recent spike is still dominated by lower-value accounts. That "
-        "keeps the response focused: monitor the spike weekly, but do not let it "
-        "pull scarce save-desk capacity away from the high-value account tail.", styles))
+    story.append(
+        P(
+            f"The quantified acceleration is material on both count and value. The final "
+            f"three observed months average {M['last3_churn']:.1f} percent customer churn, "
+            f"{M['last3_churn_delta_pp']:.1f} percentage points above the prior nine "
+            f"months. Revenue churn averages {M['last3_rev_churn']:.1f} percent, "
+            f"{M['last3_rev_churn_delta_pp']:.1f} points above its prior nine-month "
+            "baseline. Because the revenue increase is smaller than the customer-count "
+            "increase, the recent spike is still dominated by lower-value accounts. That "
+            "keeps the response focused: monitor the spike weekly, but do not let it "
+            "pull scarce save-desk capacity away from the high-value account tail.",
+            styles,
+        )
+    )
 
-    story.append(fig("recent_churn_acceleration.png",
-                     "Figure 3. Monthly customer churn rate over the last twelve "
-                     "months. The final three months (highlighted) sit well above the "
-                     "prior nine-month average shown by the dotted line.", styles))
+    story.append(
+        fig(
+            "recent_churn_acceleration.png",
+            "Figure 3. Monthly customer churn rate over the last twelve "
+            "months. The final three months (highlighted) sit well above the "
+            "prior nine-month average shown by the dotted line.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "Underneath the rates, the active book has grown steadily in revenue terms "
-        f"to {usd(M['active_mrr'])} per month at the snapshot, so the business is "
-        "adding more than it is losing. The retention question is therefore not "
-        "about survival but about efficiency: every point of avoidable churn is a "
-        "point the acquisition engine has to refill before the book grows, and the "
-        "next sections show that a large share of the current loss is concentrated "
-        "in places where it could be reduced.", styles))
+    story.append(
+        P(
+            "Underneath the rates, the active book has grown steadily in revenue terms "
+            f"to {usd(M['active_mrr'])} per month at the snapshot, so the business is "
+            "adding more than it is losing. That makes this a question of efficiency, "
+            "not survival: every point of avoidable churn is a point the acquisition "
+            "engine has to refill before the book grows, and the next sections show "
+            "that a large share of the current loss is concentrated in places where "
+            "management has practical levers.",
+            styles,
+        )
+    )
 
-    story.append(fig("mrr_trend.png",
-                     "Figure 4. Active monthly recurring revenue by month. The book "
-                     "has compounded steadily; the retention task is to protect the "
-                     "base, not to rescue a business in decline.", styles))
+    story.append(
+        fig(
+            "mrr_trend.png",
+            "Figure 4. Active monthly recurring revenue by month. The book "
+            "has compounded steadily; the retention task is to protect the "
+            "base, not to rescue a business in decline.",
+            styles,
+        )
+    )
 
     H2("The shape of the loss", "s5a", styles, story)
-    story.append(P(
-        f"The gap between customer churn ({M['avg_cust_churn']:.1f} percent a month "
-        f"on average) and revenue churn ({M['avg_rev_churn']:.1f} percent) is worth "
-        "reading deliberately, because its sign decides the whole posture of a "
-        "retention programme. When revenue churn runs below customer churn, the "
-        "average departing account is worth less than the average retained one, and "
-        "the book is upgrading its quality even as it loses count. That is the case "
-        "here, and it is the opposite of the dangerous pattern, where a business "
-        "loses a few large accounts and posts low customer churn against high revenue "
-        "churn. A retention owner who saw the dangerous pattern would drop everything "
-        "to defend the top accounts; the owner here can instead run an efficient, "
-        "mostly automated programme against a large low-value tail and reserve "
-        "human effort for the genuine high-value exceptions.", styles))
-    story.append(P(
-        "This shape also sets expectations for lifetime value. Because the accounts "
-        "leaving are concentrated in the low-revenue, low-tenure end, the surviving "
-        "book skews toward longer-lived, higher-value accounts, and blended lifetime "
-        "value rises mechanically as the weak tail churns out. The risk in such a "
-        "book is complacency: a healthy revenue-retention headline can mask a real "
-        "and growing customer-count problem that will eventually starve the funnel. "
-        "The cohort and concentration findings that follow are the check against "
-        "that complacency.", styles))
+    story.append(
+        P(
+            f"The gap between customer churn ({M['avg_cust_churn']:.1f} percent a month "
+            f"on average) and revenue churn ({M['avg_rev_churn']:.1f} percent) is worth "
+            "reading deliberately, because its sign decides the whole posture of a "
+            "retention programme. When revenue churn runs below customer churn, the "
+            "average departing account is worth less than the average retained one, and "
+            "the book is upgrading its mix even as it loses count. That is the case "
+            "here. The dangerous pattern is the reverse: a few large accounts leave, "
+            "customer churn stays low, and revenue churn spikes. That pattern would "
+            "demand immediate top-account defence. This book calls for a more segmented "
+            "operating model: scaled treatment for the low-value tail, named-account "
+            "coverage for high-value exceptions.",
+            styles,
+        )
+    )
+    story.append(
+        P(
+            "The gap does not establish unit economics. This dataset has no acquisition "
+            "cost, gross margin, expansion, contraction, or remaining contract value, so "
+            "it cannot estimate lifetime value or the economic benefit of retaining a "
+            "specific account. It does show why logo and revenue retention must be read "
+            "together: a stable revenue view can coexist with a material customer-count "
+            "loss. The cohort and concentration findings that follow locate where that "
+            "difference sits in the book.",
+            styles,
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
     # 6. FINDINGS — COHORT RETENTION
     # ════════════════════════════════════════════════════════
     H1("Findings: cohort retention", "SECTION 06", "s6", styles, story)
-    story.append(P(
-        "Aggregate churn rates hide whether the business is getting better at keeping "
-        "the customers it acquires. Cohort analysis answers that by following each "
-        "monthly intake of new accounts across its own life and comparing intakes at "
-        "the same age. If recent cohorts retain better than older ones at month six, "
-        "onboarding and product-market fit are improving. If they retain worse, the "
-        "business is acquiring lower-quality accounts or onboarding them less well, "
-        "and the aggregate rate will deteriorate later even if it looks stable now.",
-        styles))
+    story.append(
+        P(
+            "Aggregate churn rates hide whether the business is getting better at keeping "
+            "the customers it acquires. Cohort analysis answers that by following each "
+            "monthly intake of new accounts across its own life and comparing intakes at "
+            "the same age. A fixed-age gap identifies a change in cohort quality; it does "
+            "not distinguish acquisition mix, onboarding, product fit, or random variation "
+            "without additional evidence.",
+            styles,
+        )
+    )
 
-    story.append(fig("cohort_retention_curves.png",
-                     "Figure 5. Retention by cohort age for the eight most recent "
-                     "monthly cohorts. Each line follows one acquisition month as its "
-                     "accounts age; the most recent cohorts are drawn most prominently.",
-                     styles))
+    story.append(
+        fig(
+            "cohort_retention_curves.png",
+            "Figure 5. Retention by cohort age for the eight most recent "
+            "monthly cohorts. Each line follows one acquisition month as its "
+            "accounts age; the most recent cohorts are drawn most prominently.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "Read at a fixed age, the curves bend the wrong way. Early cohorts hold "
-        "almost all of their accounts through the first half-year; more recent "
-        "cohorts start to separate downward at the same ages. The deterioration is "
-        "modest in absolute terms, six-month retention still reads near 98 to 99 "
-        "percent, but the direction is consistent and it is the direction that "
-        "matters, because a cohort that retains one point worse at month six "
-        "typically retains several points worse by the end of its second year. The "
-        "honest qualifier is that the most recent cohorts are right-censored: they "
-        "have not yet lived long enough to be compared fairly at the longer horizons, "
-        "so the long-run gap should be read as a leading indicator to monitor rather "
-        "than a settled fact.", styles))
+    story.append(
+        P(
+            "Read at a fixed age, the curves bend the wrong way. Early cohorts hold "
+            "almost all of their accounts through the first half-year. More recent "
+            "cohorts start to separate downward at the same ages. The deterioration is "
+            "modest in absolute terms, six-month retention still reads near 98 to 99 "
+            "percent. The most recent cohorts are right-censored: they "
+            "have not yet lived long enough to be compared fairly at the longer horizons, "
+            "so the long-run gap should be read as a leading indicator to monitor rather "
+            "than a settled fact.",
+            styles,
+        )
+    )
 
-    story.append(fig("cohort_retention_heatmap.png",
-                     "Figure 6. Cohort retention heatmap. Each row is an acquisition "
-                     "month, each column a month of age, and each cell the share of "
-                     "the original cohort still active. Green is healthy retention, "
-                     "red is loss; the gradient down the early columns is where "
-                     "onboarding quality shows up.", styles))
+    story.append(
+        fig(
+            "cohort_retention_heatmap.png",
+            "Figure 6. Cohort retention heatmap. Each row is an acquisition "
+            "month, each column a month of age, and each cell the share of "
+            "the original cohort still active. Green is higher retention, "
+            "red is loss; the gradient down the early columns is where "
+            "onboarding quality shows up.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "The heatmap makes the pattern legible at a glance. The strongest retention "
-        "sits in the upper rows, the older cohorts, and the early-age columns. As the "
-        "eye moves down toward the recent cohorts, the early-age cells lose a little "
-        "of their green. This is the same story the curves tell, shown as a surface "
-        "rather than as lines, and it points the same way: the acquisition mix has "
-        "been drifting toward accounts that are slightly harder to keep, which "
-        "connects directly to the channel and segment findings in the next section.",
-        styles))
-    story.append(P(
-        "The fixed-age read is the stricter test. It compares cohorts at the same "
-        "age, so it does not penalise recent cohorts for not yet having long lives. "
-        "On that basis the signal is not a single noisy month: recent cohorts trail "
-        "early cohorts at month three, six, nine, and twelve. The logo gap is larger "
-        "than the revenue gap at every age, confirming that the deterioration is "
-        "concentrated in smaller accounts. The table below is the reason the report "
-        "treats the cohort pattern as a real operating signal, while still refusing "
-        "to call it a settled long-run outcome.", styles))
-    story.append(data_table(
-        ["Age", "Early logo ret.", "Recent logo ret.", "Logo delta",
-         "Early rev. ret.", "Recent rev. ret.", "Rev. delta"],
-        [[
-            f"{age}m",
-            f"{M['cohort_deltas'][age]['early_logo']:.1f}%",
-            f"{M['cohort_deltas'][age]['recent_logo']:.1f}%",
-            f"{M['cohort_deltas'][age]['logo_delta']:.1f} pp",
-            f"{M['cohort_deltas'][age]['early_rev']:.1f}%",
-            f"{M['cohort_deltas'][age]['recent_rev']:.1f}%",
-            f"{M['cohort_deltas'][age]['rev_delta']:.1f} pp",
-        ] for age in [3, 6, 9, 12]],
-        styles,
-        [1.4 * cm, 2.5 * cm, 2.7 * cm, 2.2 * cm,
-         2.5 * cm, 2.7 * cm, CONTENT_W - 14.0 * cm],
-    ))
-    story.append(P(
-        "One distinction matters for how this finding is used. Logo retention, the "
-        "share of accounts still active, deteriorates a little faster than revenue "
-        "retention, the share of original cohort revenue still billing, because the "
-        "accounts leaving the recent cohorts are disproportionately the smaller ones. "
-        "Six-month revenue retention holds near 99 percent even where logo retention "
-        "slips below it. That is the same favourable shape seen in the aggregate "
-        "trend, and it tells the retention owner that the cohort drift is a problem "
-        "of small-account volume rather than an erosion of the cohorts' revenue "
-        "spine. The fix belongs upstream in acquisition and onboarding, not in a "
-        "high-touch save motion aimed at the recent cohorts.", styles))
+    story.append(
+        P(
+            "The heatmap makes the pattern legible at a glance. The strongest retention "
+            "sits in the upper rows, the older cohorts, and the early-age columns. As the "
+            "eye moves down toward the recent cohorts, the early-age cells lose a little "
+            "of their green. This is the same story the curves tell, shown as a surface. "
+            "The chart supports monitoring a possible cohort-quality shift; it does not "
+            "diagnose acquisition mix or onboarding as the cause. That question connects "
+            "to the channel and "
+            "segment findings in the next section.",
+            styles,
+        )
+    )
+    story.append(
+        P(
+            "The fixed-age read is the stricter test. It compares cohorts at the same "
+            "age, so it does not penalise recent cohorts for not yet having long lives. "
+            "On that basis the signal is not a single noisy month: recent cohorts trail "
+            "early cohorts at month three, six, nine, and twelve. The logo gap is larger "
+            "than the revenue gap at every age, confirming that the deterioration is "
+            "concentrated in smaller accounts. The table below is why this pattern "
+            "counts as a real operating signal, not yet a settled long-run outcome.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            [
+                "Age",
+                "Early logo ret.",
+                "Recent logo ret.",
+                "Logo delta",
+                "Early rev. ret.",
+                "Recent rev. ret.",
+                "Rev. delta",
+            ],
+            [
+                [
+                    f"{age}m",
+                    f"{M['cohort_deltas'][age]['early_logo']:.1f}%",
+                    f"{M['cohort_deltas'][age]['recent_logo']:.1f}%",
+                    f"{M['cohort_deltas'][age]['logo_delta']:.1f} pp",
+                    f"{M['cohort_deltas'][age]['early_rev']:.1f}%",
+                    f"{M['cohort_deltas'][age]['recent_rev']:.1f}%",
+                    f"{M['cohort_deltas'][age]['rev_delta']:.1f} pp",
+                ]
+                for age in [3, 6, 9, 12]
+            ],
+            styles,
+            [1.4 * cm, 2.5 * cm, 2.7 * cm, 2.2 * cm, 2.5 * cm, 2.7 * cm, CONTENT_W - 14.0 * cm],
+        )
+    )
+    story.append(
+        P(
+            "One distinction matters for how this finding is used. Logo retention, the "
+            "share of accounts still active, deteriorates a little faster than revenue "
+            "retention, the share of original cohort revenue still billing, because the "
+            "accounts leaving the recent cohorts are disproportionately the smaller ones. "
+            "Six-month revenue retention holds near 99 percent even where logo retention "
+            "slips below it. That is the same favourable shape seen in the aggregate "
+            "trend. The cohort drift is a problem of small-account volume, not an "
+            "erosion of the cohorts' revenue spine. The fix belongs upstream in "
+            "acquisition and onboarding, not in a high-touch save motion aimed at the "
+            "recent cohorts.",
+            styles,
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
     # 7. FINDINGS — WHERE CHURN CONCENTRATES
     # ════════════════════════════════════════════════════════
     H1("Findings: where churn concentrates", "SECTION 07", "s7", styles, story)
-    story.append(P(
-        "This is the section that turns a number into a target. The aggregate churn "
-        "rate is an average over populations that behave nothing like each other, and "
-        "averaging them together hides the only thing a retention team can act on: "
-        "which populations are doing the leaving. Decomposed by segment, plan, "
-        "channel, and region, the loss is strikingly uneven, and the unevenness lines "
-        "up across the cuts in a way that points to a single underlying story.",
-        styles))
+    story.append(
+        P(
+            "This section turns the aggregate churn rate into an operating target. The "
+            "book-wide rate averages together populations with very different economics, "
+            "purchase intent, and support needs. Segment, plan, channel, and region cuts "
+            "show where the leaving happens and whether the same weak populations appear "
+            "from multiple angles.",
+            styles,
+        )
+    )
 
     H2("By customer segment", "s7a", styles, story)
-    story.append(P(
-        f"Segment is the sharpest single cut. Startup accounts have lost "
-        f"{seg.loc['Startup','cumulative_churn_share']*100:.1f} percent of their "
-        f"number and SMB accounts {seg.loc['SMB','cumulative_churn_share']*100:.1f} "
-        f"percent, against {seg.loc['Mid-Market','cumulative_churn_share']*100:.1f} "
-        f"percent for Mid-Market and just "
-        f"{seg.loc['Enterprise','cumulative_churn_share']*100:.1f} percent for "
-        "Enterprise. The gradient is monotonic in account size: the smaller the "
-        "customer, the more likely it is to leave. The same gradient runs through "
-        "average revenue, where Enterprise accounts bill "
-        f"{usd(seg.loc['Enterprise','avg_monthly_revenue'])} a month against "
-        f"{usd(seg.loc['Startup','avg_monthly_revenue'])} for Startup, and through "
-        "the health signals examined below. Small accounts churn more and are worth "
-        "less individually, which is why the revenue line sits below the customer "
-        "line in the trend.", styles))
+    story.append(
+        P(
+            f"Segment is the sharpest single cut. Startup accounts have lost "
+            f"{seg.loc['Startup', 'cumulative_churn_share'] * 100:.1f} percent of their "
+            f"number and SMB accounts {seg.loc['SMB', 'cumulative_churn_share'] * 100:.1f} "
+            f"percent, against {seg.loc['Mid-Market', 'cumulative_churn_share'] * 100:.1f} "
+            f"percent for Mid-Market and just "
+            f"{seg.loc['Enterprise', 'cumulative_churn_share'] * 100:.1f} percent for "
+            "Enterprise. The gradient is monotonic in account size: the smaller the "
+            "customer, the more likely it is to leave. The same gradient runs through "
+            "average revenue, where Enterprise accounts bill "
+            f"{usd(seg.loc['Enterprise', 'avg_monthly_revenue'])} a month against "
+            f"{usd(seg.loc['Startup', 'avg_monthly_revenue'])} for Startup, and through "
+            "the health signals examined below. Small accounts churn more and are worth "
+            "less individually. That is why the revenue line sits below the customer "
+            "line in the trend.",
+            styles,
+        )
+    )
 
-    story.append(fig("churn_by_segment.png",
-                     "Figure 7. Cumulative churn share by customer segment. The "
-                     "gradient is monotonic in account size, from Enterprise at the "
-                     "low end to Startup at the high end.", styles, width_frac=0.92))
+    story.append(
+        fig(
+            "churn_by_segment.png",
+            "Figure 7. Cumulative churn share by customer segment. The "
+            "gradient is monotonic in account size, from Enterprise at the "
+            "low end to Startup at the high end.",
+            styles,
+            width_frac=0.92,
+        )
+    )
 
-    story.append(P(
-        "The segment story is not only about churn rates; it is about the whole "
-        "health profile. The comparison below puts cumulative churn next to average "
-        "net promoter score and the average usage trend for each segment. Enterprise "
-        "accounts churn least, score highest on net promoter, and show usage that is "
-        "still growing. Startup accounts invert all three. The signals are not "
-        "independent symptoms; they move together, which is what makes a single "
-        "segment-level health read meaningful.", styles))
+    story.append(
+        P(
+            "The segment story goes beyond churn rates. It is about the whole health "
+            "profile. The comparison below puts cumulative churn next to average net "
+            "promoter score and the average usage trend for each segment. Enterprise "
+            "accounts churn least, score highest on net promoter, and show usage that is "
+            "still growing. Startup accounts invert all three. The signals move together "
+            "rather than firing independently. That is what makes a single "
+            "segment-level health read meaningful.",
+            styles,
+        )
+    )
 
-    story.append(fig("segment_health_comparison.png",
-                     "Figure 8. Segment health on three axes: cumulative churn share, "
-                     "average net promoter score, and average usage trend. A segment "
-                     "that is losing accounts is also the segment with weak sentiment "
-                     "and declining usage.", styles))
+    story.append(
+        fig(
+            "segment_health_comparison.png",
+            "Figure 8. Segment health on three axes: cumulative churn share, "
+            "average net promoter score, and average usage trend. A segment "
+            "that is losing accounts is also the segment with weak sentiment "
+            "and declining usage.",
+            styles,
+        )
+    )
 
     H2("By plan type", "s7b", styles, story)
-    story.append(P(
-        f"Plan tier tells the same story in pricing terms. Basic-plan accounts churn "
-        f"at {plan.loc['Basic','cumulative_churn_share']*100:.1f} percent, nearly ten "
-        f"times the {plan.loc['Enterprise','cumulative_churn_share']*100:.1f} percent "
-        "rate of Enterprise-plan accounts, with Growth and Pro stepping down in "
-        "between. Lower-priced plans attract lower-commitment buyers, and the data "
-        "shows it. The commercial implication is not to abandon the entry tier, which "
-        "feeds the funnel, but to recognise that a Basic-plan signup is a different "
-        "and more fragile asset than a Pro-plan signup and should be onboarded and "
-        "monitored as one.", styles))
+    story.append(
+        P(
+            f"Plan tier tells the same story in pricing terms. Basic-plan accounts churn "
+            f"at {plan.loc['Basic', 'cumulative_churn_share'] * 100:.1f} percent, nearly ten "
+            f"times the {plan.loc['Enterprise', 'cumulative_churn_share'] * 100:.1f} percent "
+            "rate of Enterprise-plan accounts, with Growth and Pro stepping down in "
+            "between. Lower-priced plans behave like lower-commitment purchases in this "
+            "book. The commercial implication is not to abandon the entry tier: it feeds "
+            "the funnel. It is to treat a Basic-plan signup as a different operating "
+            "asset from a Pro-plan signup, with a faster activation path and earlier "
+            "risk monitoring.",
+            styles,
+        )
+    )
 
-    story.append(fig("churn_by_plan.png",
-                     "Figure 9. Cumulative churn share by plan type. Churn falls "
-                     "steeply as plan tier rises.", styles, width_frac=0.92))
+    story.append(
+        fig(
+            "churn_by_plan.png",
+            "Figure 9. Cumulative churn share by plan type. Churn falls "
+            "steeply as plan tier rises.",
+            styles,
+            width_frac=0.92,
+        )
+    )
 
     H2("By acquisition channel", "s7c", styles, story)
-    story.append(P(
-        f"Channel is where the analysis becomes directly actionable on spend. "
-        f"Affiliate-sourced accounts churn at "
-        f"{chan.loc['Affiliate','cumulative_churn_share']*100:.1f} percent and "
-        f"Paid Search at {chan.loc['Paid Search','cumulative_churn_share']*100:.1f} "
-        f"percent, against {chan.loc['Partner','cumulative_churn_share']*100:.1f} "
-        f"percent for Partner and "
-        f"{chan.loc['Referral','cumulative_churn_share']*100:.1f} percent for "
-        "Referral. The accounts a business pays a third party to send it leave at "
-        "roughly two to three times the rate of the accounts that arrive through a "
-        "partner or a referral. This is the most controllable finding in the report, "
-        "because acquisition mix is a budget decision. Shifting marginal spend from "
-        "Affiliate and Paid Search toward Partner and Referral would lower the "
-        "blended churn rate of every future cohort without touching a single "
-        "retention playbook.", styles))
+    story.append(
+        P(
+            f"Channel is the clearest link between the retention read and spend decisions. "
+            f"Affiliate-sourced accounts churn at "
+            f"{chan.loc['Affiliate', 'cumulative_churn_share'] * 100:.1f} percent and "
+            f"Paid Search at {chan.loc['Paid Search', 'cumulative_churn_share'] * 100:.1f} "
+            f"percent, against {chan.loc['Partner', 'cumulative_churn_share'] * 100:.1f} "
+            f"percent for Partner and "
+            f"{chan.loc['Referral', 'cumulative_churn_share'] * 100:.1f} percent for "
+            "Referral. Paid and affiliate demand is less durable than partner and "
+            "referral demand in this run. The next step is a live cohort test that controls "
+            "for segment, plan, CAC, and volume before changing channel budgets.",
+            styles,
+        )
+    )
 
-    story.append(fig("churn_by_channel.png",
-                     "Figure 10. Cumulative churn share by acquisition channel. "
-                     "Paid and affiliate channels (red) deliver the least durable "
-                     "accounts; partner and referral channels (green) the most "
-                     "durable.", styles, width_frac=0.92))
+    story.append(
+        fig(
+            "churn_by_channel.png",
+            "Figure 10. Cumulative churn share by acquisition channel. "
+            "Paid and affiliate channels (red) deliver the least durable "
+            "accounts; partner and referral channels (green) the most "
+            "durable.",
+            styles,
+            width_frac=0.92,
+        )
+    )
 
     H2("By region", "s7d", styles, story)
-    story.append(P(
-        f"Region is the weakest of the four cuts but not a flat one. LATAM accounts "
-        f"churn at {reg.loc['LATAM','cumulative_churn_share']*100:.1f} percent and "
-        f"APAC at {reg.loc['APAC','cumulative_churn_share']*100:.1f} percent, both "
-        f"above the {M['cum_churn_pct']:.1f} percent book average, while North "
-        f"America sits below it at "
-        f"{reg.loc['North America','cumulative_churn_share']*100:.1f} percent. The "
-        "spread is narrower than for segment or channel, and a good part of it "
-        "probably reflects which segments and channels dominate each region rather "
-        "than geography itself. Region is therefore a place to watch and to read "
-        "alongside the other cuts, not a primary lever on its own.", styles))
+    story.append(
+        P(
+            f"Region is the weakest of the four cuts but not a flat one. LATAM accounts "
+            f"churn at {reg.loc['LATAM', 'cumulative_churn_share'] * 100:.1f} percent and "
+            f"APAC at {reg.loc['APAC', 'cumulative_churn_share'] * 100:.1f} percent, both "
+            f"above the {M['cum_churn_pct']:.1f} percent book average, while North "
+            f"America sits below it at "
+            f"{reg.loc['North America', 'cumulative_churn_share'] * 100:.1f} percent. The "
+            "spread is narrower than for segment or channel, and a good part of it "
+            "probably reflects which segments and channels dominate each region rather "
+            "than geography itself. Region is therefore a place to watch and to read "
+            "alongside the other cuts, not a primary lever on its own.",
+            styles,
+        )
+    )
 
-    story.append(fig("churn_by_region.png",
-                     "Figure 11. Cumulative churn share by region against the book "
-                     "average. LATAM and APAC run hot; North America runs cool.",
-                     styles, width_frac=0.92))
+    story.append(
+        fig(
+            "churn_by_region.png",
+            "Figure 11. Cumulative churn share by region against the book "
+            "average. LATAM and APAC run hot; North America runs cool.",
+            styles,
+            width_frac=0.92,
+        )
+    )
 
-    story.append(P(
-        "Taken together the four cuts tell one story from four angles. The accounts "
-        "that leave are smaller, on cheaper plans, more often acquired through paid "
-        "and affiliate channels, and somewhat concentrated outside North America. "
-        "These are not four problems; they are four views of the same low-commitment "
-        "population, and they explain both why revenue churn sits below customer "
-        "churn and why the cohort mix has been drifting. The next section asks what "
-        "those accounts looked like in the weeks before they left.", styles))
-    story.append(P(
-        "One word of caution carries over from the framework in Section 04. Because "
-        "the four cuts overlap, they cannot simply be added. Affiliate traffic skews "
-        "toward Startup and SMB accounts on Basic plans, so part of the channel "
-        "effect is really the segment and plan effect wearing a channel label, and "
-        "part of the regional spread is which segments and channels dominate each "
-        "region. Separating the independent contribution of each attribute would take "
-        "a model that holds the others constant, which is the natural next step "
-        "beyond this descriptive cut. For the decisions at hand the overlap does not "
-        "change the conclusion: the levers point the same way whether the channel "
-        "effect is direct or inherited, because shifting spend toward partner and "
-        "referral also shifts the segment and plan mix toward the durable end.",
-        styles))
-    story.append(P(
-        "The mix test below shows why this is still an executive issue rather than a "
-        "statistical footnote. The weak commercial populations contribute more churn "
-        "than their account share would imply, while the durable populations do the "
-        "opposite. That is the signature of an upstream mix problem: every month the "
-        "funnel over-indexes toward the weak side, it creates future retention work "
-        "that the customer success team will later have to absorb.", styles))
-    story.append(data_table(
-        ["Population", "Account share", "Churn share", "Read"],
-        [
-            ["Startup + SMB",
-             f"{M['low_end_acct_share']:.1f}%",
-             f"{M['low_end_churn_share']:.1f}%",
-             "Low-end segments over-index in the churn pool."],
-            ["Mid-Market + Enterprise",
-             f"{M['durable_acct_share']:.1f}%",
-             f"{M['durable_churn_share']:.1f}%",
-             "Durable segments under-index despite higher value."],
-            ["Basic + Growth plans",
-             f"{M['low_plan_acct_share']:.1f}%",
-             f"{M['low_plan_churn_share']:.1f}%",
-             "Entry and mid tiers carry most logo churn."],
-            ["Pro + Enterprise plans",
-             f"{M['premium_plan_acct_share']:.1f}%",
-             f"{M['premium_plan_churn_share']:.1f}%",
-             "Premium tiers are the revenue spine to defend."],
-            ["Affiliate + Paid Search",
-             f"{M['weak_channel_acct_share']:.1f}%",
-             f"{M['weak_channel_churn_share']:.1f}%",
-             "Paid-intent sources bring disproportionate churn."],
-            ["Partner + Referral",
-             f"{M['quality_channel_acct_share']:.1f}%",
-             f"{M['quality_channel_churn_share']:.1f}%",
-             "Trust-led sources bring more durable accounts."],
-        ],
-        styles,
-        [4.6 * cm, 2.5 * cm, 2.4 * cm, CONTENT_W - 9.5 * cm],
-    ))
+    story.append(
+        P(
+            "Taken together, the four cuts describe an overlapping population rather "
+            "than four unrelated problems. The accounts that leave are smaller, sit on "
+            "cheaper plans, arrive more often through paid and affiliate channels, and "
+            "are somewhat more concentrated outside North America. That overlap explains "
+            "why revenue churn sits below customer churn and why recent cohorts have "
+            "started to drift. The next section asks what those accounts looked like in "
+            "the weeks before they left.",
+            styles,
+        )
+    )
+    story.append(
+        P(
+            "One word of caution carries over from the framework in Section 04. Because "
+            "the four cuts overlap, they cannot simply be added. Affiliate traffic skews "
+            "toward Startup and SMB accounts on Basic plans, so part of the channel "
+            "effect is really the segment and plan effect wearing a channel label, and "
+            "part of the regional spread is which segments and channels dominate each "
+            "region. Separating the independent contribution of each attribute would "
+            "take a model that holds the others constant. Budget reallocation should wait "
+            "for that multivariate read and a controlled channel test.",
+            styles,
+        )
+    )
+    story.append(
+        P(
+            "The mix test below shows why this is still an executive issue rather than a "
+            "statistical footnote. The weak commercial populations contribute more churn "
+            "than their account share would imply, while the durable populations do the "
+            "opposite. This is a screening signal for an upstream mix problem, not proof "
+            "that channel or segment independently causes the difference.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            ["Population", "Account share", "Churn share", "Read"],
+            [
+                [
+                    "Startup + SMB",
+                    f"{M['low_end_acct_share']:.1f}%",
+                    f"{M['low_end_churn_share']:.1f}%",
+                    "Low-end segments over-index in the churn pool.",
+                ],
+                [
+                    "Mid-Market + Enterprise",
+                    f"{M['durable_acct_share']:.1f}%",
+                    f"{M['durable_churn_share']:.1f}%",
+                    "Durable segments under-index despite higher value.",
+                ],
+                [
+                    "Basic + Growth plans",
+                    f"{M['low_plan_acct_share']:.1f}%",
+                    f"{M['low_plan_churn_share']:.1f}%",
+                    "Entry and mid tiers carry most logo churn.",
+                ],
+                [
+                    "Pro + Enterprise plans",
+                    f"{M['premium_plan_acct_share']:.1f}%",
+                    f"{M['premium_plan_churn_share']:.1f}%",
+                    "Premium tiers are the revenue spine to defend.",
+                ],
+                [
+                    "Affiliate + Paid Search",
+                    f"{M['weak_channel_acct_share']:.1f}%",
+                    f"{M['weak_channel_churn_share']:.1f}%",
+                    "Paid-intent sources bring disproportionate churn.",
+                ],
+                [
+                    "Partner + Referral",
+                    f"{M['quality_channel_acct_share']:.1f}%",
+                    f"{M['quality_channel_churn_share']:.1f}%",
+                    "Trust-led sources bring more durable accounts.",
+                ],
+            ],
+            styles,
+            [4.6 * cm, 2.5 * cm, 2.4 * cm, CONTENT_W - 9.5 * cm],
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
     # 8. FINDINGS — BEHAVIOURAL CHURN DRIVERS
     # ════════════════════════════════════════════════════════
     H1("Findings: behavioural churn drivers", "SECTION 08", "s8", styles, story)
-    story.append(P(
-        "Commercial attributes say which accounts are structurally fragile. "
-        "Behavioural signals say which accounts are in trouble right now, and they do "
-        "it with the kind of separation that is rare in real data and worth examining "
-        "carefully here. Each signal is a flag a customer success team can see in its "
-        "own tools: a low recent net promoter score, a spike in support tickets, a "
-        "failed payment, weak feature adoption, or a decline in usage.", styles))
+    story.append(
+        P(
+            "Commercial attributes say which accounts are structurally fragile. "
+            "Behavioural signals say which accounts show current distress. The separation "
+            "is wider than a live operating dataset would usually produce, which is a "
+            "synthetic-data caveat, but the signals themselves are practical: recent net "
+            "promoter score, support tickets, failed payments, feature adoption, and "
+            "usage trend.",
+            styles,
+        )
+    )
 
-    story.append(fig("signal_separation.png",
-                     "Figure 12. Churn rate for accounts with and without each "
-                     "pre-churn signal. The gap between the two dots is the whole "
-                     "point: these flags split the book into populations that behave "
-                     "almost nothing alike.", styles))
+    story.append(
+        fig(
+            "signal_separation.png",
+            "Figure 12. Churn rate for accounts with and without each "
+            "pre-churn signal. The gap between the two dots is the decision "
+            "signal: these flags split the book into populations with very "
+            "different observed churn rates.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        f"The separation is stark. Accounts carrying a low net promoter score churn "
-        f"at {beh.loc['low_nps_flag','churn_rate_in_group']*100:.0f} percent against "
-        f"{beh.loc['low_nps_flag','churn_rate_out_group']*100:.0f} percent for "
-        "accounts without it. Accounts with a heavy support burden churn at "
-        f"{beh.loc['high_support_ticket_flag','churn_rate_in_group']*100:.0f} percent "
-        f"against {beh.loc['high_support_ticket_flag','churn_rate_out_group']*100:.0f} "
-        "percent. Failed payments mark a population that churns at "
-        f"{beh.loc['failed_payment_flag','churn_rate_in_group']*100:.0f} percent, "
-        "weak feature adoption "
-        f"{beh.loc['low_feature_adoption_flag','churn_rate_in_group']*100:.0f} "
-        "percent, and declining usage "
-        f"{beh.loc['usage_decline_flag','churn_rate_in_group']*100:.0f} percent. "
-        "Expressed as a multiple, a low net promoter score lifts the churn rate by "
-        f"more than {beh.loc['low_nps_flag','churn_rate_lift']:.0f} times and a heavy "
-        f"support burden by more than "
-        f"{beh.loc['high_support_ticket_flag','churn_rate_lift']:.0f} times relative "
-        "to accounts without the flag.", styles))
+    story.append(
+        P(
+            f"The separation is stark. Accounts carrying a low net promoter score churn "
+            f"at {beh.loc['low_nps_flag', 'churn_rate_in_group'] * 100:.0f} percent against "
+            f"{beh.loc['low_nps_flag', 'churn_rate_out_group'] * 100:.0f} percent for "
+            "accounts without it. Accounts with a heavy support burden churn at "
+            f"{beh.loc['high_support_ticket_flag', 'churn_rate_in_group'] * 100:.0f} percent "
+            f"against {beh.loc['high_support_ticket_flag', 'churn_rate_out_group'] * 100:.0f} "
+            "percent. Failed payments mark a population that churns at "
+            f"{beh.loc['failed_payment_flag', 'churn_rate_in_group'] * 100:.0f} percent, "
+            "weak feature adoption "
+            f"{beh.loc['low_feature_adoption_flag', 'churn_rate_in_group'] * 100:.0f} "
+            "percent, and declining usage "
+            f"{beh.loc['usage_decline_flag', 'churn_rate_in_group'] * 100:.0f} percent. "
+            "Expressed as a multiple, a low net promoter score lifts the churn rate by "
+            f"more than {floor_multiple(beh.loc['low_nps_flag', 'churn_rate_lift'])} times and "
+            f"a heavy support burden by more than "
+            f"{floor_multiple(beh.loc['high_support_ticket_flag', 'churn_rate_lift'])} times relative "
+            "to accounts without the flag.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "These multiples are large partly because the comparison group, accounts "
-        "without any distress flag, almost never churns in this book. That is a "
-        "property of synthetic data and the report does not lean on the exact "
-        "magnitudes. What survives the caveat is the ranking and the practical "
-        "consequence: sentiment and support signals identify near-certain churn, "
-        "while usage decline identifies a much larger but lower-certainty population. "
-        "A retention programme should treat the two differently, reserving expensive "
-        "human save motions for the high-certainty sentiment and payment flags and "
-        "using cheaper automated nudges for the broad usage-decline population.",
-        styles))
+    story.append(
+        P(
+            "These multiples are large partly because the comparison group, accounts "
+            "without any distress flag, almost never churns in this book. That is a "
+            "property of synthetic data and the report does not lean on the exact "
+            "magnitudes. What survives the caveat is the ranking and the practical "
+            "consequence: sentiment and support signals identify a small, high-risk "
+            "population, while usage decline identifies a larger, lower-certainty "
+            "population. The operating response should match that difference: human save "
+            "motions for high-value accounts with severe signals, scaled nudges for the "
+            "broad usage-decline tail.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "Expressed as a multiple against accounts without each flag, the same five "
-        "signals rank in a stable order. Low sentiment and high support burden sit "
-        "far out at the top, payment failure in the middle, and weak adoption and "
-        "usage decline closer to the no-lift line, though still well above it. The "
-        "lift view and the absolute-separation view agree on the ranking and "
-        "disagree only on emphasis, which is the reassurance that the ordering is a "
-        "property of the data rather than of the chosen comparison.", styles))
-    story.append(fig("behavioral_churn_drivers.png",
-                     "Figure 13. Churn rate lift by behavioural signal, the ratio of "
-                     "the churn rate inside each signal to the rate outside it. Bars "
-                     "past the dotted no-lift line mark signals that raise the rate; "
-                     "the strongest sit several times above it.", styles,
-                     width_frac=0.95))
+    story.append(
+        P(
+            "Expressed as a multiple against accounts without each flag, the same five "
+            "signals rank in a stable order. Low sentiment and high support burden sit "
+            "far out at the top, payment failure in the middle, and weak adoption and "
+            "usage decline closer to the no-lift line, though still well above it. The "
+            "lift view and the absolute-separation view agree on the ranking and "
+            "disagree only on emphasis. That makes the ordering more credible: it is not "
+            "an artifact of one charting choice.",
+            styles,
+        )
+    )
+    story.append(
+        fig(
+            "behavioral_churn_drivers.png",
+            "Figure 13. Churn rate lift by behavioural signal, the ratio of "
+            "the churn rate inside each signal to the rate outside it. Bars "
+            "past the dotted no-lift line mark signals that raise the rate; "
+            "the strongest sit several times above it.",
+            styles,
+            width_frac=0.95,
+        )
+    )
 
     H2("Ranking the drivers by money, not just by rate", "s8a", styles, story)
-    story.append(P(
-        "A high lift on a tiny population is less important than a moderate lift on a "
-        "large and valuable one. The ranking below therefore scores each driver by "
-        "its excess MRR association: the monthly revenue tied to churned accounts "
-        "carrying the signal, above what the book-average churn rate would predict. "
-        "This reorders the list. Support burden and low sentiment stay near the top "
-        "because they combine a high rate with real revenue, but usage decline rises "
-        "sharply, because although its lift is the smallest of the behavioural "
-        "signals it touches the most accounts and the most money.", styles))
+    story.append(
+        P(
+            "A high lift on a tiny population is less important than a moderate lift on a "
+            "large and valuable one. The ranking below therefore scores each driver by "
+            "its excess MRR association: the monthly revenue tied to churned accounts "
+            "carrying the signal, above what the book-average churn rate would predict. "
+            "This reorders the list. Support burden and low sentiment stay near the top "
+            "because they combine a high rate with real revenue. Usage decline rises "
+            "sharply for a different reason: its lift is the smallest of the five "
+            "behavioural signals, but it touches the most accounts and the most money.",
+            styles,
+        )
+    )
 
-    story.append(fig("churn_driver_ranking.png",
-                     "Figure 14. Churn drivers ranked by excess MRR association. "
-                     "Behavioural signals (red) dominate the structural attributes "
-                     "(slate); the label shows each driver's churn-rate multiple.",
-                     styles))
+    story.append(
+        fig(
+            "churn_driver_ranking.png",
+            "Figure 14. Churn drivers ranked by excess MRR association. "
+            "Behavioural signals (red) dominate the structural attributes "
+            "(slate); the label shows each driver's churn-rate multiple.",
+            styles,
+        )
+    )
 
     drv_top = drv.sort_values("excess_mrr_association_proxy", ascending=False).head(5)
-    story.append(data_table(
-        ["Driver", "Accounts", "Churn rate", "Lift", "Excess MRR assoc."],
-        [[
-            r["driver"].replace("_flag", "").replace("_", " ").title()
-                       .replace("Nps", "NPS"),
-            f"{int(r['impacted_customers']):,}",
-            f"{r['churn_rate']*100:.0f}%",
-            f"{r['churn_rate_lift']:.1f}×",
-            usd(r["excess_mrr_association_proxy"]),
-        ] for _, r in drv_top.iterrows()],
-        styles,
-        [5.4 * cm, 2.2 * cm, 2.4 * cm, 1.8 * cm, CONTENT_W - 11.8 * cm],
-    ))
-    story.append(P(
-        "The five behavioural signals at the top of this table are the foundation of "
-        "the risk index in Section 04 and of the intervention queues in Section 11. "
-        "They are also the natural candidates for the controlled experiments the "
-        "framework calls for: each one defines a population, a plausible "
-        "intervention, and a revenue stake large enough to justify the test.",
-        styles))
-    story.append(P(
-        "The signals also compound. An account that is both paying late and filing "
-        "support tickets is in a different state from one carrying a single flag, and "
-        "the risk index in Section 04 is built to capture that by scoring on the full "
-        "signal set rather than on any one flag. In operational terms this means the "
-        "save desk should not work five separate lists, one per signal, with the same "
-        "account appearing on several. It should work one ranked list in which the "
-        "multiply-flagged accounts rise to the top, and reserve its most expensive "
-        "human contact for them. The single-flag, usage-decline-only accounts are "
-        "the large base of the queue and belong in an automated motion, not a "
-        "phone call.", styles))
-    story.append(P(
-        f"On the open book, {M['multi_signal_active']:,} accounts carry two or more "
-        f"distress signals, representing {usd(M['multi_signal_active_mrr'])} of "
-        "current MRR. By contrast, "
-        f"{M['zero_signal_active']:,} active accounts carry none of the five "
-        f"distress signals and account for {usd(M['zero_signal_active_mrr'])} of "
-        "current MRR. That split is important operationally. A broad outreach "
-        "campaign would spend most of its effort on accounts with no current signal, "
-        "while a tiered queue can reserve human coverage for the multi-signal tail "
-        "and leave the healthy majority alone. The value of the score is not that it "
-        "finds a new signal; it prevents the business from over-treating accounts "
-        "that do not need intervention.", styles))
+    story.append(
+        data_table(
+            ["Driver", "Accounts", "Churn rate", "Lift", "Excess MRR assoc."],
+            [
+                [
+                    r["driver"]
+                    .replace("_flag", "")
+                    .replace("_", " ")
+                    .title()
+                    .replace("Nps", "NPS"),
+                    f"{int(r['impacted_customers']):,}",
+                    f"{r['churn_rate'] * 100:.0f}%",
+                    f"{r['churn_rate_lift']:.1f}×",
+                    usd(r["excess_mrr_association_proxy"]),
+                ]
+                for _, r in drv_top.iterrows()
+            ],
+            styles,
+            [5.4 * cm, 2.2 * cm, 2.4 * cm, 1.8 * cm, CONTENT_W - 11.8 * cm],
+        )
+    )
+    story.append(
+        P(
+            "The five behavioural signals at the top of this table are the foundation of "
+            "the risk index in Section 04 and of the intervention queues in Section 11. "
+            "They define the eligible populations for the controlled intervention layer: "
+            "each one maps to a plausible treatment and a revenue stake large enough to "
+            "justify preserving a holdout.",
+            styles,
+        )
+    )
+    story.append(
+        P(
+            "The signals also compound. An account paying late and filing support "
+            "tickets is in a different state from one carrying a single flag, and the "
+            "risk index in Section 04 captures that by scoring on the full signal set. "
+            "The save desk should work one ranked list, not five overlapping lists by "
+            "signal. Multi-signal value accounts rise to the top; single-flag usage "
+            "decline stays in the scaled-motion layer.",
+            styles,
+        )
+    )
+    story.append(
+        P(
+            f"On the open book, {M['multi_signal_active']:,} accounts carry two or more "
+            f"distress signals, representing {usd(M['multi_signal_active_mrr'])} of "
+            "current MRR. By contrast, "
+            f"{M['zero_signal_active']:,} active accounts carry none of the five "
+            f"distress signals and account for {usd(M['zero_signal_active_mrr'])} of "
+            "current MRR. That split is important operationally. A broad outreach "
+            "campaign would spend most of its effort on accounts with no current signal. "
+            "A tiered queue reserves human coverage for the multi-signal tail and leaves "
+            "low-signal accounts alone. The score's value is not that it finds a new "
+            "signal; it prevents over-treatment.",
+            styles,
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
     # 9. FINDINGS — REVENUE AT RISK
     # ════════════════════════════════════════════════════════
     H1("Findings: revenue at risk and concentration", "SECTION 09", "s9", styles, story)
-    story.append(P(
-        "Counting accounts tells you how many customers you are losing; it does not "
-        "tell you how much money is leaving or whether it is worth a targeted defence. "
-        "This section attaches revenue to the risk and asks the question that decides "
-        "the operating model: is the exposure concentrated enough to defend account "
-        "by account, or so diffuse that only a broad programme could touch it?",
-        styles))
+    story.append(
+        P(
+            "Counting accounts tells you how many customers you are losing. It does not "
+            "tell you how much money is leaving, or whether the loss is worth a "
+            "targeted defence. This section attaches revenue to the risk and asks the "
+            "question that informs "
+            "the operating model: is the exposure concentrated enough to defend account "
+            "by account, or so diffuse that only a broad programme could touch it?",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "The answer is that it is highly concentrated. Ranking churned accounts by "
-        f"value, the top tenth carries {M['conc10']:.0f} percent of all lost monthly "
-        f"revenue, the top fifth carries {M['conc20']:.0f} percent, and the top third "
-        f"carries {M['conc30']:.0f} percent. By the halfway point of churned accounts "
-        f"by value, {M['conc50']:.0f} percent of all lost monthly revenue is already "
-        "accounted for. A small set of departures does most of the financial damage, "
-        "which is the "
-        "single most important fact for designing the response: a focused save desk "
-        "working a few hundred named accounts can address the majority of the "
-        "revenue at stake.", styles))
+    story.append(
+        P(
+            "The answer is that it is highly concentrated. Ranking churned accounts by "
+            f"value, the top tenth carries {M['conc10']:.0f} percent of all lost monthly "
+            f"revenue, the top fifth carries {M['conc20']:.0f} percent, and the top third "
+            f"carries {M['conc30']:.0f} percent. By the halfway point of churned accounts "
+            f"by value, {M['conc50']:.0f} percent of all lost monthly revenue is already "
+            "accounted for. A small set of departures carries most of the lost monthly value. "
+            "That concentration is the operating design point: a focused save desk "
+            "working a few hundred named accounts can address the majority of the "
+            "monthly-value exposure.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        f"In dollars, the historical churn pool represents {usd(M['lost_mrr_total'])} "
-        "of lost monthly value. The first 5 percent of churned accounts by value "
-        f"carry {M['conc5']:.0f} percent of that loss, before the long tail even "
-        "enters the discussion. This is why the response should be value-weighted. "
-        "A logo-count target would push the team toward many small saves; a "
-        "value-weighted target pushes it toward the accounts where one successful "
-        "intervention changes the monthly run-rate.", styles))
+    story.append(
+        pull_quote("A small set of departures carries most of the lost monthly value.", styles)
+    )
 
-    story.append(fig("revenue_concentration.png",
-                     "Figure 15. Concentration of lost monthly value across churned "
-                     "accounts. The curve bows far above the line of even "
-                     "distribution; the marked point shows the top fifth of accounts "
-                     "carrying the majority of the loss.", styles))
+    story.append(
+        P(
+            f"In dollars, the historical churn pool represents {usd(M['lost_mrr_total'])} "
+            "of lost monthly value. The first 5 percent of churned accounts by value "
+            f"carry {M['conc5']:.0f} percent of that loss, before the long tail even "
+            "enters the discussion. This is why the response should be value-weighted. "
+            "A logo-count target would push the team toward many small saves; a "
+            "value-weighted target pushes it toward the accounts where one successful "
+            "intervention changes the monthly run-rate.",
+            styles,
+        )
+    )
+
+    story.append(
+        fig(
+            "revenue_concentration.png",
+            "Figure 15. Concentration of lost monthly value across churned "
+            "accounts. The curve bows far above the line of even "
+            "distribution; the marked point shows the top fifth of accounts "
+            "carrying the majority of the loss.",
+            styles,
+        )
+    )
 
     H2("Where the at-risk revenue sits", "s9a", styles, story)
-    story.append(P(
-        "On the forward book, the same concentration appears across segments. The "
-        "comparison below sets each segment's current at-risk MRR against the "
-        "monthly value it has already lost to churn. SMB carries the largest current "
-        f"at-risk MRR at {usd(segr.loc['SMB','current_mrr_at_risk'])}, reflecting its "
-        "size, while Enterprise, despite churning the fewest accounts, still carries "
-        f"{usd(segr.loc['Enterprise','current_mrr_at_risk'])} of at-risk MRR because "
-        "each Enterprise account is worth so much that even a handful in distress "
-        "represents real money. This is why value has to sit alongside risk in the "
-        "prioritisation: a single wavering Enterprise account can outweigh a dozen "
-        "Startup accounts.", styles))
+    story.append(
+        P(
+            "On the forward book, the same concentration appears across segments. The "
+            "comparison below sets each segment's current at-risk MRR against the "
+            "monthly value it has already lost to churn. SMB carries the largest current "
+            f"at-risk MRR at {usd(segr.loc['SMB', 'current_mrr_at_risk'])}, reflecting its "
+            "size, while Enterprise, despite churning the fewest accounts, still carries "
+            f"{usd(segr.loc['Enterprise', 'current_mrr_at_risk'])} of at-risk MRR because "
+            "each Enterprise account is worth so much that even a handful in distress "
+            "represents real money. This is why value has to sit alongside risk in the "
+            "prioritisation: a single wavering Enterprise account can outweigh a dozen "
+            "Startup accounts.",
+            styles,
+        )
+    )
 
-    story.append(fig("revenue_at_risk_by_segment.png",
-                     "Figure 16. Current at-risk MRR against churned monthly value by "
-                     "segment. SMB leads on current exposure; Enterprise punches above "
-                     "its account count on value per account.", styles))
+    story.append(
+        fig(
+            "revenue_at_risk_by_segment.png",
+            "Figure 16. Current at-risk MRR against churned monthly value by "
+            "segment. SMB leads on current exposure; Enterprise punches above "
+            "its account count on value per account.",
+            styles,
+        )
+    )
 
     srows = []
     for s in ["Enterprise", "Mid-Market", "SMB", "Startup"]:
         if s in segr.index:
             r = segr.loc[s]
-            srows.append([
-                s, f"{int(r['at_risk_customers']):,}",
-                usd(r["current_mrr_at_risk"]),
-                f"{int(r['churned_customers']):,}",
-                usd(r["churned_monthly_value_proxy"]),
-            ])
-    story.append(data_table(
-        ["Segment", "At-risk accts", "At-risk MRR", "Churned accts",
-         "Churned monthly value"],
-        srows, styles,
-        [3.4 * cm, 2.8 * cm, 2.8 * cm, 2.8 * cm, CONTENT_W - 11.8 * cm],
-    ))
+            srows.append(
+                [
+                    s,
+                    f"{int(r['at_risk_customers']):,}",
+                    usd(r["current_mrr_at_risk"]),
+                    f"{int(r['churned_customers']):,}",
+                    usd(r["churned_monthly_value_proxy"]),
+                ]
+            )
+    story.append(
+        data_table(
+            ["Segment", "At-risk accts", "At-risk MRR", "Churned accts", "Churned monthly value"],
+            srows,
+            styles,
+            [3.4 * cm, 2.8 * cm, 2.8 * cm, 2.8 * cm, CONTENT_W - 11.8 * cm],
+        )
+    )
 
     H2("The risk tiers", "s9b", styles, story)
-    story.append(P(
-        f"The risk index sorts the {M['scored']:,} active accounts into four tiers. "
-        f"The critical tier holds {M['crit_n']:,} accounts billing "
-        f"{usd(M['crit_mrr'])} a month, the high tier {M['high_n']:,} accounts "
-        f"billing {usd(M['high_mrr'])}, and the medium tier {M['med_n']:,} accounts "
-        f"billing {usd(M['med_mrr'])}. The critical and high tiers together, "
-        f"{M['crit_n'] + M['high_n']:,} accounts and "
-        f"{usd(M['crit_mrr'] + M['high_mrr'])} of MRR, are small enough for a team to "
-        "work by hand and large enough to matter. They are the spine of the priority "
-        "queue.", styles))
+    story.append(
+        P(
+            f"The risk index sorts the {M['scored']:,} active accounts into four tiers. "
+            f"The critical tier holds {M['crit_n']:,} accounts billing "
+            f"{usd(M['crit_mrr'])} a month, the high tier {M['high_n']:,} accounts "
+            f"billing {usd(M['high_mrr'])}, and the medium tier {M['med_n']:,} accounts "
+            f"billing {usd(M['med_mrr'])}. The critical and high tiers together, "
+            f"{M['crit_n'] + M['high_n']:,} accounts and "
+            f"{usd(M['crit_mrr'] + M['high_mrr'])} of MRR, are small enough for a team to "
+            "work by hand and large enough to matter. They are the spine of the priority "
+            "queue.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        f"These two upper tiers represent only {M['high_crit_count_share']:.1f} "
-        f"percent of scored accounts but {M['high_crit_mrr_share']:.1f} percent of "
-        "scored-book MRR. That is not a perfect concentration ratio, but it is "
-        "enough to justify named-account management. The more important point is "
-        "capacity: two hundred twenty-three accounts can be assigned, worked, and "
-        "tracked without turning the programme into a mass campaign. The medium "
-        "tier should be monitored and largely automated; the low tier should be "
-        "protected from unnecessary outreach so customer-facing teams do not create "
-        "work where the data shows no current problem.", styles))
+    story.append(
+        P(
+            f"These two upper tiers represent only {M['high_crit_count_share']:.1f} "
+            f"percent of scored accounts but {M['high_crit_mrr_share']:.1f} percent of "
+            "scored-book MRR. That is not a perfect concentration ratio, but it is "
+            "enough to justify named-account management. The more important point is "
+            "capacity: two hundred twenty-three accounts can be assigned, worked, and "
+            "tracked without turning the programme into a mass campaign. The medium "
+            "tier should be monitored and largely automated; the low tier should be "
+            "protected from unnecessary outreach so customer-facing teams do not create "
+            "work where the data shows no current problem.",
+            styles,
+        )
+    )
 
-    story.append(fig("risk_tier_breakdown.png",
-                     "Figure 17. Account count and MRR exposure by risk tier. The "
-                     "critical and high tiers are a workable number of accounts "
-                     "holding a material share of exposed revenue.", styles))
+    story.append(
+        fig(
+            "risk_tier_breakdown.png",
+            "Figure 17. Account count and MRR exposure by risk tier. The "
+            "critical and high tiers are a workable number of accounts "
+            "holding a material share of exposed revenue.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "The score distribution behind those tiers confirms that the book is mostly "
-        "healthy and the risk is a tail, not a bulk. The low tier dominates the count "
-        "and clusters at the bottom of the score range; the critical and high tiers "
-        "are a thin, well-separated tail at the top. That shape is exactly what a "
-        "prioritisation index should produce: it is not labelling half the book as "
-        "at risk, it is isolating the minority that genuinely is.", styles))
+    story.append(
+        P(
+            "The score distribution behind those tiers confirms that the book is "
+            "low-risk in aggregate and the risk is a tail, not a bulk. The low tier dominates "
+            "the count and clusters at the bottom of the score range; the critical and "
+            "high tiers are a thin, well-separated tail at the top. That shape is what a "
+            "prioritisation index should produce: it avoids labelling half the book as "
+            "at risk and isolates the minority that needs review.",
+            styles,
+        )
+    )
 
-    story.append(fig("risk_score_distribution.png",
-                     "Figure 18. Distribution of churn risk scores by tier. The mass "
-                     "sits in the healthy low tier; the at-risk tiers form a distinct "
-                     "upper tail.", styles))
+    story.append(
+        fig(
+            "risk_score_distribution.png",
+            "Figure 18. Distribution of churn risk scores by tier. The mass "
+            "sits in the low-risk tier; the at-risk tiers form a distinct "
+            "upper tail.",
+            styles,
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
     # 10. RISKS, LIMITATIONS, CAVEATS
     # ════════════════════════════════════════════════════════
     H1("Risks, limitations, and caveats", "SECTION 10", "s10", styles, story)
-    story.append(P(
-        "A report that hides its weaknesses is less useful than one that names them, "
-        "because the reader cannot judge how far to trust a finding without knowing "
-        "what could undermine it. Five limitations bound everything above and each "
-        "changes how a specific finding should be read.", styles))
+    story.append(
+        P(
+            "A report that hides its weaknesses is less useful than one that names them, "
+            "because the reader cannot judge how far to trust a finding without knowing "
+            "what could undermine it. Six limitations bound everything above and each "
+            "changes how a specific finding should be read.",
+            styles,
+        )
+    )
 
     H2("The data is synthetic", "s10a", styles, story)
-    story.append(P(
-        "The book is generated from a fixed seed, not collected from a live business. "
-        "The relationships are real and stable but designed, so the magnitudes are "
-        "illustrative. The behavioural lifts in Section 08 in particular are larger "
-        "than a real book would show, because the comparison group of fully healthy "
-        "accounts almost never churns here. The method, the pipeline, the metric "
-        "definitions, and the prioritisation logic carry over to real data without "
-        "change; the specific percentages do not.", styles))
+    story.append(
+        P(
+            "The book is generated from a fixed seed, not collected from a live business. "
+            "Its relationships are designed and deterministic, so the magnitudes are "
+            "illustrative rather than externally observed. The behavioural lifts in Section 08 are larger "
+            "than a real book would show, because the comparison group of low-signal "
+            "accounts almost never churns here. The method, the pipeline, the metric "
+            "definitions, and the prioritisation logic are reusable starting points for "
+            "real data, but source mappings, thresholds, validation rules, and outcome "
+            "calibration would need to be fitted to the operating environment.",
+            styles,
+        )
+    )
 
-    H2("The recent months are right-censored", "s10b", styles, story)
-    story.append(P(
-        "The apparent acceleration in the final three months of the trend, where the "
-        f"rate climbs to {M['last_cust_churn']:.1f} percent, is partly a measurement "
-        "artifact. Accounts that close near the snapshot are mechanically "
-        "over-represented relative to accounts that will close later but have not "
-        "yet, so the tail of the window overstates the settled rate. The finding to "
-        "carry forward is that the recent months merit monitoring, not that the book "
-        "has entered a churn crisis.", styles))
+    H2("Recent acceleration is not yet a trend", "s10b", styles, story)
+    story.append(
+        P(
+            "The last three complete months have a higher realised churn rate than the "
+            f"prior nine-month baseline, with the final month at {M['last_cust_churn']:.1f} "
+            "percent. Three observations are not enough to separate a persistent shift "
+            "from ordinary variation or a change in customer mix. The appropriate response "
+            "is to monitor the next complete periods and decompose the change by segment, "
+            "channel, plan, and tenure rather than declare a churn crisis.",
+            styles,
+        )
+    )
 
-    H2("Revenue loss uses a monthly-value proxy", "s10c", styles, story)
-    story.append(P(
-        "Every revenue figure is built from the account's recurring monthly revenue "
-        "at the point it left or at the snapshot, not from contract value or "
-        "modelled lifetime value. This understates the true cost of losing a "
-        "long-contract Enterprise account and overstates the relative importance of "
-        "easily-replaced monthly accounts. The concentration finding in Section 09 is "
-        "robust to this, since both ends use the same proxy, but absolute exposure "
-        "figures should be read as monthly run-rate, not annual contract value.",
-        styles))
+    H2("Economics use recurring-value and direct-cost proxies", "s10c", styles, story)
+    story.append(
+        P(
+            "The MRR bridge reconciles contract-value movements, direct service costs, "
+            "acquisition spend, payback, and capped 24-month LTV. These measures are "
+            "applied consistently and support retention-adjusted comparisons, but they "
+            "are not GAAP revenue recognition, audited cost allocation, remaining contract "
+            "value, or a perpetuity. Absolute exposure remains a monthly run-rate proxy.",
+            styles,
+        )
+    )
 
     H2("Relationships are associative", "s10d", styles, story)
-    story.append(P(
-        "No finding in this report establishes cause. A low net promoter score does "
-        "not necessarily cause a departure; it co-occurs with it. The intervention "
-        "queues in the next section are therefore presented as hypotheses to be "
-        "validated with controlled tests, not as guaranteed returns. The weighted "
-        "exposure numbers size the prize; they do not promise it.", styles))
+    story.append(
+        P(
+            "No finding in this report establishes cause. A low net promoter score does "
+            "not necessarily cause a departure; it co-occurs with it. The intervention "
+            "queues are therefore assigned with an explicit randomized holdout. The "
+            "bundled forward outcomes are simulated to demonstrate the estimator and must "
+            "not be presented as observed treatment efficacy. Weighted exposure sizes the "
+            "scope; only live controlled outcomes can establish incremental value.",
+            styles,
+        )
+    )
 
     H2("Tiering depends on the chosen thresholds", "s10e", styles, story)
-    story.append(P(
-        "The value tiers and risk cut-points are quantile-based and would need "
-        "recalibration on a real distribution. Moving a threshold moves accounts "
-        "between tiers and changes the headline counts. The ranking is stable to "
-        "these choices; the exact tier populations are not, and any operational "
-        "commitment to a tier size should be set against real data.", styles))
+    story.append(
+        P(
+            "The value tiers and risk cut-points are quantile-based and would need "
+            "recalibration on a real distribution. Moving a threshold moves accounts "
+            "between tiers and changes the headline counts. The ranking is stable to "
+            "these choices; the exact tier populations are not, and any operational "
+            "commitment to a tier size should be set against real data.",
+            styles,
+        )
+    )
 
-    H2("The book is observed at a single snapshot", "s10f", styles, story)
-    story.append(P(
-        "Every active account is measured at one date, the reference snapshot, rather "
-        "than followed continuously. That keeps the cross-sectional comparison clean, "
-        "because every account is read at a comparable point in its own life, but it "
-        "means the analysis cannot see seasonality, recovery, or the path an account "
-        "took to its current state. An account that spiked on support tickets last "
-        "month and has since settled looks the same at the snapshot as one still "
-        "deteriorating. A live deployment would refresh the snapshot on a schedule "
-        "and watch the trajectory between refreshes, which would sharpen the risk "
-        "index and catch recoveries the single snapshot misses.", styles))
+    H2("The operating history is simulated", "s10f", styles, story)
+    story.append(
+        P(
+            "The system now retains monthly customer probabilities, tier transitions, "
+            "calibration outcomes, and drift. That resolves the single-snapshot engineering "
+            "gap, but the history is still generated rather than observed in operations. "
+            "A live deployment needs enough complete monthly intervals to distinguish "
+            "seasonality, recovery, definition changes, and persistent deterioration before "
+            "alert thresholds or retraining cadence are treated as stable.",
+            styles,
+        )
+    )
 
     H2("What would change the conclusion", "s10g", styles, story)
-    story.append(P(
-        "The limitations above do not invalidate the recommendations, but they define "
-        "the tests that would change them. The table below is the report's decision "
-        "control: if one of these checks fails on real or refreshed data, the "
-        "operating response should change before more budget is committed.", styles))
-    story.append(data_table(
-        ["Conclusion at risk", "Check to run", "Decision trigger"],
-        [
-            ["Low-end acquisition is the main churn issue",
-             "Hold segment, plan, and region constant and re-estimate channel "
-             "retention on live cohorts.",
-             "If Affiliate and Paid Search no longer over-index after controls, "
-             "shift from budget reallocation to onboarding/product fixes."],
-            ["Recent cohorts are deteriorating",
-             "Refresh the cohort read after the next three complete months and "
-             "compare at fixed ages.",
-             "If the fixed-age gap closes, treat the spike as right-censoring noise "
-             "rather than a structural mix shift."],
-            ["Behavioural signals are intervention-ready",
-             "Run held-out tests for payment rescue, adoption reactivation, and "
-             "service recovery.",
-             "If treated accounts do not outperform controls, downgrade the driver "
-             "from an intervention lever to a monitoring signal."],
-            ["The save desk should be value-weighted",
-             "Compare saved MRR, saved logos, and cost-to-serve by queue.",
-             "If small-account saves have materially better economics, rebalance "
-             "capacity toward scaled automation rather than named-account coverage."],
-        ],
-        styles,
-        [4.0 * cm, 6.2 * cm, CONTENT_W - 10.2 * cm],
-    ))
+    story.append(
+        P(
+            "The limitations above do not invalidate the recommendations, but they define "
+            "the tests that would change them. The table below is the report's decision "
+            "control: if one of these checks fails on real or refreshed data, the "
+            "operating response should change before more budget is committed.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            ["Conclusion at risk", "Check to run", "Decision trigger"],
+            [
+                [
+                    "Low-end acquisition is the main churn issue",
+                    "Hold segment, plan, and region constant and re-estimate channel "
+                    "retention on live cohorts.",
+                    "If Affiliate and Paid Search no longer over-index after controls, "
+                    "shift from budget reallocation to onboarding/product fixes.",
+                ],
+                [
+                    "Recent cohorts are deteriorating",
+                    "Refresh the cohort read after the next three complete months and "
+                    "compare at fixed ages.",
+                    "If the fixed-age gap closes, treat the spike as right-censoring noise "
+                    "rather than a structural mix shift.",
+                ],
+                [
+                    "Behavioural signals are intervention-ready",
+                    "Run held-out tests for payment rescue, adoption reactivation, and "
+                    "service recovery.",
+                    "If treated accounts do not outperform controls, downgrade the driver "
+                    "from an intervention lever to a monitoring signal.",
+                ],
+                [
+                    "The save desk should be value-weighted",
+                    "Compare saved MRR, saved logos, and cost-to-serve by queue.",
+                    "If small-account saves have materially better economics, rebalance "
+                    "capacity toward scaled automation rather than named-account coverage.",
+                ],
+            ],
+            styles,
+            [4.0 * cm, 6.2 * cm, CONTENT_W - 10.2 * cm],
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
     # 11. RECOMMENDATIONS
     # ════════════════════════════════════════════════════════
     H1("Recommendations and action priorities", "SECTION 11", "s11", styles, story)
-    story.append(P(
-        "The findings converge on a short, ordered list. The ordering is by weighted "
-        "exposure and by speed to value, not by how interesting the finding is, and "
-        "each recommendation names the finding it rests on, the population it "
-        "targets, and the metric that would prove it worked.", styles))
+    story.append(
+        P(
+            "The findings converge on a short, ordered list. The ordering is by weighted "
+            "exposure and operational separability, and "
+            "each recommendation names the finding it rests on, the population it "
+            "targets, and the metric that would prove it worked.",
+            styles,
+        )
+    )
 
-    story.append(P(
-        "The four intervention queues that anchor the priorities are sized below. "
-        "Read the weighted-exposure column as the order of magnitude of monthly "
-        "revenue each play is defending, and the scope column as the gross revenue "
-        "passing through the queue. The gap between the two reflects the historical "
-        "churn rate of the targeted accounts: the renewal save desk works a large "
-        "book at a moderate rate, while payment rescue works a small book at a very "
-        "high rate, which is why the second is the stronger return on effort even "
-        "though the first defends more revenue in absolute terms.", styles))
+    story.append(
+        P(
+            "The four intervention queues that anchor the priorities are sized below. "
+            "Read the scope column as current MRR passing through each queue. Weighted "
+            "exposure multiplies that MRR by the target group's historical churn share, "
+            "which puts the queues on a common ranking scale without estimating saved "
+            "revenue. The gap between the two columns reflects the historical "
+            "churn rate of the targeted accounts: the renewal save desk works a large "
+            "book at a moderate rate, while payment rescue works a small book at a very "
+            "high rate. The data ranks exposure; it does not contain implementation cost "
+            "and therefore does not estimate return on effort.",
+            styles,
+        )
+    )
     itv_rows = []
     for _, r in itv.iterrows():
-        itv_rows.append([
-            r["opportunity"],
-            f"{int(r['candidate_customers']):,}",
-            usd(r["current_mrr_scope"]),
-            f"{r['historical_churn_share']*100:.0f}%",
-            usd(r["mrr_exposure_proxy"]),
-        ])
-    story.append(data_table(
-        ["Intervention queue", "Accounts", "MRR in scope",
-         "Hist. churn", "Weighted exposure"],
-        itv_rows, styles,
-        [5.0 * cm, 2.2 * cm, 2.8 * cm, 2.2 * cm, CONTENT_W - 12.2 * cm],
-    ))
+        itv_rows.append(
+            [
+                r["opportunity"],
+                f"{int(r['candidate_customers']):,}",
+                usd(r["current_mrr_scope"]),
+                f"{r['historical_churn_share'] * 100:.0f}%",
+                usd(r["mrr_exposure_proxy"]),
+            ]
+        )
+    story.append(
+        data_table(
+            ["Intervention queue", "Accounts", "MRR in scope", "Hist. churn", "Weighted exposure"],
+            itv_rows,
+            styles,
+            [5.0 * cm, 2.2 * cm, 2.8 * cm, 2.2 * cm, CONTENT_W - 12.2 * cm],
+        )
+    )
 
     recs = [
-        ("P1", "Stand up a renewal save desk for Mid-Market and SMB",
-         f"This play carries the largest weighted exposure in the book at "
-         f"{usd(itv.iloc[0]['mrr_exposure_proxy'])}, across "
-         f"{int(itv.iloc[0]['candidate_customers']):,} accounts holding "
-         f"{usd(itv.iloc[0]['current_mrr_scope'])} of MRR in scope, with the focus on "
-         "Mid-Market and SMB where the value and the volume meet (Section 09, Figure "
-         "1). Work the critical and high risk tiers first, lead with the accounts "
-         "flagged on sentiment and support, and run a pre-renewal save playbook with "
-         "tailored offers. Measure success as the saved MRR among contacted accounts "
-         "against a held-out control, not as gross contact volume."),
-        ("P1", "Fix the payment-failure path",
-         f"Accounts with a failed payment churn at "
-         f"{beh.loc['failed_payment_flag','churn_rate_in_group']*100:.0f} percent, "
-         f"more than {beh.loc['failed_payment_flag','churn_rate_lift']:.0f} times the "
-         "rate of accounts that pay cleanly (Section 08). The payment-rescue queue is "
-         f"only {int(itv.iloc[1]['candidate_customers']):,} accounts but carries "
-         f"{usd(itv.iloc[1]['mrr_exposure_proxy'])} of weighted exposure, and the fix "
-         "is cheap: dunning sequencing, card-update prompts, and retry logic. This is "
-         "the highest return-on-effort action in the report and should ship in "
-         "parallel with the save desk. Measure recovered MRR per failed-payment "
-         "account."),
-        ("P2", "Rebalance acquisition spend away from the weakest channels",
-         f"Affiliate and Paid Search accounts churn at "
-         f"{chan.loc['Affiliate','cumulative_churn_share']*100:.1f} and "
-         f"{chan.loc['Paid Search','cumulative_churn_share']*100:.1f} percent against "
-         f"{chan.loc['Partner','cumulative_churn_share']*100:.1f} percent for Partner "
-         "and below 20 percent for Referral (Section 07, Figure 10). Shifting "
-         "marginal budget toward partner and referral motions lowers the blended "
-         "churn rate of every future cohort with no retention effort at all. Measure "
-         "the six-month retention of new cohorts by channel and track the blended "
-         "rate down."),
-        ("P2", "Run an adoption-reactivation programme for the usage-decline tail",
-         f"Usage decline touches {int(beh.loc['usage_decline_flag','customers_in_group']):,} "
-         "accounts, the largest behavioural population, at a lower per-account "
-         "certainty than the sentiment flags (Section 08). It suits a cheaper, "
-         "automated motion: onboarding refreshers, feature nudges, and success "
-         f"check-ins. The reactivation queue carries "
-         f"{usd(itv.iloc[2]['mrr_exposure_proxy'])} of weighted exposure across "
-         f"{int(itv.iloc[2]['candidate_customers']):,} accounts. Measure the share of "
-         "flagged accounts that return to a positive usage trend."),
-        ("P3", "Treat low-tier and Basic-plan signups as a distinct, instrumented class",
-         f"Basic-plan accounts churn at "
-         f"{plan.loc['Basic','cumulative_churn_share']*100:.1f} percent (Section 07). "
-         "Rather than a save motion, this calls for a product and onboarding fix: a "
-         "guided first-value path for entry-tier accounts and clearer upgrade prompts "
-         "for the ones that show real engagement. Measure the rate at which Basic "
-         "accounts either reach an activation milestone or upgrade within ninety days."),
-        ("P3", "Convert the top drivers into controlled experiments",
-         "Because every relationship here is associative (Section 10), the driver "
-         "ranking should feed a small experiment programme: hold out a control for "
-         "each of the top intervention queues and measure the lift directly. This "
-         "turns the weighted-exposure estimates into known returns and protects the "
-         "budget from chasing a correlation that does not respond to treatment."),
+        (
+            "P1",
+            "Stand up a renewal save desk for Mid-Market and SMB",
+            f"This play carries the largest weighted exposure in the book at "
+            f"{usd(itv.iloc[0]['mrr_exposure_proxy'])}, across "
+            f"{int(itv.iloc[0]['candidate_customers']):,} accounts holding "
+            f"{usd(itv.iloc[0]['current_mrr_scope'])} of MRR in scope, with the focus on "
+            "Mid-Market and SMB where the value and the volume meet (Section 09, Figure "
+            "1). Work the critical and high risk tiers first, lead with the accounts "
+            "flagged on sentiment and support, and run a pre-renewal save playbook with "
+            "tailored offers. Measure success as the saved MRR among contacted accounts "
+            "against a held-out control, not as gross contact volume.",
+        ),
+        (
+            "P1",
+            "Fix the payment-failure path",
+            f"Accounts with a failed payment churn at "
+            f"{beh.loc['failed_payment_flag', 'churn_rate_in_group'] * 100:.0f} percent, "
+            f"more than {floor_multiple(beh.loc['failed_payment_flag', 'churn_rate_lift'])} times the "
+            "rate of accounts that pay cleanly (Section 08). The payment-rescue queue is "
+            f"only {int(itv.iloc[1]['candidate_customers']):,} accounts but carries "
+            f"{usd(itv.iloc[1]['mrr_exposure_proxy'])} of weighted exposure. The operating "
+            "fix is straightforward: dunning sequencing, card-update prompts, and retry "
+            "logic. It is the smallest of the high-exposure specialist queues and can run "
+            "in parallel with the save desk. Measure recovered MRR per failed-payment "
+            "account.",
+        ),
+        (
+            "P2",
+            "Rebalance acquisition spend away from the weakest channels",
+            f"Affiliate and Paid Search accounts churn at "
+            f"{chan.loc['Affiliate', 'cumulative_churn_share'] * 100:.1f} and "
+            f"{chan.loc['Paid Search', 'cumulative_churn_share'] * 100:.1f} percent against "
+            f"{chan.loc['Partner', 'cumulative_churn_share'] * 100:.1f} percent for Partner "
+            f"and {chan.loc['Referral', 'cumulative_churn_share'] * 100:.1f} percent for "
+            "Referral (Section 07, Figure 10). Run a controlled marginal reallocation and "
+            "retain it only if six-month retention improves after accounting for CAC, "
+            "segment, plan, and acquisition volume.",
+        ),
+        (
+            "P2",
+            "Run an adoption-reactivation programme for the usage-decline tail",
+            f"Usage decline touches {int(beh.loc['usage_decline_flag', 'customers_in_group']):,} "
+            "accounts, the largest behavioural population, at a lower per-account "
+            "certainty than the sentiment flags (Section 08). It suits a scaled, "
+            "automated motion: onboarding refreshers, feature nudges, and success "
+            f"check-ins. The reactivation queue carries "
+            f"{usd(itv.iloc[2]['mrr_exposure_proxy'])} of weighted exposure across "
+            f"{int(itv.iloc[2]['candidate_customers']):,} accounts. Measure the share of "
+            "flagged accounts that return to a positive usage trend.",
+        ),
+        (
+            "P3",
+            "Treat low-tier and Basic-plan signups as a distinct, instrumented class",
+            f"Basic-plan accounts churn at "
+            f"{plan.loc['Basic', 'cumulative_churn_share'] * 100:.1f} percent (Section 07). "
+            "Rather than a save motion, this calls for a product and onboarding fix: a "
+            "guided first-value path for entry-tier accounts and clearer upgrade prompts "
+            "for the ones that show real engagement. Measure the rate at which Basic "
+            "accounts either reach an activation milestone or upgrade within ninety days.",
+        ),
+        (
+            "P3",
+            "Replace simulated intervention outcomes with observed results",
+            f"The controlled design already assigns {M['experiment_treatment']:,} accounts "
+            f"to treatment and {M['experiment_control']:,} to holdout with maximum baseline "
+            f"SMD {M['maximum_experiment_smd']:.3f}. Preserve that assignment, record "
+            "delivery and cost, and replace simulated outcomes with observed 90-day churn "
+            "before scaling or claiming ROI.",
+        ),
     ]
     for tag, title, bodytext in recs:
-        story.append(KeepTogether([
-            Paragraph(
-                f'<font color="#B83530"><b>{tag}</b></font>&nbsp;&nbsp;'
-                f'<font color="#1B3A6B"><b>{title}</b></font>',
-                styles["h3"]),
-            P(bodytext, styles),
-        ]))
+        story.append(
+            KeepTogether(
+                [
+                    Paragraph(
+                        f'<font color="#B83530"><b>{tag}</b></font>&nbsp;&nbsp;'
+                        f'<font color="#1B3A6B"><b>{title}</b></font>',
+                        styles["h3"],
+                    ),
+                    P(bodytext, styles),
+                ]
+            )
+        )
 
     story.append(Spacer(1, 4))
-    story.append(P(
-        "Sequenced this way, the first two actions defend the revenue already in "
-        "distress and ship within a quarter; the middle two reduce the inflow of "
-        "fragile accounts and the size of the at-risk tail over the following two "
-        "quarters; and the last two harden the programme so its returns are measured "
-        "rather than assumed. None of the six depends on a tool the team does not "
-        "already have, and all six trace to a quantified finding in this report.",
-        styles))
+    story.append(
+        P(
+            "Sequenced this way, the first two actions address open-account exposure, the "
+            "middle two test acquisition and adoption hypotheses, and the last two build "
+            "measurement discipline. Capacity, implementation cost, and delivery timing "
+            "are not present in the dataset and must be set by the operating team.",
+            styles,
+        )
+    )
 
-    story.append(SectionHeading("Sequencing, ownership, and success measures",
-                                styles["h3"], 1, "s11seq"))
-    story.append(P(
-        "The plan resolves to the following sequence. Each action carries one owner, "
-        "one horizon, and one measure that settles whether it worked, so the "
-        "programme can be governed on outcomes rather than activity.", styles))
-    story.append(data_table(
-        ["#", "Action", "Owner", "Horizon", "Success measure"],
-        [
-            ["P1", "Renewal save desk", "Customer Success", "0–90 days",
-             "Saved MRR vs held-out control"],
-            ["P1", "Payment-failure path", "Billing / RevOps", "0–60 days",
-             "Recovered MRR per failed-payment account"],
-            ["P2", "Acquisition rebalance", "Marketing", "1–2 quarters",
-             "6-month retention of new cohorts by channel"],
-            ["P2", "Adoption reactivation", "Customer Success", "1–2 quarters",
-             "Share of flagged accounts returning to positive usage"],
-            ["P3", "Basic-plan onboarding fix", "Product", "2 quarters",
-             "90-day activation or upgrade rate"],
-            ["P3", "Driver experiments", "Analytics", "Ongoing",
-             "Measured lift vs control per queue"],
-        ],
-        styles,
-        [1.0 * cm, 4.2 * cm, 3.0 * cm, 2.2 * cm, CONTENT_W - 10.4 * cm],
-    ))
+    story.append(
+        SectionHeading("Sequencing, ownership, and success measures", styles["h3"], 1, "s11seq")
+    )
+    story.append(
+        P(
+            "The plan resolves to the following sequence. Each action carries one owner, "
+            "one horizon, and one measure that settles whether it worked, so the "
+            "programme can be governed on outcomes rather than activity.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            ["#", "Action", "Owner", "Horizon", "Success measure"],
+            [
+                [
+                    "P1",
+                    "Renewal save desk",
+                    "Customer Success",
+                    "0-90 days",
+                    "Saved MRR vs held-out control",
+                ],
+                [
+                    "P1",
+                    "Payment-failure path",
+                    "Billing / RevOps",
+                    "0-60 days",
+                    "Recovered MRR per failed-payment account",
+                ],
+                [
+                    "P2",
+                    "Acquisition rebalance",
+                    "Marketing",
+                    "1-2 quarters",
+                    "6-month retention of new cohorts by channel",
+                ],
+                [
+                    "P2",
+                    "Adoption reactivation",
+                    "Customer Success",
+                    "1-2 quarters",
+                    "Share of flagged accounts returning to positive usage",
+                ],
+                [
+                    "P3",
+                    "Basic-plan onboarding fix",
+                    "Product",
+                    "2 quarters",
+                    "90-day activation or upgrade rate",
+                ],
+                [
+                    "P3",
+                    "Driver experiments",
+                    "Analytics",
+                    "Ongoing",
+                    "Measured lift vs control per queue",
+                ],
+            ],
+            styles,
+            [1.0 * cm, 4.2 * cm, 3.0 * cm, 2.2 * cm, CONTENT_W - 10.4 * cm],
+        )
+    )
 
     H2("Management cadence and escalation rules", "s11gov", styles, story)
-    story.append(P(
-        "The programme should be governed as a short operating cycle, not as a one-off "
-        "analysis handoff. The first review should establish the queue, owners, and "
-        "controls; the second should prove the mechanics; the third should decide "
-        "which motions scale and which are stopped. This cadence keeps the team from "
-        "mistaking activity for retention impact.", styles))
-    story.append(data_table(
-        ["Review point", "Decision to make", "Evidence required"],
-        [
-            ["Day 30",
-             "Confirm that the critical/high-risk queue is assigned and contactable.",
-             "Named-account coverage, payment-failure retry status, and baseline "
-             "control groups for each intervention."],
-            ["Day 60",
-             "Decide whether payment rescue and adoption reactivation are clearing "
-             "their minimum return bar.",
-             "Recovered MRR per failed-payment account, usage trend recovery rate, "
-             "and untreated-control comparison."],
-            ["Day 90",
-             "Scale, stop, or redesign the save-desk motion.",
-             "Saved MRR versus control, renewal outcomes by risk tier, and cost per "
-             "account worked."],
-            ["Quarterly",
-             "Reallocate acquisition budget by observed cohort quality.",
-             "Six-month retention by channel and plan, plus CAC-adjusted payback "
-             "where real acquisition cost data exists."],
-        ],
-        styles,
-        [2.6 * cm, 5.4 * cm, CONTENT_W - 8.0 * cm],
-    ))
-    story.append(P(
-        f"The four intervention queues currently cover {usd(M['play_scope_mrr'])} "
-        f"of MRR in scope and {usd(M['play_weighted_exposure'])} of weighted "
-        "monthly exposure. That is the starting control total. A good first quarter "
-        "does not need to eliminate the risk; it needs to show that the critical and "
-        "high-risk tail is shrinking, that payment failures are being recovered "
-        "faster, and that new cohorts are no longer over-weighted toward the weakest "
-        "channels. Those are the proof points that the recommendation is working.",
-        styles))
+    story.append(
+        P(
+            "The programme should be governed as a short operating cycle, not a one-off "
+            "analysis handoff. The first review establishes the queue, owners, and "
+            "controls. The second tests the mechanics. The third decides which motions "
+            "scale and which are stopped. This cadence keeps the team from mistaking "
+            "activity for retention impact.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            ["Review point", "Decision to make", "Evidence required"],
+            [
+                [
+                    "Day 30",
+                    "Confirm that the critical/high-risk queue is assigned and contactable.",
+                    "Named-account coverage, payment-failure retry status, and baseline "
+                    "control groups for each intervention.",
+                ],
+                [
+                    "Day 60",
+                    "Decide whether payment rescue and adoption reactivation are clearing "
+                    "their minimum return bar.",
+                    "Recovered MRR per failed-payment account, usage trend recovery rate, "
+                    "and untreated-control comparison.",
+                ],
+                [
+                    "Day 90",
+                    "Scale, stop, or redesign the save-desk motion.",
+                    "Saved MRR versus control, renewal outcomes by risk tier, and cost per "
+                    "account worked.",
+                ],
+                [
+                    "Quarterly",
+                    "Reallocate acquisition budget by observed cohort quality.",
+                    "Six-month retention by channel and plan, plus finance-approved CAC, "
+                    "gross margin, and payback.",
+                ],
+            ],
+            styles,
+            [2.6 * cm, 5.4 * cm, CONTENT_W - 8.0 * cm],
+        )
+    )
+    story.append(
+        P(
+            f"The four intervention queues currently cover {usd(M['play_scope_mrr'])} "
+            f"of MRR in scope and {usd(M['play_weighted_exposure'])} of weighted "
+            "monthly exposure. That is the starting control total. A good first quarter "
+            "does not need to eliminate the risk; it needs to show that the critical and "
+            "high-risk tail is shrinking, that payment failures are being recovered "
+            "faster, and that new cohorts are no longer over-weighted toward the weakest "
+            "channels. Those are the proof points that the recommendation is working.",
+            styles,
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
-    # 12. FURTHER QUESTIONS
+    # 12. PRODUCTION EVIDENCE
     # ════════════════════════════════════════════════════════
-    H1("Open questions", "SECTION 12", "s12", styles, story)
-    story.append(P(
-        "The report is decision-ready for prioritising retention work, but four "
-        "questions remain open because the current synthetic dataset does not contain "
-        "the additional evidence needed to close them. They should be treated as the "
-        "next analytical backlog, not as reasons to delay the first intervention "
-        "cycle.", styles))
-    story.append(data_table(
-        ["Question", "Why it matters", "Evidence needed"],
-        [
-            ["What is the CAC and payback by acquisition channel?",
-             "Channel rebalance should be based on retention-adjusted economics, not "
-             "retention alone.",
-             "Marketing spend, sales effort, conversion rate, gross margin, and "
-             "payback by source and cohort."],
-            ["Which product events define durable activation?",
-             "The Basic and Growth recommendations need a sharper first-value path "
-             "than broad feature-adoption scoring.",
-             "Event-level product usage mapped to activation, expansion, support "
-             "volume, and churn outcomes."],
-            ["How much expansion offsets logo churn?",
-             "Revenue churn sits below customer churn, but the analysis does not "
-             "model expansion or contraction inside retained accounts.",
-             "Account-level MRR movement, upgrades, downgrades, seat growth, and "
-             "gross/net revenue retention."],
-            ["Which interventions actually change behaviour?",
-             "Associative drivers are strong enough to prioritise tests, but not "
-             "enough to claim ROI.",
-             "Randomised or quasi-experimental holdouts for payment rescue, adoption "
-             "reactivation, service recovery, and renewal save motions."],
-            ["How stable is the score over time?",
-             "A queue that changes too much between refreshes is hard to operate; "
-             "one that changes too little misses recovery and deterioration.",
-             "Weekly or monthly score snapshots, transition matrices, and realised "
-             "churn by prior risk tier."],
-        ],
-        styles,
-        [4.3 * cm, 6.3 * cm, CONTENT_W - 10.6 * cm],
-    ))
-    story.append(P(
-        "The highest-value next data enhancement is CAC by channel, because it would "
-        "turn the acquisition recommendation from a retention-quality decision into "
-        "a unit-economics decision. The highest-value next measurement enhancement "
-        "is intervention holdouts, because they would convert the weighted-exposure "
-        "queue from a prioritisation model into an ROI model. Those two additions "
-        "would move the report from decision-support to budget-allocation grade.",
-        styles))
+    H1("Production evidence still required", "SECTION 12", "s12", styles, story)
+    story.append(
+        P(
+            "The engineering gaps identified in the initial analysis are now implemented: "
+            "reconciled MRR movements, unit economics, calibrated temporal probabilities, "
+            "randomized holdouts, incremental saved-MRR estimation, and tier-transition "
+            "alerts. The remaining questions are evidence gaps that only live operating "
+            "history can close.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            ["Implemented control", "Current release evidence", "Production evidence needed"],
+            [
+                [
+                    "Retention-adjusted unit economics",
+                    f"Average NRR {M['average_monthly_nrr'] * 100:.1f}%; direct-cost margin "
+                    f"{M['gross_margin_rate'] * 100:.1f}%; blended CAC "
+                    f"{usd(M['blended_cac'])}.",
+                    "Finance-approved spend allocation, cost-to-serve, revenue recognition, "
+                    "and mature cohort follow-up.",
+                ],
+                [
+                    "Point-in-time probability model",
+                    f"Out-of-time ROC AUC {M['model_roc_auc']:.3f}, average precision "
+                    f"{M['model_average_precision']:.3f}, Brier "
+                    f"{M['model_brier_score']:.4f}.",
+                    "Live outcomes, stable feature definitions, independent recalibration, "
+                    "and customer-cluster uncertainty estimates.",
+                ],
+                [
+                    "Product activation definition",
+                    "Trailing sessions and adoption separate risk, but do not identify a "
+                    "causal first-value event.",
+                    "Event-level product usage mapped to activation, expansion, support "
+                    "volume, and churn outcomes.",
+                ],
+                [
+                    "Randomized intervention holdout",
+                    f"{M['experiment_treatment']:,} treatment and "
+                    f"{M['experiment_control']:,} control; maximum baseline SMD "
+                    f"{M['maximum_experiment_smd']:.3f}.",
+                    "Observed delivery, treatment cost, 90-day outcomes, and sufficient "
+                    "sample size before efficacy or ROI claims.",
+                ],
+                [
+                    "Risk migration and alerts",
+                    f"Monthly tier transitions, outcome calibration, PSI, and "
+                    f"{M['monitoring_alerts']} open release alerts.",
+                    "Enough complete operating months to estimate seasonality, alert "
+                    "precision, recovery, and retraining cadence.",
+                ],
+            ],
+            styles,
+            [4.3 * cm, 6.3 * cm, CONTENT_W - 10.6 * cm],
+        )
+    )
+    story.append(
+        P(
+            f"The simulated intervention produces an incremental saved-MRR estimate of "
+            f"{usd(M['simulated_saved_mrr'])}, with a 95 percent interval from "
+            f"{usd(M['simulated_saved_mrr_ci_lower'])} to "
+            f"{usd(M['simulated_saved_mrr_ci_upper'])}. That number validates the "
+            "holdout estimator and reconciliation logic; budget allocation must wait for "
+            "observed outcomes and delivery cost.",
+            styles,
+        )
+    )
     story.append(PageBreak())
 
     # ════════════════════════════════════════════════════════
@@ -1905,89 +2757,171 @@ def build_story(styles: dict, M: dict) -> list:
         for k in idx:
             if k in frame.index:
                 r = frame.loc[k]
-                rows.append([label, k, f"{int(r['customers']):,}",
-                             f"{int(r['churned_customers']):,}",
-                             f"{r['cumulative_churn_share']*100:.1f}%",
-                             usd(r['avg_monthly_revenue'])])
-    story.append(data_table(
-        ["Cut", "Group", "Accounts", "Churned", "Churn share", "Avg MRR"],
-        rows, styles,
-        [2.2 * cm, 3.4 * cm, 2.2 * cm, 2.0 * cm, 2.6 * cm, CONTENT_W - 12.4 * cm],
-    ))
+                rows.append(
+                    [
+                        label,
+                        k,
+                        f"{int(r['customers']):,}",
+                        f"{int(r['churned_customers']):,}",
+                        f"{r['cumulative_churn_share'] * 100:.1f}%",
+                        usd(r["avg_monthly_revenue"]),
+                    ]
+                )
+    story.append(
+        data_table(
+            ["Cut", "Group", "Accounts", "Churned", "Churn share", "Avg MRR"],
+            rows,
+            styles,
+            [2.2 * cm, 3.4 * cm, 2.2 * cm, 2.0 * cm, 2.6 * cm, CONTENT_W - 12.4 * cm],
+        )
+    )
 
     H2("B. Full behavioural driver detail", "s12b", styles, story)
     brows = []
     for k, r in beh.iterrows():
-        brows.append([
-            k.replace("_flag", "").replace("_", " ").title().replace("Nps", "NPS"),
-            f"{int(r['customers_in_group']):,}",
-            f"{r['churn_rate_in_group']*100:.0f}%",
-            f"{r['churn_rate_out_group']*100:.0f}%",
-            f"{r['churn_rate_lift']:.1f}×",
-        ])
-    story.append(data_table(
-        ["Signal", "Accounts", "Churn w/ signal", "Churn w/o signal", "Lift"],
-        brows, styles,
-        [5.6 * cm, 2.6 * cm, 3.2 * cm, 3.4 * cm, CONTENT_W - 14.8 * cm],
-    ))
+        brows.append(
+            [
+                k.replace("_flag", "").replace("_", " ").title().replace("Nps", "NPS"),
+                f"{int(r['customers_in_group']):,}",
+                f"{r['churn_rate_in_group'] * 100:.0f}%",
+                f"{r['churn_rate_out_group'] * 100:.0f}%",
+                f"{r['churn_rate_lift']:.1f}×",
+            ]
+        )
+    story.append(
+        data_table(
+            ["Signal", "Accounts", "Churn w/ signal", "Churn w/o signal", "Lift"],
+            brows,
+            styles,
+            [5.6 * cm, 2.6 * cm, 3.2 * cm, 3.4 * cm, CONTENT_W - 14.8 * cm],
+        )
+    )
 
     H2("C. Recommended-action distribution across the scored book", "s12c", styles, story)
-    arows = [[k, f"{v:,}", f"{v / M['scored'] * 100:.1f}%"]
-             for k, v in M["rec_counts"].items()]
-    story.append(data_table(
-        ["Recommended action", "Accounts", "Share of scored book"],
-        arows, styles,
-        [7.0 * cm, 3.0 * cm, CONTENT_W - 10.0 * cm],
-    ))
+    arows = [[k, f"{v:,}", f"{v / M['scored'] * 100:.1f}%"] for k, v in M["rec_counts"].items()]
+    story.append(
+        data_table(
+            ["Recommended action", "Accounts", "Share of scored book"],
+            arows,
+            styles,
+            [7.0 * cm, 3.0 * cm, CONTENT_W - 10.0 * cm],
+        )
+    )
 
     H2("D. Monthly retention trend, last twelve months", "s12d2", styles, story)
-    story.append(P(
-        "The active book at the start of each month, the accounts and revenue lost "
-        "during it, and the resulting churn rates. The customer and revenue churn "
-        "columns are the data behind Figures 2 and 3; the right-censoring caveat in "
-        "Section 10 applies to the final rows.", styles))
-    story.append(data_table(
-        ["Month", "Active accts", "Active MRR", "Churned", "Cust. churn", "Rev. churn"],
-        M["trend12"], styles,
-        [2.8 * cm, 2.4 * cm, 2.6 * cm, 2.0 * cm, 2.4 * cm, CONTENT_W - 12.2 * cm],
-    ))
+    story.append(
+        P(
+            "The active book at the start of each month, the accounts and revenue lost "
+            "during it, and the resulting churn rates. The customer and revenue churn "
+            "columns are the data behind Figures 2 and 3; the right-censoring caveat in "
+            "Section 10 applies to the final rows.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            ["Month", "Active accts", "Active MRR", "Churned", "Cust. churn", "Rev. churn"],
+            M["trend12"],
+            styles,
+            [2.8 * cm, 2.4 * cm, 2.6 * cm, 2.0 * cm, 2.4 * cm, CONTENT_W - 12.2 * cm],
+        )
+    )
 
     H2("E. Figure index", "s12d", styles, story)
-    story.append(P(
-        "Figures 1 through 18 are the static export of the chart pack in "
-        "outputs/graphs/, regenerated deterministically from the same processed data "
-        "and analytical tables that drive the live dashboard. The dashboard "
-        "(executive-retention-command-center.html) carries the interactive versions "
-        "of the trend, segment, driver, and queue views, with period, segment, and "
-        "channel filters. This report and that dashboard are two renderings of one "
-        "governed pipeline; neither contains a number the other cannot reproduce.",
-        styles))
+    story.append(
+        P(
+            "Figures 1 through 18 are the static export of the chart pack in "
+            f"{code('outputs/graphs/')}, regenerated deterministically from the same "
+            "processed data and analytical tables that drive the live dashboard. The "
+            f"dashboard ({code('executive-retention-command-center.html')}) carries the "
+            "interactive versions of the trend, segment, driver, and queue views, with "
+            "period, segment, and channel filters. This report and that dashboard are "
+            "two renderings of one "
+            "governed pipeline; neither contains a number the other cannot reproduce.",
+            styles,
+        )
+    )
 
     H2("F. Per-account feature dictionary", "s12f", styles, story)
-    story.append(P(
-        "The behavioural signals examined in Sections 07 and 08 and scored in the "
-        "risk index are measured at the account's churn date or, for active accounts, "
-        "at the snapshot. The principal fields are defined below.", styles))
-    story.append(data_table(
-        ["Field", "Definition"],
-        [
-            ["tenure_days", "Days from acquisition to churn or snapshot."],
-            ["current_mrr", "Account's monthly recurring revenue at observation."],
-            ["usage_trend", "Change in 30-day session count; negative is decline."],
-            ["recent_sessions_30d / 90d", "Product sessions in the trailing window."],
-            ["feature_adoption_score_recent",
-             "Breadth of feature use, 0 to 100."],
-            ["support_tickets_30d / 90d", "Support tickets filed in the window."],
-            ["nps_score_recent", "Most recent net promoter response."],
-            ["failed_payments_90d", "Count of failed billing attempts in 90 days."],
-            ["payment_failure_flag", "Any failed payment in the window."],
-            ["renewal_near_flag", "Renewal falls within the near-term horizon."],
-            ["at_risk_flag", "Account carries at least one distress signal."],
-            ["churn_flag", "Account has closed (the analysis target)."],
-        ],
-        styles,
-        [5.4 * cm, CONTENT_W - 5.4 * cm],
-    ))
+    story.append(
+        P(
+            "The behavioural signals examined in Sections 07 and 08 and scored in the "
+            "risk index are measured at the account's churn date or, for active accounts, "
+            "at the snapshot. The principal fields are defined below.",
+            styles,
+        )
+    )
+    story.append(
+        data_table(
+            ["Field", "Definition"],
+            [
+                [code("tenure_days"), "Days from subscription start to churn or snapshot."],
+                [code("current_mrr"), "Account's monthly recurring revenue at observation."],
+                [
+                    code("usage_trend"),
+                    "Mean weekly sessions in days 0-29 minus the mean in days 30-59.",
+                ],
+                [code("recent_sessions_30d / 90d"), "Product sessions in the trailing window."],
+                [
+                    code("feature_adoption_score_recent"),
+                    "Mean feature-adoption score in the trailing 30 days, 0 to 100.",
+                ],
+                [code("support_tickets_30d / 90d"), "Support tickets filed in the window."],
+                [code("nps_score_recent"), "Mean NPS in the trailing 90 days."],
+                [code("failed_payments_90d"), "Count of failed billing attempts in 90 days."],
+                [code("payment_failure_flag"), "Any failed payment in the window."],
+                [code("renewal_near_flag"), "Contract renewal falls within 45 days."],
+                [code("at_risk_flag"), "Source subscription status is at_risk."],
+                [code("churn_flag"), "Account has closed (the analysis target)."],
+            ],
+            styles,
+            [6.2 * cm, CONTENT_W - 6.2 * cm],
+        )
+    )
+
+    H2("G. Strategic expansion release evidence", "s12g", styles, story)
+    story.append(
+        data_table(
+            ["Control", "Release result", "Interpretation"],
+            [
+                [
+                    "Retention economics",
+                    f"NRR {M['average_monthly_nrr'] * 100:.1f}%; gross-margin proxy "
+                    f"{M['gross_margin_rate'] * 100:.1f}%; CAC {usd(M['blended_cac'])}",
+                    "Complete periods only; recurring-value and direct-cost proxies.",
+                ],
+                [
+                    "90-day probability model",
+                    f"ROC AUC {M['model_roc_auc']:.3f}; AP "
+                    f"{M['model_average_precision']:.3f}; Brier "
+                    f"{M['model_brier_score']:.4f}",
+                    "Independent calibration and out-of-time evaluation on synthetic data.",
+                ],
+                [
+                    "Intervention holdout",
+                    f"{M['experiment_treatment']:,} treatment / "
+                    f"{M['experiment_control']:,} control; max SMD "
+                    f"{M['maximum_experiment_smd']:.3f}",
+                    "Assignment is valid; forward outcomes are a simulation.",
+                ],
+                [
+                    "Incremental saved MRR",
+                    f"{usd(M['simulated_saved_mrr'])}; 95% interval "
+                    f"{usd(M['simulated_saved_mrr_ci_lower'])} to "
+                    f"{usd(M['simulated_saved_mrr_ci_upper'])}",
+                    "Estimator demonstration, not production efficacy or ROI.",
+                ],
+                [
+                    "Monitoring",
+                    f"{M['monitoring_alerts']} open alerts; {M['gov_pass']} / "
+                    f"{M['gov_total']} validation checks pass",
+                    "Monthly transitions exclude partial periods from alert decisions.",
+                ],
+            ],
+            styles,
+            [4.1 * cm, 5.0 * cm, CONTENT_W - 9.1 * cm],
+        )
+    )
 
     return story
 
@@ -2001,11 +2935,15 @@ def build() -> Path:
     story = build_story(styles, M)
 
     doc = ReportDoc(
-        str(REPORT_PATH), pagesize=A4,
-        leftMargin=LMARGIN, rightMargin=RMARGIN,
-        topMargin=TMARGIN, bottomMargin=BMARGIN,
+        str(REPORT_PATH),
+        pagesize=A4,
+        leftMargin=LMARGIN,
+        rightMargin=RMARGIN,
+        topMargin=TMARGIN,
+        bottomMargin=BMARGIN,
         title="Churn & Retention Intelligence: Retention Review",
-        author="Retention Analytics", subject="Churn and retention analysis",
+        author="Retention Analytics",
+        subject="Churn and retention analysis",
     )
     # multiBuild resolves the table of contents page numbers (two passes)
     doc.multiBuild(story, canvasmaker=_invariant_canvas)

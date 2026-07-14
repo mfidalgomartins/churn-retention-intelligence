@@ -37,7 +37,8 @@ churn_in_month as (
     sum(s.monthly_revenue) as churned_mrr
   from month_bounds m
   join subscriptions_clean s
-    on s.subscription_end_date is not null
+    on s.subscription_start_date <= m.month_start
+   and s.subscription_end_date is not null
    and s.subscription_end_date >= m.month_start
    and s.subscription_end_date <= (m.month_start + interval '1 month' - interval '1 day')
   group by 1

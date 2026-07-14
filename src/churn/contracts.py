@@ -4,10 +4,12 @@ Reads config/contracts/data_contracts.json and verifies that every declared
 dataset exists, has its required columns, has rows, and has a unique non-null
 primary key. Writes a check log and (if any failed) an issues log.
 """
+
 from __future__ import annotations
 
 import csv
 import json
+import math
 import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -67,7 +69,9 @@ def _missing_constraint_check(
     )
 
 
-def _allowed_value_checks(dataset: str, rows: list[dict[str, str]], cols: list[str], cfg: dict) -> list[Check]:
+def _allowed_value_checks(
+    dataset: str, rows: list[dict[str, str]], cols: list[str], cfg: dict
+) -> list[Check]:
     checks: list[Check] = []
     allowed_values: dict[str, list[str]] = cfg.get("allowed_values", {})
     for col, allowed in allowed_values.items():
@@ -77,20 +81,30 @@ def _allowed_value_checks(dataset: str, rows: list[dict[str, str]], cols: list[s
             continue
 
         allowed_set = {str(v) for v in allowed}
-        invalid = [_cell(row.get(col)) for row in rows if _cell(row.get(col)) not in allowed_set]
-        checks.append(Check(
-            dataset=dataset,
-            check_name=f"allowed_values:{col}",
-            status="PASS" if not invalid else "FAIL",
-            severity="info" if not invalid else "blocker",
-            evidence=f"allowed={sorted(allowed_set)}; invalid_rows={len(invalid)}; sample={_sample(invalid)}",
-        ))
+        nullable = col in {str(value) for value in cfg.get("nullable_columns", [])}
+        invalid = [
+            value
+            for row in rows
+            if (value := _cell(row.get(col))) not in allowed_set and not (nullable and not value)
+        ]
+        checks.append(
+            Check(
+                dataset=dataset,
+                check_name=f"allowed_values:{col}",
+                status="PASS" if not invalid else "FAIL",
+                severity="info" if not invalid else "blocker",
+                evidence=f"allowed={sorted(allowed_set)}; invalid_rows={len(invalid)}; sample={_sample(invalid)}",
+            )
+        )
     return checks
 
 
-def _numeric_range_checks(dataset: str, rows: list[dict[str, str]], cols: list[str], cfg: dict) -> list[Check]:
+def _numeric_range_checks(
+    dataset: str, rows: list[dict[str, str]], cols: list[str], cfg: dict
+) -> list[Check]:
     checks: list[Check] = []
     ranges: dict[str, dict[str, float]] = cfg.get("numeric_ranges", {})
+    nullable_columns = {str(value) for value in cfg.get("nullable_columns", [])}
     for col, bounds in ranges.items():
         missing_check = _missing_constraint_check(dataset, f"numeric_range:{col}", [col], cols)
         if missing_check:
@@ -102,24 +116,57 @@ def _numeric_range_checks(dataset: str, rows: list[dict[str, str]], cols: list[s
         invalid: list[str] = []
         for row in rows:
             raw = _cell(row.get(col))
+            if col in nullable_columns and not raw:
+                continue
             try:
                 value = float(raw)
             except ValueError:
                 invalid.append(raw)
                 continue
-            if (
-                (lower is not None and value < float(lower))
-                or (upper is not None and value > float(upper))
+            if not math.isfinite(value):
+                invalid.append(raw)
+                continue
+            if (lower is not None and value < float(lower)) or (
+                upper is not None and value > float(upper)
             ):
                 invalid.append(raw)
 
-        checks.append(Check(
-            dataset=dataset,
-            check_name=f"numeric_range:{col}",
-            status="PASS" if not invalid else "FAIL",
-            severity="info" if not invalid else "blocker",
-            evidence=f"min={lower}; max={upper}; invalid_rows={len(invalid)}; sample={_sample(invalid)}",
-        ))
+        checks.append(
+            Check(
+                dataset=dataset,
+                check_name=f"numeric_range:{col}",
+                status="PASS" if not invalid else "FAIL",
+                severity="info" if not invalid else "blocker",
+                evidence=f"min={lower}; max={upper}; invalid_rows={len(invalid)}; sample={_sample(invalid)}",
+            )
+        )
+    return checks
+
+
+def _unique_column_checks(
+    dataset: str,
+    rows: list[dict[str, str]],
+    cols: list[str],
+    cfg: dict,
+) -> list[Check]:
+    checks: list[Check] = []
+    for col in [str(value) for value in cfg.get("unique_columns", [])]:
+        check_name = f"unique:{col}"
+        missing_check = _missing_constraint_check(dataset, check_name, [col], cols)
+        if missing_check:
+            checks.append(missing_check)
+            continue
+        values = [_cell(row.get(col)) for row in rows]
+        duplicates = sum(count - 1 for count in Counter(values).values() if count > 1)
+        checks.append(
+            Check(
+                dataset=dataset,
+                check_name=check_name,
+                status="PASS" if duplicates == 0 else "FAIL",
+                severity="info" if duplicates == 0 else "blocker",
+                evidence=f"column={col}; duplicate_rows={duplicates}",
+            )
+        )
     return checks
 
 
@@ -127,7 +174,9 @@ def _parse_iso_date(value: str) -> date:
     return date.fromisoformat(value[:10])
 
 
-def _date_order_checks(dataset: str, rows: list[dict[str, str]], cols: list[str], cfg: dict) -> list[Check]:
+def _date_order_checks(
+    dataset: str, rows: list[dict[str, str]], cols: list[str], cfg: dict
+) -> list[Check]:
     checks: list[Check] = []
     for rule in cfg.get("date_order_checks", []):
         start_col = str(rule["start_column"])
@@ -157,16 +206,18 @@ def _date_order_checks(dataset: str, rows: list[dict[str, str]], cols: list[str]
                 order_failures += 1
 
         failures = invalid + order_failures
-        checks.append(Check(
-            dataset=dataset,
-            check_name=check_name,
-            status="PASS" if failures == 0 else "FAIL",
-            severity="info" if failures == 0 else "blocker",
-            evidence=(
-                f"invalid_dates={invalid}; order_failures={order_failures}; "
-                f"allow_blank_end={allow_blank_end}"
-            ),
-        ))
+        checks.append(
+            Check(
+                dataset=dataset,
+                check_name=check_name,
+                status="PASS" if failures == 0 else "FAIL",
+                severity="info" if failures == 0 else "blocker",
+                evidence=(
+                    f"invalid_dates={invalid}; order_failures={order_failures}; "
+                    f"allow_blank_end={allow_blank_end}"
+                ),
+            )
+        )
     return checks
 
 
@@ -195,35 +246,41 @@ def _foreign_key_checks(
 
         ref_cfg = all_configs.get(ref_dataset)
         if not ref_cfg:
-            checks.append(Check(
-                dataset=dataset,
-                check_name=check_name,
-                status="FAIL",
-                severity="blocker",
-                evidence=f"reference_dataset_missing={ref_dataset}",
-            ))
+            checks.append(
+                Check(
+                    dataset=dataset,
+                    check_name=check_name,
+                    status="FAIL",
+                    severity="blocker",
+                    evidence=f"reference_dataset_missing={ref_dataset}",
+                )
+            )
             continue
 
         ref_path = root / str(ref_cfg.get("path", ""))
         if not ref_path.exists():
-            checks.append(Check(
-                dataset=dataset,
-                check_name=check_name,
-                status="FAIL",
-                severity="blocker",
-                evidence=f"reference_path_missing={ref_path}",
-            ))
+            checks.append(
+                Check(
+                    dataset=dataset,
+                    check_name=check_name,
+                    status="FAIL",
+                    severity="blocker",
+                    evidence=f"reference_path_missing={ref_path}",
+                )
+            )
             continue
 
         ref_rows, ref_cols = _load_csv(ref_path)
         if ref_col not in ref_cols:
-            checks.append(Check(
-                dataset=dataset,
-                check_name=check_name,
-                status="FAIL",
-                severity="blocker",
-                evidence=f"reference_column_missing={ref_col}; available_columns={ref_cols}",
-            ))
+            checks.append(
+                Check(
+                    dataset=dataset,
+                    check_name=check_name,
+                    status="FAIL",
+                    severity="blocker",
+                    evidence=f"reference_column_missing={ref_col}; available_columns={ref_cols}",
+                )
+            )
             continue
 
         reference_values = {_cell(row.get(ref_col)) for row in ref_rows}
@@ -232,13 +289,15 @@ def _foreign_key_checks(
             for row in rows
             if _cell(row.get(col)) and _cell(row.get(col)) not in reference_values
         ]
-        checks.append(Check(
-            dataset=dataset,
-            check_name=check_name,
-            status="PASS" if not missing_values else "FAIL",
-            severity="info" if not missing_values else "blocker",
-            evidence=f"missing_rows={len(missing_values)}; sample={_sample(missing_values)}",
-        ))
+        checks.append(
+            Check(
+                dataset=dataset,
+                check_name=check_name,
+                status="PASS" if not missing_values else "FAIL",
+                severity="info" if not missing_values else "blocker",
+                evidence=f"missing_rows={len(missing_values)}; sample={_sample(missing_values)}",
+            )
+        )
     return checks
 
 
@@ -254,53 +313,73 @@ def evaluate_dataset(
     path = root / rel
     exists = path.exists()
 
-    checks: list[Check] = [Check(
-        dataset=name, check_name="dataset_exists",
-        status="PASS" if exists else "FAIL",
-        severity="info" if exists else "blocker",
-        evidence=f"path={rel}; exists={exists}",
-    )]
+    checks: list[Check] = [
+        Check(
+            dataset=name,
+            check_name="dataset_exists",
+            status="PASS" if exists else "FAIL",
+            severity="info" if exists else "blocker",
+            evidence=f"path={rel}; exists={exists}",
+        )
+    ]
     if not exists:
         return checks
 
     rows, cols = _load_csv(path)
     missing = sorted(set(required_cols) - set(cols))
-    checks.append(Check(
-        dataset=name, check_name="required_columns_present",
-        status="PASS" if not missing else "FAIL",
-        severity="info" if not missing else "blocker",
-        evidence=f"missing_columns={missing}",
-    ))
-    checks.append(Check(
-        dataset=name, check_name="row_count_nonzero",
-        status="PASS" if rows else "FAIL",
-        severity="info" if rows else "blocker",
-        evidence=f"row_count={len(rows)}",
-    ))
+    checks.append(
+        Check(
+            dataset=name,
+            check_name="required_columns_present",
+            status="PASS" if not missing else "FAIL",
+            severity="info" if not missing else "blocker",
+            evidence=f"missing_columns={missing}",
+        )
+    )
+    checks.append(
+        Check(
+            dataset=name,
+            check_name="row_count_nonzero",
+            status="PASS" if rows else "FAIL",
+            severity="info" if rows else "blocker",
+            evidence=f"row_count={len(rows)}",
+        )
+    )
 
     if pk and pk in cols:
         null_pk = sum(1 for r in rows if not str(r.get(pk, "")).strip())
         dup_pk = sum(c - 1 for c in Counter(str(r.get(pk, "")) for r in rows).values() if c > 1)
-        checks.append(Check(
-            dataset=name, check_name="primary_key_not_null",
-            status="PASS" if null_pk == 0 else "FAIL",
-            severity="info" if null_pk == 0 else "blocker",
-            evidence=f"primary_key={pk}; null_rows={null_pk}",
-        ))
-        checks.append(Check(
-            dataset=name, check_name="primary_key_unique",
-            status="PASS" if dup_pk == 0 else "FAIL",
-            severity="info" if dup_pk == 0 else "blocker",
-            evidence=f"primary_key={pk}; duplicate_rows={dup_pk}",
-        ))
+        checks.append(
+            Check(
+                dataset=name,
+                check_name="primary_key_not_null",
+                status="PASS" if null_pk == 0 else "FAIL",
+                severity="info" if null_pk == 0 else "blocker",
+                evidence=f"primary_key={pk}; null_rows={null_pk}",
+            )
+        )
+        checks.append(
+            Check(
+                dataset=name,
+                check_name="primary_key_unique",
+                status="PASS" if dup_pk == 0 else "FAIL",
+                severity="info" if dup_pk == 0 else "blocker",
+                evidence=f"primary_key={pk}; duplicate_rows={dup_pk}",
+            )
+        )
     else:
-        checks.append(Check(
-            dataset=name, check_name="primary_key_declared_and_present",
-            status="FAIL", severity="blocker",
-            evidence=f"primary_key={pk}; available_columns={cols}",
-        ))
+        checks.append(
+            Check(
+                dataset=name,
+                check_name="primary_key_declared_and_present",
+                status="FAIL",
+                severity="blocker",
+                evidence=f"primary_key={pk}; available_columns={cols}",
+            )
+        )
     checks.extend(_allowed_value_checks(name, rows, cols, cfg))
     checks.extend(_numeric_range_checks(name, rows, cols, cfg))
+    checks.extend(_unique_column_checks(name, rows, cols, cfg))
     checks.extend(_date_order_checks(name, rows, cols, cfg))
     checks.extend(_foreign_key_checks(name, rows, cols, cfg, root, all_configs))
     return checks
@@ -308,7 +387,9 @@ def evaluate_dataset(
 
 def main() -> int:
     root = project_root()
-    contract = json.loads((root / "config" / "contracts" / "data_contracts.json").read_text(encoding="utf-8"))
+    contract = json.loads(
+        (root / "config" / "contracts" / "data_contracts.json").read_text(encoding="utf-8")
+    )
     datasets: dict[str, dict[str, Any]] = contract.get("datasets", {})
 
     all_checks: list[Check] = []

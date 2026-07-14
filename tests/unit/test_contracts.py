@@ -1,4 +1,5 @@
 """Unit tests for data contract validation."""
+
 from __future__ import annotations
 
 import csv
@@ -40,13 +41,16 @@ class TestEvaluateDataset(unittest.TestCase):
             )
 
         self.assertTrue(all(check.status == "PASS" for check in checks))
-        self.assertEqual({check.check_name for check in checks}, {
-            "dataset_exists",
-            "required_columns_present",
-            "row_count_nonzero",
-            "primary_key_not_null",
-            "primary_key_unique",
-        })
+        self.assertEqual(
+            {check.check_name for check in checks},
+            {
+                "dataset_exists",
+                "required_columns_present",
+                "row_count_nonzero",
+                "primary_key_not_null",
+                "primary_key_unique",
+            },
+        )
 
     def test_missing_dataset_returns_only_existence_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -112,7 +116,9 @@ class TestEvaluateDataset(unittest.TestCase):
                 root,
             )
 
-        pk_check = next(check for check in checks if check.check_name == "primary_key_declared_and_present")
+        pk_check = next(
+            check for check in checks if check.check_name == "primary_key_declared_and_present"
+        )
         self.assertEqual(pk_check.status, "FAIL")
         self.assertEqual(pk_check.severity, "blocker")
 
@@ -167,6 +173,85 @@ class TestEvaluateDataset(unittest.TestCase):
             "FAIL",
         )
 
+    def test_non_numeric_value_in_numeric_range_column_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_rows(
+                root / "data" / "subscriptions.csv",
+                [{"subscription_id": "S001", "monthly_revenue": "not-a-number"}],
+                ["subscription_id", "monthly_revenue"],
+            )
+
+            checks = evaluate_dataset(
+                "subscriptions",
+                {
+                    "path": "data/subscriptions.csv",
+                    "primary_key": "subscription_id",
+                    "required_columns": ["subscription_id"],
+                    "numeric_ranges": {"monthly_revenue": {"min": 0}},
+                },
+                root,
+            )
+
+        statuses = {check.check_name: check.status for check in checks}
+        self.assertEqual(statuses["numeric_range:monthly_revenue"], "FAIL")
+
+    def test_non_finite_numeric_values_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_rows(
+                root / "data" / "subscriptions.csv",
+                [
+                    {"subscription_id": "S001", "monthly_revenue": "NaN"},
+                    {"subscription_id": "S002", "monthly_revenue": "inf"},
+                ],
+                ["subscription_id", "monthly_revenue"],
+            )
+
+            checks = evaluate_dataset(
+                "subscriptions",
+                {
+                    "path": "data/subscriptions.csv",
+                    "primary_key": "subscription_id",
+                    "required_columns": ["subscription_id"],
+                    "numeric_ranges": {"monthly_revenue": {"min": 0}},
+                },
+                root,
+            )
+
+        numeric = next(
+            check for check in checks if check.check_name == "numeric_range:monthly_revenue"
+        )
+        self.assertEqual(numeric.status, "FAIL")
+        self.assertIn("invalid_rows=2", numeric.evidence)
+
+    def test_declared_unique_column_rejects_duplicate_customer_grain(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_rows(
+                root / "data" / "subscriptions.csv",
+                [
+                    {"subscription_id": "S001", "customer_id": "C001"},
+                    {"subscription_id": "S002", "customer_id": "C001"},
+                ],
+                ["subscription_id", "customer_id"],
+            )
+
+            checks = evaluate_dataset(
+                "subscriptions",
+                {
+                    "path": "data/subscriptions.csv",
+                    "primary_key": "subscription_id",
+                    "required_columns": ["subscription_id", "customer_id"],
+                    "unique_columns": ["customer_id"],
+                },
+                root,
+            )
+
+        unique = next(check for check in checks if check.check_name == "unique:customer_id")
+        self.assertEqual(unique.status, "FAIL")
+        self.assertIn("duplicate_rows=1", unique.evidence)
+
     def test_foreign_key_checks_reference_dataset_membership(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -206,7 +291,9 @@ class TestEvaluateDataset(unittest.TestCase):
             checks = evaluate_dataset("payments", configs["payments"], root, configs)
 
         fk_check = next(
-            check for check in checks if check.check_name == "foreign_key:customer_id->customers.customer_id"
+            check
+            for check in checks
+            if check.check_name == "foreign_key:customer_id->customers.customer_id"
         )
         self.assertEqual(fk_check.status, "FAIL")
         self.assertEqual(fk_check.severity, "blocker")
@@ -225,15 +312,17 @@ class TestContractsMain(unittest.TestCase):
             contract_path = root / "config" / "contracts" / "data_contracts.json"
             contract_path.parent.mkdir(parents=True, exist_ok=True)
             contract_path.write_text(
-                json.dumps({
-                    "datasets": {
-                        "customers": {
-                            "path": "data/customers.csv",
-                            "primary_key": "customer_id",
-                            "required_columns": ["customer_id", "segment"],
+                json.dumps(
+                    {
+                        "datasets": {
+                            "customers": {
+                                "path": "data/customers.csv",
+                                "primary_key": "customer_id",
+                                "required_columns": ["customer_id", "segment"],
+                            }
                         }
                     }
-                }),
+                ),
                 encoding="utf-8",
             )
 

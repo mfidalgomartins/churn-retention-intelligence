@@ -1,19 +1,28 @@
-.PHONY: install data profile features analyze risk dashboard charts report validate test coverage lint security quality all release clean
+.PHONY: install data ingest profile economics features analyze risk training-snapshots model experiments monitor memo dashboard charts report validate test coverage lint format-check typecheck security quality pipeline production snapshot all release clean
 
 PY ?= ./.venv/bin/python
 MOD = $(PY) -m churn
 MPLCONFIGDIR ?= ./.cache/matplotlib
+LOCK ?= requirements.lock
+SOURCE_ADAPTER ?= csv
+SOURCE_ARGS ?=
 
 install:
 	python -m venv .venv
 	$(PY) -m pip install --upgrade pip
-	$(PY) -m pip install -e ".[dev,charts]"
+	$(PY) -m pip install -c $(LOCK) -e ".[dev,charts]"
 
 data:
 	$(MOD).generate
 
+ingest:
+	$(MOD).ingest --adapter $(SOURCE_ADAPTER) $(SOURCE_ARGS)
+
 profile:
 	$(MOD).profile
+
+economics:
+	$(MOD).economics
 
 features:
 	$(MOD).features
@@ -23,6 +32,21 @@ analyze:
 
 risk:
 	$(MOD).risk
+
+training-snapshots:
+	$(MOD).snapshots
+
+model:
+	$(MOD).modeling
+
+experiments:
+	$(MOD).experiments
+
+monitor:
+	$(MOD).monitor
+
+memo:
+	$(MOD).memo
 
 dashboard:
 	$(MOD).dashboard
@@ -48,20 +72,33 @@ coverage:
 lint:
 	$(PY) -m ruff check src tests
 
+format-check:
+	$(PY) -m ruff format --check src tests
+
+typecheck:
+	$(PY) -m mypy
+
 security:
 	$(PY) -m bandit -q -r src -c pyproject.toml
 	$(PY) -m pip_audit --skip-editable
 
-quality: lint coverage security
+quality: lint format-check typecheck coverage security
+
+pipeline: profile economics features analyze risk training-snapshots model experiments monitor dashboard validate
+	$(MOD).dashboard
+
+production: ingest pipeline
+
+snapshot:
+	$(MOD).snapshot
 
 # Validate inspects the first render; the recipe then publishes a final render
 # with the current validation summary embedded.
-all: data profile features analyze risk dashboard validate
-	$(MOD).dashboard
+all: data pipeline
 
-release: all report
+release: all memo report snapshot
 
 clean:
-	rm -rf data/raw data/processed outputs/tables
+	rm -rf data/raw data/processed outputs/tables outputs/models outputs/snapshots
 	rm -f outputs/dashboard/*.html outputs/graphs/*.png outputs/reports/*.pdf
 	rm -f index.html docs/index.html

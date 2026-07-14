@@ -4,7 +4,7 @@
 with params as (
   select date '2026-03-01' as snapshot_date
 ),
-base as (
+subscription_base as (
   select
     c.customer_id,
     c.segment,
@@ -14,6 +14,7 @@ base as (
     s.subscription_start_date,
     least(coalesce(s.subscription_end_date, p.snapshot_date), p.snapshot_date) as observation_date,
     s.monthly_revenue,
+    s.contract_type,
     s.billing_cycle,
     (s.status = 'churned')::integer as churn_flag,
     (s.status = 'at_risk')::integer as at_risk_flag,
@@ -21,6 +22,24 @@ base as (
   from raw_customers c
   join subscriptions_clean s using (customer_id)
   cross join params p
+),
+base as (
+  select
+    b.*,
+    renewal.next_renewal_date
+  from subscription_base b
+  left join lateral (
+    select min(renewal_date)::date as next_renewal_date
+    from generate_series(
+      b.subscription_start_date::timestamp,
+      b.observation_date::timestamp + interval '1 year',
+      case
+        when b.contract_type = 'Annual' then interval '1 year'
+        else interval '1 month'
+      end
+    ) as series(renewal_date)
+    where renewal_date > b.observation_date
+  ) renewal on true
 ),
 usage_observed as (
   select
@@ -46,6 +65,7 @@ usage_features as (
       0.0
     ) as usage_trend,
     coalesce(avg(feature_adoption_score) filter (where days_before_observation between 0 and 29), 0.0) as feature_adoption_score_recent,
+    coalesce(sum(support_tickets) filter (where days_before_observation between 0 and 29), 0) as support_tickets_30d,
     coalesce(sum(support_tickets) filter (where days_before_observation between 0 and 89), 0) as support_tickets_90d,
     coalesce(avg(nps_score) filter (where days_before_observation between 0 and 89), 0.0) as nps_score_recent
   from usage_observed
@@ -93,10 +113,15 @@ select
   coalesce(u.recent_sessions_90d, 0) as recent_sessions_90d,
   coalesce(u.usage_trend, 0.0) as usage_trend,
   coalesce(u.feature_adoption_score_recent, 0.0) as feature_adoption_score_recent,
+  coalesce(u.support_tickets_30d, 0) as support_tickets_30d,
   coalesce(u.support_tickets_90d, 0) as support_tickets_90d,
   coalesce(u.nps_score_recent, 0.0) as nps_score_recent,
   coalesce(p.failed_payments_90d, 0) as failed_payments_90d,
   (coalesce(p.failed_payments_90d, 0) > 0)::integer as payment_failure_flag,
+  (
+    b.churn_flag = 0
+    and b.next_renewal_date - b.observation_date between 0 and 45
+  )::integer as renewal_near_flag,
   b.churn_flag,
   b.at_risk_flag
 from base b

@@ -1,0 +1,11 @@
+# Generated binary artefacts should never produce textual diffs.
+*.pdf binary
+*.png binary
+*.joblib binary
+*.zip binary
+
+# Keep generated and vendored assets out of repository-language statistics.
+outputs/dashboard/*.html linguist-generated=true
+docs/index.html linguist-generated=true
+index.html linguist-generated=true
+assets/vendor/*.js linguist-vendored=true

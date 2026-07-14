@@ -8,6 +8,7 @@ Three interpretable scores feed a four-tier action queue:
     main_risk_driver    — the signal contributing most to churn_risk_score
     recommended_action  — rule-based play assigned per tier and driver
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -18,26 +19,26 @@ from churn.common import docs_dir, outputs_tables_dir, processed_dir
 # Policy thresholds are intentionally interpretable. This is a prioritisation
 # index, not a calibrated probability model.
 SIGNAL_WEIGHTS: dict[str, float] = {
-    "usage_decline":   0.26,
+    "usage_decline": 0.26,
     "failed_payments": 0.22,
-    "low_nps":         0.20,
-    "low_adoption":    0.16,
-    "support_burden":  0.16,
+    "low_nps": 0.20,
+    "low_adoption": 0.16,
+    "support_burden": 0.16,
 }
 
 DRIVER_LABEL: dict[str, str] = {
-    "usage_decline":   "usage decline",
+    "usage_decline": "usage decline",
     "failed_payments": "failed payments",
-    "low_nps":         "low NPS",
-    "low_adoption":    "low adoption",
-    "support_burden":  "support burden",
+    "low_nps": "low NPS",
+    "low_adoption": "low adoption",
+    "support_burden": "support burden",
 }
 
 # Tier cut-offs on retention_priority_score for the canonical synthetic run.
 TIER_CUTOFFS: dict[str, float] = {
     "critical": 35.0,
-    "high":     25.0,
-    "medium":   15.0,
+    "high": 25.0,
+    "medium": 15.0,
 }
 
 REQUIRED_FEATURE_COLUMNS: tuple[str, ...] = (
@@ -108,13 +109,15 @@ def _validate_feature_input(features: pd.DataFrame) -> None:
 
 def normalize_signals(df: pd.DataFrame) -> pd.DataFrame:
     """Map raw features to 0-1 signals. Higher = more risk."""
-    return pd.DataFrame({
-        "usage_decline":   ((-df["usage_trend"]) / 5.0).clip(0, 1),
-        "failed_payments": (df["failed_payments_90d"] / 1.5).clip(0, 1),
-        "support_burden":  ((df["support_tickets_90d"] - 3.0) / 6.0).clip(0, 1),
-        "low_nps":         ((20.0 - df["nps_score_recent"]) / 25.0).clip(0, 1),
-        "low_adoption":    ((50.0 - df["feature_adoption_score_recent"]) / 25.0).clip(0, 1),
-    })
+    return pd.DataFrame(
+        {
+            "usage_decline": ((-df["usage_trend"]) / 5.0).clip(0, 1),
+            "failed_payments": (df["failed_payments_90d"] / 1.5).clip(0, 1),
+            "support_burden": ((df["support_tickets_90d"] - 3.0) / 6.0).clip(0, 1),
+            "low_nps": ((20.0 - df["nps_score_recent"]) / 25.0).clip(0, 1),
+            "low_adoption": ((50.0 - df["feature_adoption_score_recent"]) / 25.0).clip(0, 1),
+        }
+    )
 
 
 def churn_risk_score(df: pd.DataFrame, signals: pd.DataFrame) -> pd.Series:
@@ -197,12 +200,18 @@ def recommend_actions(scored: pd.DataFrame) -> pd.Series:
 
 def recommendation_context(scored: pd.DataFrame) -> pd.Series:
     return (
-        "Tier=" + scored["risk_tier"]
-        + "; driver=" + scored["main_risk_driver"]
-        + "; churn_risk=" + scored["churn_risk_score"].round(1).astype(str)
-        + "; customer_value=" + scored["customer_value_score"].round(1).astype(str)
-        + "; priority=" + scored["retention_priority_score"].round(1).astype(str)
-        + "; current_mrr=$" + scored["current_mrr"].round(2).astype(str)
+        "Tier="
+        + scored["risk_tier"]
+        + "; driver="
+        + scored["main_risk_driver"]
+        + "; churn_risk="
+        + scored["churn_risk_score"].round(1).astype(str)
+        + "; customer_value="
+        + scored["customer_value_score"].round(1).astype(str)
+        + "; priority="
+        + scored["retention_priority_score"].round(1).astype(str)
+        + "; current_mrr=$"
+        + scored["current_mrr"].round(2).astype(str)
     )
 
 
@@ -366,7 +375,9 @@ def main() -> None:
     if scored.empty:
         print("Top priority: none (no open customers to score).")
     else:
-        print(f"Top priority: {scored.iloc[0]['customer_id']} @ {scored.iloc[0]['retention_priority_score']:.1f}")
+        print(
+            f"Top priority: {scored.iloc[0]['customer_id']} @ {scored.iloc[0]['retention_priority_score']:.1f}"
+        )
 
 
 if __name__ == "__main__":

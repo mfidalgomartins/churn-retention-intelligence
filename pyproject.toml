@@ -4,35 +4,51 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "churn-retention-intelligence"
-version = "1.0.0"
-description = "Reproducible SaaS churn analysis with governed risk scoring and an executive dashboard."
+version = "2.0.0"
+description = "Production-shaped SaaS retention intelligence with governed scoring, economics, experiments, and monitoring."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Miguel Fidalgo Martins" }]
 keywords = ["analytics", "churn", "retention", "saas", "risk-scoring"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
     "numpy>=2.0,<3",
     "pandas>=2.2,<4",
     "PyYAML>=6.0,<7",
+    "scikit-learn>=1.9,<2",
 ]
 
 [project.optional-dependencies]
 dev = [
     "bandit[toml]>=1.8,<2",
     "coverage[toml]>=7.6,<8",
+    "mypy>=1.13,<2",
     "pip-audit>=2.7,<3",
     "ruff>=0.15,<1",
+    "types-PyYAML>=6.0,<7",
+    # Security floor for a tooling transitive (pip-audit → CacheControl → msgpack).
+    # Keeps `make security` clean; GHSA-6v7p-g79w-8964 is fixed in 1.2.1.
+    "msgpack>=1.2.1",
 ]
-charts = ["matplotlib>=3.9,<4", "reportlab>=4.0,<5"]
+charts = [
+    "matplotlib>=3.9,<4",
+    "Pillow>=12.3,<13",
+    "reportlab>=4.0,<5",
+]
+warehouse = [
+    "psycopg[binary]>=3.2,<4",
+    "SQLAlchemy>=2.0,<3",
+]
 
 [project.urls]
 Homepage = "https://mfidalgomartins.github.io/churn-retention-intelligence/"
@@ -42,7 +58,7 @@ Repository = "https://github.com/mfidalgomartins/churn-retention-intelligence"
 where = ["src"]
 
 [tool.setuptools.package-data]
-churn = ["*.html"]
+churn = ["*.html", "py.typed"]
 
 [tool.ruff]
 line-length = 100
@@ -66,7 +82,6 @@ omit = [
     "src/churn/graphs.py",
     "src/churn/generate.py",
     "src/churn/profile.py",
-    "src/churn/validate.py",
 ]
 
 [tool.coverage.report]
@@ -76,6 +91,22 @@ skip_covered = true
 exclude_also = [
     "if __name__ == .__main__.:",
 ]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+packages = ["churn"]
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+strict_equality = true
+warn_unreachable = true
+check_untyped_defs = true
+
+# These runtime libraries do not currently expose complete PEP 561 type metadata.
+[[tool.mypy.overrides]]
+module = ["joblib.*", "pandas.*", "reportlab.*", "sklearn.*", "sqlalchemy.*"]
+ignore_missing_imports = true
 
 [tool.bandit]
 exclude_dirs = [".venv", "build", "dist", "outputs", "tests"]

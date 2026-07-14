@@ -1,4 +1,5 @@
 """Edge-case unit tests for feature engineering."""
+
 from __future__ import annotations
 
 import unittest
@@ -30,9 +31,9 @@ def _empty_usage() -> pd.DataFrame:
 
 
 def _empty_payments() -> pd.DataFrame:
-    return pd.DataFrame(
-        columns=["customer_id", "payment_date", "amount", "payment_status"]
-    ).astype({"payment_date": "datetime64[ns]"})
+    return pd.DataFrame(columns=["customer_id", "payment_date", "amount", "payment_status"]).astype(
+        {"payment_date": "datetime64[ns]"}
+    )
 
 
 class TestObservationDateEdgeCases(unittest.TestCase):
@@ -65,6 +66,7 @@ class TestNoEventFeatureDefaults(unittest.TestCase):
                     "segment": "SMB",
                     "region": "EU",
                     "acquisition_channel": "Inbound",
+                    "plan_type": "Pro",
                 }
             ]
         )
@@ -76,8 +78,8 @@ class TestNoEventFeatureDefaults(unittest.TestCase):
                     "subscription_end_date": pd.NaT,
                     "status": "active",
                     "monthly_revenue": 250.0,
+                    "contract_type": "Monthly",
                     "billing_cycle": "Monthly",
-                    "plan_type": "Pro",
                 }
             ]
         )
@@ -108,9 +110,7 @@ class TestNoEventFeatureDefaults(unittest.TestCase):
 
 class TestUsageAggregationEdgeCases(unittest.TestCase):
     def test_empty_usage_returns_empty_aggregate_with_expected_columns(self) -> None:
-        observation_dates = pd.DataFrame(
-            [{"customer_id": "A", "observation_date": SNAPSHOT}]
-        )
+        observation_dates = pd.DataFrame([{"customer_id": "A", "observation_date": SNAPSHOT}])
 
         result = usage_aggregates(_empty_usage(), observation_dates)
 
@@ -142,9 +142,7 @@ class TestUsageAggregationEdgeCases(unittest.TestCase):
                 }
             ]
         )
-        observation_dates = pd.DataFrame(
-            [{"customer_id": "A", "observation_date": SNAPSHOT}]
-        )
+        observation_dates = pd.DataFrame([{"customer_id": "A", "observation_date": SNAPSHOT}])
 
         result = usage_aggregates(usage, observation_dates)
 
@@ -153,9 +151,7 @@ class TestUsageAggregationEdgeCases(unittest.TestCase):
 
 class TestPaymentAggregationEdgeCases(unittest.TestCase):
     def test_customer_with_only_failed_payments_has_no_revenue_and_failure_flag(self) -> None:
-        subscriptions = pd.DataFrame(
-            [{"customer_id": "A", "billing_cycle": "Monthly"}]
-        )
+        subscriptions = pd.DataFrame([{"customer_id": "A", "billing_cycle": "Monthly"}])
         payments = pd.DataFrame(
             [
                 {
@@ -166,9 +162,7 @@ class TestPaymentAggregationEdgeCases(unittest.TestCase):
                 }
             ]
         )
-        observation_dates = pd.DataFrame(
-            [{"customer_id": "A", "observation_date": SNAPSHOT}]
-        )
+        observation_dates = pd.DataFrame([{"customer_id": "A", "observation_date": SNAPSHOT}])
 
         result = payment_aggregates(payments, subscriptions, observation_dates)
         row = result.iloc[0]
@@ -179,9 +173,7 @@ class TestPaymentAggregationEdgeCases(unittest.TestCase):
         self.assertEqual(row["payment_failure_flag"], 1)
 
     def test_unknown_billing_cycle_falls_back_to_monthly_equivalent(self) -> None:
-        subscriptions = pd.DataFrame(
-            [{"customer_id": "A", "billing_cycle": "Custom"}]
-        )
+        subscriptions = pd.DataFrame([{"customer_id": "A", "billing_cycle": "Custom"}])
         payments = pd.DataFrame(
             [
                 {
@@ -192,9 +184,7 @@ class TestPaymentAggregationEdgeCases(unittest.TestCase):
                 }
             ]
         )
-        observation_dates = pd.DataFrame(
-            [{"customer_id": "A", "observation_date": SNAPSHOT}]
-        )
+        observation_dates = pd.DataFrame([{"customer_id": "A", "observation_date": SNAPSHOT}])
 
         result = payment_aggregates(payments, subscriptions, observation_dates)
         row = result.iloc[0]

@@ -1,12 +1,19 @@
 {
-  "baseline_version": "2026-06-06-v4",
-  "population": 2547,
+  "baseline_version": "2026-07-14-v5",
+  "reference_date": "2026-07-14",
+  "seed": 42,
+  "population": 2517,
   "tier_share": {
-    "critical": 0.009422850412249706,
-    "high": 0.07813113466823714,
-    "medium": 0.18374558303886925,
-    "low": 0.7287004318806439
+    "critical": 0.012713547874453714,
+    "high": 0.0723083035367501,
+    "medium": 0.19070321811680573,
+    "low": 0.7242749304729901
   },
-  "avg_priority_score": 10.127966234786022,
-  "notes": "Value-adjusted priority baseline; customer value cannot create risk when churn risk is zero."
+  "avg_priority_score": 10.339058402860546,
+  "thresholds": {
+    "max_tier_share_drift": 0.03,
+    "max_avg_priority_drift": 3.0,
+    "max_population_relative_drift": 0.02
+  },
+  "notes": "Deterministic synthetic-data baseline for seed 42. Customer value cannot create retention priority when churn risk is zero."
 }
