@@ -18,7 +18,7 @@
 | `nps_score_recent` | Mean NPS in last 90 days. |
 | `failed_payments_90d` | Failed payments in last 90 days. |
 | `payment_failure_flag` | `1` if any failed payment in last 90 days. |
-| `renewal_near_flag` | `1` if non-churned account renews within 45 days. |
+| `renewal_near_flag` | `1` if an open account's contract anniversary falls within 45 days. Contract term, not billing cadence, determines renewal. |
 | `churn_flag` | `1` if `status == "churned"`. |
 | `at_risk_flag` | `1` if `status == "at_risk"`. |
 

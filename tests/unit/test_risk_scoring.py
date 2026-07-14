@@ -1,4 +1,5 @@
 """Unit tests for risk scoring."""
+
 from __future__ import annotations
 
 import contextlib
@@ -29,16 +30,26 @@ def _baseline_row(**overrides) -> dict:
     """A 'clean' customer with no risk signals."""
     base = {
         "customer_id": "C000001",
-        "segment": "SMB", "region": "Europe",
-        "acquisition_channel": "Organic", "plan_type": "Growth",
+        "segment": "SMB",
+        "region": "Europe",
+        "acquisition_channel": "Organic",
+        "plan_type": "Growth",
         "tenure_days": 720,
-        "current_mrr": 200.0, "avg_monthly_revenue": 200.0, "lifetime_revenue": 4800.0,
-        "usage_trend": 2.0, "feature_adoption_score_recent": 80.0,
-        "support_tickets_30d": 0, "support_tickets_90d": 1,
-        "nps_score_recent": 50.0, "recent_sessions_30d": 30, "recent_sessions_90d": 100,
-        "failed_payments_90d": 0, "payment_failure_flag": 0,
+        "current_mrr": 200.0,
+        "avg_monthly_revenue": 200.0,
+        "lifetime_revenue": 4800.0,
+        "usage_trend": 2.0,
+        "feature_adoption_score_recent": 80.0,
+        "support_tickets_30d": 0,
+        "support_tickets_90d": 1,
+        "nps_score_recent": 50.0,
+        "recent_sessions_30d": 30,
+        "recent_sessions_90d": 100,
+        "failed_payments_90d": 0,
+        "payment_failure_flag": 0,
         "renewal_near_flag": 0,
-        "churn_flag": 0, "at_risk_flag": 0,
+        "churn_flag": 0,
+        "at_risk_flag": 0,
     }
     base.update(overrides)
     return base
@@ -72,9 +83,13 @@ class TestNormalizeSignals(unittest.TestCase):
 
     def test_signals_are_in_unit_interval(self) -> None:
         df = _frame(
-            _baseline_row(usage_trend=-50, failed_payments_90d=10,
-                          support_tickets_90d=50, nps_score_recent=-100,
-                          feature_adoption_score_recent=0),
+            _baseline_row(
+                usage_trend=-50,
+                failed_payments_90d=10,
+                support_tickets_90d=50,
+                nps_score_recent=-100,
+                feature_adoption_score_recent=0,
+            ),
         )
         s = normalize_signals(df)
         for col in SIGNAL_WEIGHTS:
@@ -90,10 +105,15 @@ class TestChurnRiskScore(unittest.TestCase):
 
     def test_score_is_bounded(self) -> None:
         df = _frame(
-            _baseline_row(usage_trend=-30, failed_payments_90d=5,
-                          support_tickets_90d=20, nps_score_recent=-100,
-                          feature_adoption_score_recent=0,
-                          renewal_near_flag=1, recent_sessions_30d=0),
+            _baseline_row(
+                usage_trend=-30,
+                failed_payments_90d=5,
+                support_tickets_90d=20,
+                nps_score_recent=-100,
+                feature_adoption_score_recent=0,
+                renewal_near_flag=1,
+                recent_sessions_30d=0,
+            ),
         )
         s = normalize_signals(df)
         score = churn_risk_score(df, s).iloc[0]
@@ -102,8 +122,14 @@ class TestChurnRiskScore(unittest.TestCase):
 
     def test_concentration_bonus_rewards_co_firing(self) -> None:
         single = _frame(_baseline_row(usage_trend=-10))  # only 1 signal firing strongly
-        many = _frame(_baseline_row(usage_trend=-10, failed_payments_90d=2,
-                                     nps_score_recent=-10, feature_adoption_score_recent=10))
+        many = _frame(
+            _baseline_row(
+                usage_trend=-10,
+                failed_payments_90d=2,
+                nps_score_recent=-10,
+                feature_adoption_score_recent=10,
+            )
+        )
         s_single = churn_risk_score(single, normalize_signals(single)).iloc[0]
         s_many = churn_risk_score(many, normalize_signals(many)).iloc[0]
         self.assertGreater(s_many, s_single + 4.0)
@@ -112,9 +138,21 @@ class TestChurnRiskScore(unittest.TestCase):
 class TestCustomerValueScore(unittest.TestCase):
     def test_higher_mrr_gets_higher_score(self) -> None:
         df = _frame(
-            _baseline_row(customer_id="low", current_mrr=50.0, avg_monthly_revenue=50.0, lifetime_revenue=600),
-            _baseline_row(customer_id="mid", current_mrr=300.0, avg_monthly_revenue=300.0, lifetime_revenue=8000),
-            _baseline_row(customer_id="high", current_mrr=2000.0, avg_monthly_revenue=2000.0, lifetime_revenue=80000),
+            _baseline_row(
+                customer_id="low", current_mrr=50.0, avg_monthly_revenue=50.0, lifetime_revenue=600
+            ),
+            _baseline_row(
+                customer_id="mid",
+                current_mrr=300.0,
+                avg_monthly_revenue=300.0,
+                lifetime_revenue=8000,
+            ),
+            _baseline_row(
+                customer_id="high",
+                current_mrr=2000.0,
+                avg_monthly_revenue=2000.0,
+                lifetime_revenue=80000,
+            ),
         )
         s = customer_value_score(df)
         self.assertLess(s.iloc[0], s.iloc[1])
@@ -151,11 +189,17 @@ class TestMainRiskDriver(unittest.TestCase):
 
 class TestRecommendActions(unittest.TestCase):
     def test_critical_high_revenue_triggers_executive_save(self) -> None:
-        df = _frame(_baseline_row(
-            current_mrr=1500.0, avg_monthly_revenue=1500.0, lifetime_revenue=30000,
-            failed_payments_90d=2, nps_score_recent=-10,
-            feature_adoption_score_recent=20, usage_trend=-5,
-        ))
+        df = _frame(
+            _baseline_row(
+                current_mrr=1500.0,
+                avg_monthly_revenue=1500.0,
+                lifetime_revenue=30000,
+                failed_payments_90d=2,
+                nps_score_recent=-10,
+                feature_adoption_score_recent=20,
+                usage_trend=-5,
+            )
+        )
         scored = compute_scores(df)
         self.assertEqual(scored.iloc[0]["risk_tier"], "critical")
         self.assertEqual(scored.iloc[0]["recommended_action"], "executive save motion")
@@ -164,10 +208,24 @@ class TestRecommendActions(unittest.TestCase):
         # Need a small population so the target customer doesn't land in the top
         # revenue percentile (which would trigger executive save motion instead).
         df = _frame(
-            _baseline_row(customer_id="big", current_mrr=10000, avg_monthly_revenue=10000, lifetime_revenue=200000),
-            _baseline_row(customer_id="target", failed_payments_90d=2,
-                          support_tickets_90d=12, nps_score_recent=0),
-            _baseline_row(customer_id="other", current_mrr=5000, avg_monthly_revenue=5000, lifetime_revenue=80000),
+            _baseline_row(
+                customer_id="big",
+                current_mrr=10000,
+                avg_monthly_revenue=10000,
+                lifetime_revenue=200000,
+            ),
+            _baseline_row(
+                customer_id="target",
+                failed_payments_90d=2,
+                support_tickets_90d=12,
+                nps_score_recent=0,
+            ),
+            _baseline_row(
+                customer_id="other",
+                current_mrr=5000,
+                avg_monthly_revenue=5000,
+                lifetime_revenue=80000,
+            ),
         )
         scored = compute_scores(df)
         target = scored[scored["customer_id"] == "target"].iloc[0]
@@ -178,9 +236,16 @@ class TestRecommendActions(unittest.TestCase):
         # customer_value_score is percentile-based, so we need a population for it
         # to be meaningful; the clean baseline customer should rank in the middle.
         df = _frame(
-            _baseline_row(customer_id="poor", current_mrr=10.0, avg_monthly_revenue=10.0, lifetime_revenue=120),
+            _baseline_row(
+                customer_id="poor", current_mrr=10.0, avg_monthly_revenue=10.0, lifetime_revenue=120
+            ),
             _baseline_row(customer_id="clean"),
-            _baseline_row(customer_id="big", current_mrr=2000, avg_monthly_revenue=2000, lifetime_revenue=50000),
+            _baseline_row(
+                customer_id="big",
+                current_mrr=2000,
+                avg_monthly_revenue=2000,
+                lifetime_revenue=50000,
+            ),
         )
         scored = compute_scores(df)
         clean = scored[scored["customer_id"] == "clean"].iloc[0]
@@ -189,8 +254,15 @@ class TestRecommendActions(unittest.TestCase):
 
     def test_customer_value_cannot_create_priority_without_churn_risk(self) -> None:
         df = _frame(
-            _baseline_row(customer_id="small", current_mrr=10, avg_monthly_revenue=10, lifetime_revenue=100),
-            _baseline_row(customer_id="large", current_mrr=10000, avg_monthly_revenue=10000, lifetime_revenue=500000),
+            _baseline_row(
+                customer_id="small", current_mrr=10, avg_monthly_revenue=10, lifetime_revenue=100
+            ),
+            _baseline_row(
+                customer_id="large",
+                current_mrr=10000,
+                avg_monthly_revenue=10000,
+                lifetime_revenue=500000,
+            ),
         )
         scored = compute_scores(df)
         self.assertTrue((scored["retention_priority_score"] == 0).all())
@@ -219,9 +291,15 @@ class TestComputeScoresContract(unittest.TestCase):
     def test_required_columns_present(self) -> None:
         df = _frame(_baseline_row())
         scored = compute_scores(df)
-        required = {"customer_id", "churn_risk_score", "customer_value_score",
-                    "retention_priority_score", "risk_tier", "main_risk_driver",
-                    "recommended_action"}
+        required = {
+            "customer_id",
+            "churn_risk_score",
+            "customer_value_score",
+            "retention_priority_score",
+            "risk_tier",
+            "main_risk_driver",
+            "recommended_action",
+        }
         self.assertTrue(required.issubset(scored.columns))
 
     def test_missing_required_columns_fail_fast(self) -> None:
@@ -247,27 +325,29 @@ class TestRiskTierSummary(unittest.TestCase):
         self.assertEqual(summary["customers"].sum(), 0)
 
     def test_non_empty_summary_orders_tiers_and_rounds_metrics(self) -> None:
-        scored = compute_scores(_frame(
-            _baseline_row(
-                customer_id="critical",
-                current_mrr=2000,
-                avg_monthly_revenue=2000,
-                lifetime_revenue=100000,
-                failed_payments_90d=2,
-                usage_trend=-5,
-                nps_score_recent=-5,
-                feature_adoption_score_recent=10,
-            ),
-            _baseline_row(
-                customer_id="high",
-                current_mrr=1000,
-                avg_monthly_revenue=1000,
-                lifetime_revenue=50000,
-                failed_payments_90d=2,
-                nps_score_recent=0,
-            ),
-            _baseline_row(customer_id="low", current_mrr=100, avg_monthly_revenue=100),
-        ))
+        scored = compute_scores(
+            _frame(
+                _baseline_row(
+                    customer_id="critical",
+                    current_mrr=2000,
+                    avg_monthly_revenue=2000,
+                    lifetime_revenue=100000,
+                    failed_payments_90d=2,
+                    usage_trend=-5,
+                    nps_score_recent=-5,
+                    feature_adoption_score_recent=10,
+                ),
+                _baseline_row(
+                    customer_id="high",
+                    current_mrr=1000,
+                    avg_monthly_revenue=1000,
+                    lifetime_revenue=50000,
+                    failed_payments_90d=2,
+                    nps_score_recent=0,
+                ),
+                _baseline_row(customer_id="low", current_mrr=100, avg_monthly_revenue=100),
+            )
+        )
 
         summary = risk_tier_summary(scored)
 
@@ -285,16 +365,18 @@ class TestRiskMain(unittest.TestCase):
             outputs = root / "outputs"
             docs = root / "docs"
             processed.mkdir()
-            pd.DataFrame([
-                _baseline_row(
-                    customer_id="A",
-                    failed_payments_90d=2,
-                    nps_score_recent=0,
-                    feature_adoption_score_recent=20,
-                    usage_trend=-4,
-                ),
-                _baseline_row(customer_id="B", churn_flag=1),
-            ]).to_csv(processed / "customer_retention_features.csv", index=False)
+            pd.DataFrame(
+                [
+                    _baseline_row(
+                        customer_id="A",
+                        failed_payments_90d=2,
+                        nps_score_recent=0,
+                        feature_adoption_score_recent=20,
+                        usage_trend=-4,
+                    ),
+                    _baseline_row(customer_id="B", churn_flag=1),
+                ]
+            ).to_csv(processed / "customer_retention_features.csv", index=False)
 
             with (
                 mock.patch.object(risk, "processed_dir", return_value=processed),
@@ -320,10 +402,12 @@ class TestRiskMain(unittest.TestCase):
             outputs = root / "outputs"
             docs = root / "docs"
             processed.mkdir()
-            pd.DataFrame([
-                _baseline_row(customer_id="A", churn_flag=1),
-                _baseline_row(customer_id="B", churn_flag=1),
-            ]).to_csv(processed / "customer_retention_features.csv", index=False)
+            pd.DataFrame(
+                [
+                    _baseline_row(customer_id="A", churn_flag=1),
+                    _baseline_row(customer_id="B", churn_flag=1),
+                ]
+            ).to_csv(processed / "customer_retention_features.csv", index=False)
 
             with (
                 mock.patch.object(risk, "processed_dir", return_value=processed),

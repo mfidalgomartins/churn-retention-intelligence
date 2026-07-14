@@ -1,4 +1,5 @@
 """Unit tests for feature engineering."""
+
 from __future__ import annotations
 
 import unittest
@@ -7,6 +8,7 @@ import pandas as pd
 
 from churn.features import (
     build_cohort_table,
+    build_customer_features,
     build_segment_summary,
     next_renewal_date,
     payment_aggregates,
@@ -17,10 +19,12 @@ SNAPSHOT = pd.Timestamp("2026-03-01")
 
 
 def _observation_dates(*customer_ids: str, date: pd.Timestamp = SNAPSHOT) -> pd.DataFrame:
-    return pd.DataFrame({
-        "customer_id": list(customer_ids),
-        "observation_date": [date] * len(customer_ids),
-    })
+    return pd.DataFrame(
+        {
+            "customer_id": list(customer_ids),
+            "observation_date": [date] * len(customer_ids),
+        }
+    )
 
 
 class TestNextRenewalDate(unittest.TestCase):
@@ -45,22 +49,87 @@ class TestNextRenewalDate(unittest.TestCase):
         # start is after snapshot → first anniversary is the start itself
         self.assertEqual(result.iloc[0], pd.Timestamp("2026-04-01"))
 
+    def test_annual_contract_uses_contract_term_not_quarterly_billing(self) -> None:
+        customers = pd.DataFrame(
+            [
+                {
+                    "customer_id": "A",
+                    "signup_date": pd.Timestamp("2025-01-15"),
+                    "segment": "Enterprise",
+                    "region": "Europe",
+                    "acquisition_channel": "Partner",
+                    "plan_type": "Enterprise",
+                },
+            ]
+        )
+        subscriptions = pd.DataFrame(
+            [
+                {
+                    "subscription_id": "SUB-A",
+                    "customer_id": "A",
+                    "subscription_start_date": pd.Timestamp("2025-01-15"),
+                    "subscription_end_date": pd.NaT,
+                    "monthly_revenue": 1000.0,
+                    "contract_type": "Annual",
+                    "billing_cycle": "Quarterly",
+                    "status": "active",
+                },
+            ]
+        )
+        usage = pd.DataFrame(
+            [
+                {
+                    "customer_id": "A",
+                    "usage_date": pd.Timestamp("2026-02-15"),
+                    "sessions": 10,
+                    "feature_adoption_score": 70.0,
+                    "support_tickets": 0,
+                    "nps_score": 40,
+                },
+            ]
+        )
+        payments = pd.DataFrame(
+            [
+                {
+                    "customer_id": "A",
+                    "payment_date": pd.Timestamp("2026-01-15"),
+                    "amount": 3000.0,
+                    "payment_status": "paid",
+                },
+            ]
+        )
+
+        result = build_customer_features(customers, subscriptions, usage, payments, SNAPSHOT)
+
+        # Quarterly billing would incorrectly flag 2026-04-15 as near renewal.
+        # The annual contract actually renews on 2027-01-15.
+        self.assertEqual(result.iloc[0]["renewal_near_flag"], 0)
+
 
 class TestUsageAggregates(unittest.TestCase):
     def _usage(self, **rows) -> pd.DataFrame:
-        return pd.DataFrame([
-            {"customer_id": cid, "usage_date": pd.Timestamp(d),
-             "sessions": s, "support_tickets": t,
-             "feature_adoption_score": a, "nps_score": n}
-            for cid, recs in rows.items()
-            for d, s, t, a, n in recs
-        ])
+        return pd.DataFrame(
+            [
+                {
+                    "customer_id": cid,
+                    "usage_date": pd.Timestamp(d),
+                    "sessions": s,
+                    "support_tickets": t,
+                    "feature_adoption_score": a,
+                    "nps_score": n,
+                }
+                for cid, recs in rows.items()
+                for d, s, t, a, n in recs
+            ]
+        )
 
     def test_recent_30d_counts(self) -> None:
         usage = self._usage(
-            A=[("2026-02-15", 10, 1, 50, 20),  # in 30d
-               ("2026-01-20", 5, 0, 40, 10),    # in 90d, not 30d
-               ("2025-11-20", 7, 2, 30, 0)],    # outside 90d
+            A=[
+                ("2026-02-15", 10, 1, 50, 20),  # in 30d
+                ("2026-01-20", 5, 0, 40, 10),  # in 90d, not 30d
+                ("2025-11-20", 7, 2, 30, 0),
+            ],  # outside 90d
         )
         agg = usage_aggregates(usage, _observation_dates("A"))
         row = agg.iloc[0]
@@ -70,8 +139,10 @@ class TestUsageAggregates(unittest.TestCase):
     def test_usage_trend_is_recent_minus_prior(self) -> None:
         # snapshot = 2026-03-01; window 0-30d (Feb 1-Mar 1), 30-60d (Jan 2-Feb 1)
         usage = self._usage(
-            A=[("2026-02-15", 20, 0, 80, 50),  # recent_30
-               ("2026-01-15", 5, 0, 80, 50)],  # prior_30
+            A=[
+                ("2026-02-15", 20, 0, 80, 50),  # recent_30
+                ("2026-01-15", 5, 0, 80, 50),
+            ],  # prior_30
         )
         agg = usage_aggregates(usage, _observation_dates("A"))
         self.assertAlmostEqual(agg.iloc[0]["usage_trend"], 15.0)
@@ -88,16 +159,34 @@ class TestUsageAggregates(unittest.TestCase):
 class TestPaymentAggregates(unittest.TestCase):
     def test_failed_payments_90d_count(self) -> None:
         subs = pd.DataFrame([{"customer_id": "A", "billing_cycle": "Monthly"}])
-        payments = pd.DataFrame([
-            {"customer_id": "A", "payment_date": pd.Timestamp("2025-12-10"),
-             "amount": 100, "payment_status": "paid"},
-            {"customer_id": "A", "payment_date": pd.Timestamp("2026-02-10"),
-             "amount": 100, "payment_status": "failed"},
-            {"customer_id": "A", "payment_date": pd.Timestamp("2026-01-10"),
-             "amount": 100, "payment_status": "failed"},
-            {"customer_id": "A", "payment_date": pd.Timestamp("2025-11-10"),
-             "amount": 100, "payment_status": "failed"},
-        ])
+        payments = pd.DataFrame(
+            [
+                {
+                    "customer_id": "A",
+                    "payment_date": pd.Timestamp("2025-12-10"),
+                    "amount": 100,
+                    "payment_status": "paid",
+                },
+                {
+                    "customer_id": "A",
+                    "payment_date": pd.Timestamp("2026-02-10"),
+                    "amount": 100,
+                    "payment_status": "failed",
+                },
+                {
+                    "customer_id": "A",
+                    "payment_date": pd.Timestamp("2026-01-10"),
+                    "amount": 100,
+                    "payment_status": "failed",
+                },
+                {
+                    "customer_id": "A",
+                    "payment_date": pd.Timestamp("2025-11-10"),
+                    "amount": 100,
+                    "payment_status": "failed",
+                },
+            ]
+        )
         agg = payment_aggregates(payments, subs, _observation_dates("A"))
         a = agg[agg["customer_id"] == "A"].iloc[0]
         self.assertEqual(a["failed_payments_90d"], 2)
@@ -105,12 +194,22 @@ class TestPaymentAggregates(unittest.TestCase):
 
     def test_failed_payment_window_uses_customer_observation_date(self) -> None:
         subs = pd.DataFrame([{"customer_id": "A", "billing_cycle": "Monthly"}])
-        payments = pd.DataFrame([
-            {"customer_id": "A", "payment_date": pd.Timestamp("2025-06-10"),
-             "amount": 100, "payment_status": "failed"},
-            {"customer_id": "A", "payment_date": pd.Timestamp("2026-02-10"),
-             "amount": 100, "payment_status": "failed"},
-        ])
+        payments = pd.DataFrame(
+            [
+                {
+                    "customer_id": "A",
+                    "payment_date": pd.Timestamp("2025-06-10"),
+                    "amount": 100,
+                    "payment_status": "failed",
+                },
+                {
+                    "customer_id": "A",
+                    "payment_date": pd.Timestamp("2026-02-10"),
+                    "amount": 100,
+                    "payment_status": "failed",
+                },
+            ]
+        )
         observation = _observation_dates("A", date=pd.Timestamp("2025-07-01"))
         agg = payment_aggregates(payments, subs, observation)
         self.assertEqual(agg[agg["customer_id"] == "A"].iloc[0]["failed_payments_90d"], 1)
@@ -118,23 +217,30 @@ class TestPaymentAggregates(unittest.TestCase):
 
 class TestCohortTable(unittest.TestCase):
     def _subs(self, rows) -> pd.DataFrame:
-        return pd.DataFrame([
-            {"customer_id": f"C{i}",
-             "subscription_start_date": pd.Timestamp(s),
-             "subscription_end_date": pd.Timestamp(e) if e else pd.NaT,
-             "monthly_revenue": r}
-            for i, (s, e, r) in enumerate(rows)
-        ])
+        return pd.DataFrame(
+            [
+                {
+                    "customer_id": f"C{i}",
+                    "subscription_start_date": pd.Timestamp(s),
+                    "subscription_end_date": pd.Timestamp(e) if e else pd.NaT,
+                    "monthly_revenue": r,
+                }
+                for i, (s, e, r) in enumerate(rows)
+            ]
+        )
 
     def test_retention_rate_is_retained_over_cohort_size(self) -> None:
-        subs = self._subs([
-            ("2025-01-15", None, 100),    # active throughout
-            ("2025-01-20", "2025-08-10", 100),  # churned in month 7
-        ])
+        subs = self._subs(
+            [
+                ("2025-01-15", None, 100),  # active throughout
+                ("2025-01-20", "2025-08-10", 100),  # churned in month 7
+            ]
+        )
         cohort = build_cohort_table(subs, SNAPSHOT)
         # Look up the August 2025 observation for cohort 2025-01
-        row = cohort[(cohort["cohort_month"] == "2025-01-01")
-                     & (cohort["observation_month"] == "2025-08-01")].iloc[0]
+        row = cohort[
+            (cohort["cohort_month"] == "2025-01-01") & (cohort["observation_month"] == "2025-08-01")
+        ].iloc[0]
         self.assertEqual(row["active_customers"], 2)
         self.assertEqual(row["retained_customers"], 1)
         self.assertAlmostEqual(row["retention_rate"], 0.5)
@@ -142,8 +248,9 @@ class TestCohortTable(unittest.TestCase):
     def test_retention_rate_starts_at_one(self) -> None:
         subs = self._subs([("2025-06-15", None, 100), ("2025-06-20", "2026-01-15", 100)])
         cohort = build_cohort_table(subs, SNAPSHOT)
-        first = cohort[(cohort["cohort_month"] == "2025-06-01")
-                       & (cohort["observation_month"] == "2025-06-01")].iloc[0]
+        first = cohort[
+            (cohort["cohort_month"] == "2025-06-01") & (cohort["observation_month"] == "2025-06-01")
+        ].iloc[0]
         self.assertEqual(first["retention_rate"], 1.0)
 
     def test_partial_snapshot_month_is_excluded(self) -> None:
@@ -154,17 +261,43 @@ class TestCohortTable(unittest.TestCase):
 
 class TestSegmentSummary(unittest.TestCase):
     def test_churn_rate_per_segment(self) -> None:
-        features = pd.DataFrame([
-            {"customer_id": "A", "segment": "SMB", "churn_flag": 1, "at_risk_flag": 0,
-             "current_mrr": 0, "avg_monthly_revenue": 100, "tenure_days": 365,
-             "nps_score_recent": 30, "usage_trend": 0},
-            {"customer_id": "B", "segment": "SMB", "churn_flag": 0, "at_risk_flag": 1,
-             "current_mrr": 200, "avg_monthly_revenue": 200, "tenure_days": 200,
-             "nps_score_recent": 20, "usage_trend": -1},
-            {"customer_id": "C", "segment": "Enterprise", "churn_flag": 0, "at_risk_flag": 0,
-             "current_mrr": 1000, "avg_monthly_revenue": 1000, "tenure_days": 800,
-             "nps_score_recent": 50, "usage_trend": 2},
-        ])
+        features = pd.DataFrame(
+            [
+                {
+                    "customer_id": "A",
+                    "segment": "SMB",
+                    "churn_flag": 1,
+                    "at_risk_flag": 0,
+                    "current_mrr": 0,
+                    "avg_monthly_revenue": 100,
+                    "tenure_days": 365,
+                    "nps_score_recent": 30,
+                    "usage_trend": 0,
+                },
+                {
+                    "customer_id": "B",
+                    "segment": "SMB",
+                    "churn_flag": 0,
+                    "at_risk_flag": 1,
+                    "current_mrr": 200,
+                    "avg_monthly_revenue": 200,
+                    "tenure_days": 200,
+                    "nps_score_recent": 20,
+                    "usage_trend": -1,
+                },
+                {
+                    "customer_id": "C",
+                    "segment": "Enterprise",
+                    "churn_flag": 0,
+                    "at_risk_flag": 0,
+                    "current_mrr": 1000,
+                    "avg_monthly_revenue": 1000,
+                    "tenure_days": 800,
+                    "nps_score_recent": 50,
+                    "usage_trend": 2,
+                },
+            ]
+        )
         summary = build_segment_summary(features)
         smb = summary[summary["segment"] == "SMB"].iloc[0]
         self.assertEqual(smb["cumulative_churn_share"], 0.5)

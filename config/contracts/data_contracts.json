@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 4,
   "owner": "analytics-engineering",
   "scope": "churn-retention-intelligence-system",
   "datasets": {
@@ -20,8 +20,9 @@
     },
     "raw_subscriptions": {
       "path": "data/raw/subscriptions.csv",
-      "grain": "one_row_per_customer_subscription",
+      "grain": "one_row_per_customer_current_subscription",
       "primary_key": "subscription_id",
+      "unique_columns": ["customer_id"],
       "required_columns": [
         "subscription_id", "customer_id",
         "subscription_start_date", "subscription_end_date",
@@ -33,7 +34,7 @@
         "status": ["active", "at_risk", "churned"]
       },
       "numeric_ranges": {
-        "monthly_revenue": { "min": 0 }
+        "monthly_revenue": { "min": 0.01 }
       },
       "date_order_checks": [
         {
@@ -83,7 +84,63 @@
         "payment_status": ["paid", "failed"]
       },
       "numeric_ranges": {
-        "amount": { "min": 0 }
+        "amount": { "min": 0.01 }
+      },
+      "foreign_keys": [
+        {
+          "column": "customer_id",
+          "references_dataset": "raw_customers",
+          "references_column": "customer_id"
+        }
+      ]
+    },
+    "raw_revenue_movements": {
+      "path": "data/raw/revenue_movements.csv",
+      "grain": "one_row_per_customer_mrr_event",
+      "primary_key": "movement_id",
+      "required_columns": [
+        "movement_id", "customer_id", "effective_date", "movement_type",
+        "mrr_delta", "ending_mrr"
+      ],
+      "allowed_values": {
+        "movement_type": ["new", "expansion", "contraction", "reactivation", "churn"]
+      },
+      "numeric_ranges": {
+        "ending_mrr": { "min": 0 }
+      },
+      "foreign_keys": [
+        {
+          "column": "customer_id",
+          "references_dataset": "raw_customers",
+          "references_column": "customer_id"
+        }
+      ]
+    },
+    "raw_acquisition_spend": {
+      "path": "data/raw/acquisition_spend.csv",
+      "grain": "one_row_per_month_and_acquisition_channel",
+      "primary_key": "spend_id",
+      "required_columns": [
+        "spend_id", "spend_month", "acquisition_channel",
+        "marketing_spend", "sales_spend"
+      ],
+      "allowed_values": {
+        "acquisition_channel": ["Organic", "Referral", "Partner", "Paid Search", "Affiliate", "Outbound"]
+      },
+      "numeric_ranges": {
+        "marketing_spend": { "min": 0 },
+        "sales_spend": { "min": 0 }
+      }
+    },
+    "raw_service_costs": {
+      "path": "data/raw/service_costs.csv",
+      "grain": "one_row_per_customer_service_month",
+      "primary_key": "service_cost_id",
+      "required_columns": [
+        "service_cost_id", "customer_id", "cost_month", "direct_service_cost"
+      ],
+      "numeric_ranges": {
+        "direct_service_cost": { "min": 0 }
       },
       "foreign_keys": [
         {
@@ -180,11 +237,108 @@
           "references_column": "customer_id"
         }
       ]
+    },
+    "processed_customer_probabilities": {
+      "path": "data/processed/customer_churn_probabilities.csv",
+      "grain": "one_row_per_open_customer_model_score",
+      "primary_key": "customer_id",
+      "required_columns": [
+        "customer_id", "scored_at", "segment", "region", "acquisition_channel",
+        "plan_type", "current_mrr", "churn_probability_90d", "probability_risk_tier"
+      ],
+      "allowed_values": {
+        "probability_risk_tier": ["critical", "high", "medium", "low"]
+      },
+      "numeric_ranges": {
+        "current_mrr": { "min": 0 },
+        "churn_probability_90d": { "min": 0, "max": 1 }
+      },
+      "foreign_keys": [
+        {
+          "column": "customer_id",
+          "references_dataset": "processed_customer_features",
+          "references_column": "customer_id"
+        }
+      ]
+    },
+    "processed_intervention_assignments": {
+      "path": "data/processed/intervention_assignments.csv",
+      "grain": "one_row_per_eligible_customer_experiment_assignment",
+      "primary_key": "customer_id",
+      "required_columns": [
+        "experiment_id", "customer_id", "assignment_date", "source_adapter", "assignment", "holdout_flag",
+        "assignment_probability", "stratum", "probability_risk_tier",
+        "churn_probability_90d", "current_mrr"
+      ],
+      "allowed_values": {
+        "source_adapter": ["synthetic", "csv", "postgresql"],
+        "assignment": ["treatment", "control"],
+        "holdout_flag": ["0", "1"],
+        "probability_risk_tier": ["critical", "high"]
+      },
+      "numeric_ranges": {
+        "assignment_probability": { "min": 0, "max": 1 },
+        "churn_probability_90d": { "min": 0, "max": 1 },
+        "current_mrr": { "min": 0 }
+      },
+      "foreign_keys": [
+        {
+          "column": "customer_id",
+          "references_dataset": "processed_customer_features",
+          "references_column": "customer_id"
+        }
+      ]
+    },
+    "processed_intervention_outcomes": {
+      "path": "data/processed/intervention_outcome_ledger.csv",
+      "grain": "one_row_per_eligible_customer_experiment_outcome",
+      "primary_key": "customer_id",
+      "required_columns": [
+        "experiment_id", "customer_id", "assignment", "stratum", "source_adapter", "outcome_due_date",
+        "outcome_status", "outcome_source", "assigned_action_delivered",
+        "simulated_churn_probability_90d", "churned_90d", "retained_90d",
+        "current_mrr", "lost_mrr_90d", "ending_mrr_90d"
+      ],
+      "allowed_values": {
+        "source_adapter": ["synthetic", "csv", "postgresql"],
+        "assignment": ["treatment", "control"],
+        "outcome_status": ["simulated", "observed", "pending"],
+        "outcome_source": [
+          "synthetic_counterfactual_simulation",
+          "observed_outcome_file",
+          "awaiting_observed_outcomes"
+        ],
+        "assigned_action_delivered": ["treatment", "control"],
+        "churned_90d": ["0", "1"],
+        "retained_90d": ["0", "1"]
+      },
+      "nullable_columns": [
+        "assigned_action_delivered", "simulated_churn_probability_90d",
+        "churned_90d", "retained_90d", "lost_mrr_90d", "ending_mrr_90d"
+      ],
+      "numeric_ranges": {
+        "simulated_churn_probability_90d": { "min": 0, "max": 1 },
+        "current_mrr": { "min": 0 },
+        "lost_mrr_90d": { "min": 0 },
+        "ending_mrr_90d": { "min": 0 }
+      },
+      "foreign_keys": [
+        {
+          "column": "customer_id",
+          "references_dataset": "processed_intervention_assignments",
+          "references_column": "customer_id"
+        }
+      ]
     }
   },
   "governance_rules": [
     "all_primary_keys_unique",
     "no_negative_revenue_values",
+    "monthly_mrr_bridge_must_reconcile",
+    "unit_economics_must_exclude_incomplete_periods",
+    "probability_model_must_pass_out_of_time_quality_gates",
+    "intervention_effects_must_use_randomized_holdout_comparisons",
+    "risk_transition_alerts_must_use_complete_monthly_intervals",
     "churn_and_risk_flags_consistent_with_subscription_status",
     "dashboard_must_consume_governed_processed_outputs"
   ]

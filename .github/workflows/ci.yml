@@ -1,5 +1,12 @@
 name: CI
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: ["main"]
@@ -8,18 +15,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
+          cache: "pip"
 
       - name: Install
         run: |
           python -m venv .venv
           ./.venv/bin/pip install --upgrade pip
-          ./.venv/bin/pip install -e ".[dev,charts]"
+          ./.venv/bin/pip install -c requirements.lock -e ".[dev,charts]"
 
       - name: Build release (includes validation gates)
         run: make release
@@ -28,11 +37,13 @@ jobs:
         run: |
           git diff --exit-code -- \
             docs/index.html \
+            docs/decision_memo.md \
             docs/methodology/feature_dictionary.md \
             docs/methodology/risk_scoring_methodology.md \
             index.html \
             outputs/dashboard \
             outputs/graphs \
+            outputs/models \
             outputs/reports
 
       - name: Quality gates
@@ -42,3 +53,32 @@ jobs:
         run: |
           ./.venv/bin/pip check
           ./.venv/bin/pip wheel --no-deps . -w /tmp/churn-release-wheel
+
+  python-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install
+        run: |
+          python -m venv .venv
+          ./.venv/bin/pip install --upgrade pip
+          ./.venv/bin/pip install -c requirements.lock -e ".[dev,charts]"
+
+      - name: Compatibility checks
+        run: |
+          make all
+          make test
+          make lint
+          make format-check
+          make typecheck

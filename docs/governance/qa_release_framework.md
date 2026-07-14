@@ -4,7 +4,7 @@ The release framework has two independent gate groups:
 
 | Group | Command | Purpose |
 |---|---|---|
-| Analytical release gates | `make validate` | Data contracts, metric integrity, dashboard readiness, and release state |
+| Analytical release gates | `make validate` | Data contracts, metric integrity, model quality, experiment integrity, monitoring, dashboard readiness, and release state |
 | Engineering quality gates | `make quality` | Lint, tests with coverage, Bandit, and dependency audit |
 
 Both gate groups must pass before publishing dashboard, chart, or report
@@ -36,6 +36,9 @@ artifacts.
 - `config/contracts/data_contracts.json` — schema, primary-key, value-domain, numeric-range, date-order, and referential-integrity contracts
 - `config/governance/release_policy.yml` — release policy
 - `config/governance/score_stability_baseline.json` — score drift baseline
+- `config/modeling.yml` — temporal split, calibration, and model thresholds
+- `config/experiments.yml` — eligibility, allocation, estimand, and balance thresholds
+- `config/monitoring.yml` — transition, outcome, and drift alert thresholds
 
 ## Gate outputs
 

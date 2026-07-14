@@ -1,4 +1,5 @@
 """Shared constants and helpers used by the pipeline modules."""
+
 from __future__ import annotations
 
 # Canonical reference date for the synthetic generator. Every downstream snapshot
@@ -17,9 +18,7 @@ def _parse_reference_date(value: str | None) -> pd.Timestamp:
     try:
         parsed = pd.Timestamp(raw).normalize()
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"CHURN_REFERENCE_DATE must be a valid date, got {raw!r}"
-        ) from exc
+        raise ValueError(f"CHURN_REFERENCE_DATE must be a valid date, got {raw!r}") from exc
     if pd.isna(parsed):
         raise ValueError(f"CHURN_REFERENCE_DATE must be a valid date, got {raw!r}")
     return parsed

@@ -1,0 +1,10 @@
+version: 1
+currency: USD
+ltv_horizon_months: 24
+include_reactivation_in_nrr: true
+revenue_basis: average_opening_and_closing_mrr
+definitions:
+  cac: marketing_plus_sales_spend_divided_by_acquired_customers
+  gross_margin: mrr_revenue_proxy_minus_direct_service_cost
+  payback: cac_divided_by_average_monthly_gross_profit_per_customer
+  ltv: horizon_limited_expected_gross_profit_using_observed_monthly_logo_churn

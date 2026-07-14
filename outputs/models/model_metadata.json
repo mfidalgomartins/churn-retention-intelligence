@@ -1,0 +1,39 @@
+{
+  "algorithm": "regularized_logistic_regression",
+  "calibration": "platt_scaling_on_separate_time_period",
+  "intended_use": "Retention prioritization and controlled intervention testing.",
+  "limitations": [
+    "Synthetic outcomes do not establish external validity.",
+    "Repeated customer-month rows make performance descriptive rather than an independent-sample confidence interval.",
+    "Probability calibration must be re-estimated when live outcomes replace synthetic data."
+  ],
+  "model_sha256": "4227b5685a5c5624743614569f4c9cb4133ba66733bfd396f36fc7ebff69493d",
+  "model_version": "2.0.0",
+  "outcome": "churn_within_90_days",
+  "scikit_learn_version": "1.9.0",
+  "split_dates": {
+    "calibration_end": "2025-03-31",
+    "calibration_start": "2024-10-31",
+    "test_end": "2025-11-30",
+    "test_start": "2025-07-31",
+    "train_end": "2024-06-30",
+    "train_start": "2022-04-30"
+  },
+  "test_metrics": {
+    "average_precision": 0.312201,
+    "brier_score": 0.034357,
+    "calibration_intercept": 0.117915,
+    "calibration_slope": 1.069106,
+    "customers": 2375,
+    "end_date": "2025-11-30",
+    "event_rate": 0.042343,
+    "log_loss": 0.138112,
+    "roc_auc": 0.822743,
+    "rows": 10911,
+    "split": "test",
+    "start_date": "2025-07-31",
+    "top_decile_lift": 5.125642
+  },
+  "trained_as_of": "2026-03-01",
+  "training_data": "deterministic_synthetic_demonstration"
+}

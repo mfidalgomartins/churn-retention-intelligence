@@ -4,22 +4,21 @@ import csv
 import json
 import re
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import yaml
 
-from churn.common import (
-    outputs_tables_dir,
-    processed_dir,
-    project_root,
-    raw_dir,
-)
+from churn.common import outputs_tables_dir, processed_dir, project_root, raw_dir
 
 DATE_FMT = "%Y-%m-%d"
+RISK_TIERS = ("critical", "high", "medium", "low")
 ALLOWED_SUBSCRIPTION_STATUS = {"active", "at_risk", "churned"}
 ALLOWED_PAYMENT_STATUS = {"paid", "failed"}
 BLOCKER_CHECKS: set[tuple[str, str]] = {
@@ -41,7 +40,6 @@ BLOCKER_CHECKS: set[tuple[str, str]] = {
     ("Dashboard Review", "Consistency between KPI cards and trend charts"),
     ("Dashboard Review", "Version stamping and traceability"),
 }
-
 MAJOR_WARN_CHECKS: set[tuple[str, str]] = {
     ("Data Quality", "Usage dates outside subscription periods"),
     ("Data Quality", "Payment consistency"),
@@ -55,7 +53,7 @@ MAJOR_WARN_CHECKS: set[tuple[str, str]] = {
 }
 
 
-@dataclass
+@dataclass(frozen=True)
 class Check:
     category: str
     check_name: str
@@ -63,62 +61,59 @@ class Check:
     evidence: str
 
 
-def parse_date(value: str) -> date | None:
-    if value is None:
+@dataclass(frozen=True)
+class ValidationData:
+    root: Path
+    frames: dict[str, pd.DataFrame]
+    source_adapter: str
+
+    def __getitem__(self, name: str) -> pd.DataFrame:
+        return self.frames[name]
+
+
+def parse_date(value: str | None) -> date | None:
+    if value is None or not value.strip():
         return None
-    value = value.strip()
-    if not value:
-        return None
-    return datetime.strptime(value, DATE_FMT).date()
+    return datetime.strptime(value.strip(), DATE_FMT).date()
 
 
 def to_float(value: str | None) -> float:
-    if value is None:
+    if value is None or not value.strip():
         return 0.0
-    value = value.strip()
-    return float(value) if value else 0.0
+    return float(value.strip())
 
 
 def to_int(value: str | None) -> int:
-    if value is None:
+    if value is None or not value.strip():
         return 0
-    value = value.strip()
-    return int(float(value)) if value else 0
+    return int(float(value.strip()))
 
 
 def load_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
-    with path.open("r", encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
-        return rows, list(reader.fieldnames or [])
+    with path.open("r", encoding="utf-8", newline="") as file:
+        reader = csv.DictReader(file)
+        return list(reader), list(reader.fieldnames or [])
 
 
 def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
+        writer.writerows(rows)
 
 
 def count_duplicates(rows: list[dict[str, str]], key: str) -> int:
-    counts = Counter(r.get(key, "") for r in rows)
-    return sum(c - 1 for c in counts.values() if c > 1)
+    counts = Counter(row.get(key, "") for row in rows)
+    return sum(count - 1 for count in counts.values() if count > 1)
 
 
 def null_counts(rows: list[dict[str, str]], fields: list[str]) -> dict[str, int]:
-    out: dict[str, int] = {f: 0 for f in fields}
-    for r in rows:
-        for f in fields:
-            v = r.get(f)
-            if v is None or not str(v).strip():
-                out[f] += 1
-    return out
+    return {field: sum(not str(row.get(field) or "").strip() for row in rows) for field in fields}
 
 
-def pct(n: float, d: float) -> float:
-    return (n / d) if d else 0.0
+def pct(numerator: float, denominator: float) -> float:
+    return numerator / denominator if denominator else 0.0
 
 
 def month_start(month: str) -> date:
@@ -127,53 +122,24 @@ def month_start(month: str) -> date:
 
 def month_end(month: str) -> date:
     first = month_start(month)
-    if first.month == 12:
-        next_first = date(first.year + 1, 1, 1)
-    else:
-        next_first = date(first.year, first.month + 1, 1)
+    next_first = (
+        date(first.year + 1, 1, 1) if first.month == 12 else date(first.year, first.month + 1, 1)
+    )
     return next_first - timedelta(days=1)
 
 
 def month_range(start_month: str, end_month: str) -> list[str]:
-    out: list[str] = []
-    d = month_start(start_month)
+    months: list[str] = []
+    current = month_start(start_month)
     end = month_start(end_month)
-    while d <= end:
-        out.append(f"{d.year:04d}-{d.month:02d}")
-        d = date(d.year + 1, 1, 1) if d.month == 12 else date(d.year, d.month + 1, 1)
-    return out
-
-
-def dashboard_compute_trend(subscriptions: list[dict[str, str]], start_month: str, end_month: str) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    for month in month_range(start_month, end_month):
-        ms = month_start(month)
-        me = month_end(month)
-        active = []
-        churned = []
-        for s in subscriptions:
-            st = parse_date(s["subscription_start_date"])
-            en = parse_date(s["subscription_end_date"])
-            if st is None:
-                continue
-            if st <= ms and (en is None or en >= ms):
-                active.append(s)
-            if en is not None and ms <= en <= me:
-                churned.append(s)
-        active_count = len(active)
-        churn_count = len(churned)
-        active_rev = sum(to_float(r["monthly_revenue"]) for r in active)
-        churn_rev = sum(to_float(r["monthly_revenue"]) for r in churned)
-        out.append(
-            {
-                "month": month,
-                "activeCount": active_count,
-                "churnCount": churn_count,
-                "customerChurnRate": pct(churn_count, active_count),
-                "revenueChurnRate": pct(churn_rev, active_rev),
-            }
+    while current <= end:
+        months.append(f"{current.year:04d}-{current.month:02d}")
+        current = (
+            date(current.year + 1, 1, 1)
+            if current.month == 12
+            else date(current.year, current.month + 1, 1)
         )
-    return out
+    return months
 
 
 def is_blocker_check(category: str, check_name: str) -> bool:
@@ -181,13 +147,12 @@ def is_blocker_check(category: str, check_name: str) -> bool:
 
 
 def gate_level_for_check(category: str) -> str:
-    mapping = {
+    return {
         "Data Quality": "technical_validity",
         "Metric Correctness": "analytical_validity",
         "Analytical Integrity": "analytical_validity",
         "Dashboard Review": "decision_product_quality",
-    }
-    return mapping.get(category, "general")
+    }.get(category, "general")
 
 
 def severity_for_check(status: str, category: str, check_name: str) -> str:
@@ -204,69 +169,72 @@ def release_matrix(
     analytical_warn_limit: int = 1,
     decision_support_warn_limit: int = 3,
 ) -> tuple[list[dict[str, Any]], str]:
-    fail_checks = [c for c in checks if c.status == "FAIL"]
-    warn_checks = [c for c in checks if c.status == "WARN"]
-    blocker_fails = [c for c in fail_checks if is_blocker_check(c.category, c.check_name)]
-    major_warns = [c for c in warn_checks if severity_for_check(c.status, c.category, c.check_name) == "major"]
-
-    technical_failures = [
-        c for c in fail_checks if gate_level_for_check(c.category) in {"technical_validity", "decision_product_quality"}
+    failures = [check for check in checks if check.status == "FAIL"]
+    warnings = [check for check in checks if check.status == "WARN"]
+    blocker_fails = [
+        check for check in failures if is_blocker_check(check.category, check.check_name)
     ]
-    analytical_failures = [c for c in fail_checks if gate_level_for_check(c.category) == "analytical_validity"]
+    major_warns = [
+        check
+        for check in warnings
+        if severity_for_check(check.status, check.category, check.check_name) == "major"
+    ]
+    technical_failures = [
+        check
+        for check in failures
+        if gate_level_for_check(check.category)
+        in {"technical_validity", "decision_product_quality"}
+    ]
+    analytical_failures = [
+        check for check in failures if gate_level_for_check(check.category) == "analytical_validity"
+    ]
 
-    technically_valid = len(technical_failures) == 0 and len(blocker_fails) == 0
+    technically_valid = not technical_failures and not blocker_fails
     analytically_acceptable = (
-        technically_valid
-        and len(analytical_failures) == 0
-        and len(major_warns) <= analytical_warn_limit
+        technically_valid and not analytical_failures and len(major_warns) <= analytical_warn_limit
     )
     decision_support_only = (
         technically_valid
-        and len(analytical_failures) == 0
+        and not analytical_failures
         and len(major_warns) <= decision_support_warn_limit
-        and (len(warn_checks) > 0 or synthetic_data)
+        and (bool(warnings) or synthetic_data)
     )
-    screening_grade_only = technically_valid and not analytically_acceptable and not decision_support_only
-    not_committee_grade = synthetic_data or len(warn_checks) > 0
-    publish_blocked = len(blocker_fails) > 0 or len(fail_checks) > 0
-
+    screening_grade_only = (
+        technically_valid and not analytically_acceptable and not decision_support_only
+    )
+    publish_blocked = bool(blocker_fails or failures)
+    states = {
+        "technically valid": technically_valid,
+        "analytically acceptable": analytically_acceptable,
+        "decision-support only": decision_support_only,
+        "screening-grade only": screening_grade_only,
+        "not committee-grade": synthetic_data or bool(warnings),
+        "publish-blocked": publish_blocked,
+    }
+    criteria = {
+        "technically valid": "No blocker failures in technical and product-quality gates.",
+        "analytically acceptable": "Technically valid and no analytical failures within the acceptance warning limit.",
+        "decision-support only": "Technically valid decision support within the configured warning limit, with explicit caveats.",
+        "screening-grade only": "Technically stable but analytically below decision-support threshold.",
+        "not committee-grade": "Any unresolved caveat or synthetic-data limitation prevents committee-grade claims.",
+        "publish-blocked": "Any FAIL or blocker fail blocks publication-ready claim.",
+    }
+    evidence = {
+        "technically valid": f"blocker_fails={len(blocker_fails)}, technical_failures={len(technical_failures)}",
+        "analytically acceptable": f"analytical_failures={len(analytical_failures)}, major_warns={len(major_warns)}, limit={analytical_warn_limit}",
+        "decision-support only": f"synthetic_data={synthetic_data}, major_warns={len(major_warns)}, limit={decision_support_warn_limit}",
+        "screening-grade only": f"technically_valid={technically_valid}, analytically_acceptable={analytically_acceptable}",
+        "not committee-grade": f"synthetic_data={synthetic_data}, warns={len(warnings)}",
+        "publish-blocked": f"fail_count={len(failures)}, blocker_fails={len(blocker_fails)}",
+    }
     matrix = [
         {
-            "state": "technically valid",
-            "active": technically_valid,
-            "criterion": "No blocker failures in technical and product-quality gates.",
-            "evidence": f"blocker_fails={len(blocker_fails)}, technical_failures={len(technical_failures)}",
-        },
-        {
-            "state": "analytically acceptable",
-            "active": analytically_acceptable,
-            "criterion": "Technically valid and no analytical failures within the acceptance warning limit.",
-            "evidence": f"analytical_failures={len(analytical_failures)}, major_warns={len(major_warns)}, limit={analytical_warn_limit}",
-        },
-        {
-            "state": "decision-support only",
-            "active": decision_support_only,
-            "criterion": "Technically valid decision support within the configured warning limit, with explicit caveats.",
-            "evidence": f"synthetic_data={synthetic_data}, major_warns={len(major_warns)}, limit={decision_support_warn_limit}",
-        },
-        {
-            "state": "screening-grade only",
-            "active": screening_grade_only,
-            "criterion": "Technically stable but analytically below decision-support threshold.",
-            "evidence": f"technically_valid={technically_valid}, analytically_acceptable={analytically_acceptable}",
-        },
-        {
-            "state": "not committee-grade",
-            "active": not_committee_grade,
-            "criterion": "Any unresolved caveat or synthetic-data limitation prevents committee-grade claims.",
-            "evidence": f"synthetic_data={synthetic_data}, warns={len(warn_checks)}",
-        },
-        {
-            "state": "publish-blocked",
-            "active": publish_blocked,
-            "criterion": "Any FAIL or blocker fail blocks publication-ready claim.",
-            "evidence": f"fail_count={len(fail_checks)}, blocker_fails={len(blocker_fails)}",
-        },
+            "state": state,
+            "active": active,
+            "criterion": criteria[state],
+            "evidence": evidence[state],
+        }
+        for state, active in states.items()
     ]
 
     if publish_blocked:
@@ -281,1090 +249,1371 @@ def release_matrix(
         recommended = "technically valid"
     else:
         recommended = "not committee-grade"
-
     return matrix, recommended
 
 
-def main() -> int:
-    root = project_root()
-    raw = raw_dir()
-    processed = processed_dir()
-    outputs_tables = outputs_tables_dir()
+def _read_frame(path: Path) -> pd.DataFrame:
+    return pd.read_csv(path, keep_default_na=False)
 
+
+def load_validation_data(root: Path | None = None) -> ValidationData:
+    root = root or project_root()
+    raw = raw_dir() if root == project_root() else root / "data" / "raw"
+    processed = processed_dir() if root == project_root() else root / "data" / "processed"
+    tables = outputs_tables_dir() if root == project_root() else root / "outputs" / "tables"
+    paths = {
+        "customers": raw / "customers.csv",
+        "subscriptions": raw / "subscriptions.csv",
+        "usage": raw / "product_usage.csv",
+        "payments": raw / "payments.csv",
+        "features": processed / "customer_retention_features.csv",
+        "cohort": processed / "cohort_retention_table.csv",
+        "segment_summary": processed / "segment_retention_summary.csv",
+        "risk_scores": processed / "customer_risk_scores.csv",
+        "trend": tables / "overall_retention_trend_monthly.csv",
+        "churn_by_segment": tables / "churn_by_segment.csv",
+        "churn_by_region": tables / "churn_by_region.csv",
+        "churn_by_channel": tables / "churn_by_acquisition_channel.csv",
+        "churn_by_plan": tables / "churn_by_plan_type.csv",
+        "behavioral": tables / "behavioral_churn_relationships.csv",
+        "findings": tables / "main_analysis_structured_findings.csv",
+        "segment_risk": tables / "segment_revenue_risk_contribution.csv",
+        "risk_summary": tables / "risk_tier_summary.csv",
+        "revenue_bridge": tables / "revenue_movement_bridge.csv",
+        "channel_economics": tables / "unit_economics_by_channel.csv",
+        "model_performance": tables / "model_performance.csv",
+        "model_calibration": tables / "model_calibration.csv",
+        "model_drift": tables / "model_feature_drift.csv",
+        "probabilities": processed / "customer_churn_probabilities.csv",
+        "experiment_assignments": processed / "intervention_assignments.csv",
+        "experiment_outcomes": processed / "intervention_outcome_ledger.csv",
+        "intervention_incrementality": tables / "intervention_incrementality.csv",
+        "intervention_balance": tables / "intervention_balance.csv",
+        "risk_transitions": tables / "risk_tier_transition_history.csv",
+        "monitoring_alerts": tables / "monitoring_alerts.csv",
+    }
+    manifest_path = raw / "_ingestion_manifest.json"
+    source_adapter = "unknown"
+    if manifest_path.is_file():
+        source_adapter = str(json.loads(manifest_path.read_text(encoding="utf-8"))["adapter"])
+    return ValidationData(
+        root=root,
+        frames={name: _read_frame(path) for name, path in paths.items()},
+        source_adapter=source_adapter,
+    )
+
+
+def _check(category: str, name: str, passed: bool, evidence: str, fail: str = "FAIL") -> Check:
+    return Check(category, name, "PASS" if passed else fail, evidence)
+
+
+def _numeric(frame: pd.DataFrame, column: str) -> pd.Series:
+    return pd.to_numeric(frame[column], errors="coerce").fillna(0.0)
+
+
+def _dates(frame: pd.DataFrame, column: str) -> pd.Series:
+    return pd.to_datetime(frame[column], errors="coerce")
+
+
+def data_quality_checks(data: ValidationData) -> list[Check]:
+    customers = data["customers"]
+    subscriptions = data["subscriptions"]
+    usage = data["usage"]
+    payments = data["payments"]
     checks: list[Check] = []
 
-    customers, customers_cols = load_csv(raw / "customers.csv")
-    subscriptions, subscriptions_cols = load_csv(raw / "subscriptions.csv")
-    usage, usage_cols = load_csv(raw / "product_usage.csv")
-    payments, payments_cols = load_csv(raw / "payments.csv")
-
-    features, _features_cols = load_csv(processed / "customer_retention_features.csv")
-    cohort, _cohort_cols = load_csv(processed / "cohort_retention_table.csv")
-    seg_summary, _seg_summary_cols = load_csv(processed / "segment_retention_summary.csv")
-    risk_scores, risk_scores_cols = load_csv(processed / "customer_risk_scores.csv")
-
-    trend, _ = load_csv(outputs_tables / "overall_retention_trend_monthly.csv")
-    churn_by_segment, _ = load_csv(outputs_tables / "churn_by_segment.csv")
-    churn_by_region, _ = load_csv(outputs_tables / "churn_by_region.csv")
-    churn_by_channel, _ = load_csv(outputs_tables / "churn_by_acquisition_channel.csv")
-    churn_by_plan, _ = load_csv(outputs_tables / "churn_by_plan_type.csv")
-    behavioral, _ = load_csv(outputs_tables / "behavioral_churn_relationships.csv")
-    findings, _ = load_csv(outputs_tables / "main_analysis_structured_findings.csv")
-    seg_risk, _ = load_csv(outputs_tables / "segment_revenue_risk_contribution.csv")
-    # ----------------------------
-    # 1) DATA QUALITY
-    # ----------------------------
-    actual_shapes = {
-        "customers": (len(customers), len(customers_cols)),
-        "subscriptions": (len(subscriptions), len(subscriptions_cols)),
-        "product_usage": (len(usage), len(usage_cols)),
-        "payments": (len(payments), len(payments_cols)),
+    shapes = {
+        "customers": customers.shape,
+        "subscriptions": subscriptions.shape,
+        "product_usage": usage.shape,
+        "payments": payments.shape,
     }
-    shape_ok = (
-        actual_shapes["customers"] == (3500, 6)
-        and actual_shapes["subscriptions"] == (3500, 8)
-        and actual_shapes["product_usage"][1] == 7
-        and actual_shapes["payments"][1] == 5
-        and 200_000 <= actual_shapes["product_usage"][0] <= 900_000
-        and 20_000 <= actual_shapes["payments"][0] <= 90_000
+    schema_widths_ok = (
+        shapes["customers"][1] == 6
+        and shapes["subscriptions"][1] == 8
+        and shapes["product_usage"][1] == 7
+        and shapes["payments"][1] == 5
     )
-    shape_status = "PASS" if shape_ok else "WARN"
+    if data.source_adapter == "synthetic":
+        volume_ok = (
+            shapes["customers"][0] == 3500
+            and shapes["subscriptions"][0] == 3500
+            and 200_000 <= shapes["product_usage"][0] <= 900_000
+            and 20_000 <= shapes["payments"][0] <= 90_000
+        )
+    else:
+        volume_ok = all(rows > 0 for rows, _columns in shapes.values())
+    shape_ok = schema_widths_ok and volume_ok
     checks.append(
-        Check(
+        _check(
             "Data Quality",
             "Row/column count sanity",
-            shape_status,
-            f"Observed shapes: {actual_shapes}; checked against structural counts and plausible row-count ranges.",
+            shape_ok,
+            f"Observed shapes: {shapes}; adapter={data.source_adapter}; checked against schema widths and adapter-appropriate row ranges.",
+            "WARN",
         )
     )
 
-    dup_results = {
-        "customers.customer_id": count_duplicates(customers, "customer_id"),
-        "subscriptions.subscription_id": count_duplicates(subscriptions, "subscription_id"),
-        "product_usage.usage_id": count_duplicates(usage, "usage_id"),
-        "payments.payment_id": count_duplicates(payments, "payment_id"),
+    duplicate_counts = {
+        "customers.customer_id": int(customers["customer_id"].duplicated().sum()),
+        "subscriptions.subscription_id": int(subscriptions["subscription_id"].duplicated().sum()),
+        "product_usage.usage_id": int(usage["usage_id"].duplicated().sum()),
+        "payments.payment_id": int(payments["payment_id"].duplicated().sum()),
     }
-    dup_status = "PASS" if all(v == 0 for v in dup_results.values()) else "FAIL"
     checks.append(
-        Check(
+        _check(
             "Data Quality",
             "Duplicate handling",
-            dup_status,
-            f"Primary-key duplicate counts: {dup_results}.",
+            not any(duplicate_counts.values()),
+            f"Primary-key duplicate counts: {duplicate_counts}.",
         )
     )
 
-    subs_nulls = null_counts(subscriptions, subscriptions_cols)
-    non_end_nulls = {k: v for k, v in subs_nulls.items() if k != "subscription_end_date" and v > 0}
-    null_status = "PASS" if not non_end_nulls else "WARN"
+    blank = subscriptions.astype(str).apply(lambda series: series.str.strip().eq("").sum())
+    unexpected_nulls = {
+        column: int(count)
+        for column, count in blank.items()
+        if column != "subscription_end_date" and count > 0
+    }
     checks.append(
-        Check(
+        _check(
             "Data Quality",
             "Null handling",
-            null_status,
-            f"subscription_end_date nulls={subs_nulls.get('subscription_end_date', 0)} (expected for open accounts); unexpected subscription nulls={non_end_nulls}.",
+            not unexpected_nulls,
+            f"subscription_end_date nulls={int(blank.get('subscription_end_date', 0))} (expected for open accounts); unexpected subscription nulls={unexpected_nulls}.",
+            "WARN",
         )
     )
 
-    sub_status_values = {r["status"] for r in subscriptions}
-    pay_status_values = {r["payment_status"] for r in payments}
-    invalid_sub_status = sorted(sub_status_values - ALLOWED_SUBSCRIPTION_STATUS)
-    invalid_pay_status = sorted(pay_status_values - ALLOWED_PAYMENT_STATUS)
-    status_ok = not invalid_sub_status and not invalid_pay_status
+    sub_statuses = set(subscriptions["status"].astype(str))
+    payment_statuses = set(payments["payment_status"].astype(str))
+    invalid_sub_status = sorted(sub_statuses - ALLOWED_SUBSCRIPTION_STATUS)
+    invalid_payment_status = sorted(payment_statuses - ALLOWED_PAYMENT_STATUS)
     checks.append(
-        Check(
+        _check(
             "Data Quality",
             "Status consistency",
-            "PASS" if status_ok else "FAIL",
-            f"Subscription statuses={sorted(sub_status_values)}; payment statuses={sorted(pay_status_values)}; invalid subscription={invalid_sub_status}; invalid payment={invalid_pay_status}.",
+            not invalid_sub_status and not invalid_payment_status,
+            f"Subscription statuses={sorted(sub_statuses)}; payment statuses={sorted(payment_statuses)}; invalid subscription={invalid_sub_status}; invalid payment={invalid_payment_status}.",
         )
     )
 
-    customers_by_id = {r["customer_id"]: r for r in customers}
-    subs_by_customer: dict[str, list[dict[str, str]]] = defaultdict(list)
-    for s in subscriptions:
-        subs_by_customer[s["customer_id"]].append(s)
-
-    end_before_start = 0
-    signup_after_sub_start = 0
-    for s in subscriptions:
-        st = parse_date(s["subscription_start_date"])
-        en = parse_date(s["subscription_end_date"])
-        if st and en and en < st:
-            end_before_start += 1
-        cust = customers_by_id.get(s["customer_id"])
-        if cust:
-            signup = parse_date(cust["signup_date"])
-            if signup and st and signup > st:
-                signup_after_sub_start += 1
-
-    impossible_date_status = "PASS" if (end_before_start == 0 and signup_after_sub_start == 0) else "FAIL"
+    joined = subscriptions.merge(
+        customers[["customer_id", "signup_date"]], on="customer_id", how="left"
+    )
+    start = _dates(joined, "subscription_start_date")
+    end = _dates(joined, "subscription_end_date")
+    signup = _dates(joined, "signup_date")
+    end_before_start = int((end.notna() & (end < start)).sum())
+    signup_after_start = int((signup.notna() & start.notna() & (signup > start)).sum())
     checks.append(
-        Check(
+        _check(
             "Data Quality",
             "Impossible date logic",
-            impossible_date_status,
-            f"subscription_end_before_start={end_before_start}; signup_after_subscription_start={signup_after_sub_start}.",
+            end_before_start == 0 and signup_after_start == 0,
+            f"subscription_end_before_start={end_before_start}; signup_after_subscription_start={signup_after_start}.",
         )
     )
 
-    invalid_monthly_revenue = sum(1 for s in subscriptions if to_float(s["monthly_revenue"]) <= 0.0)
+    invalid_revenue = int((_numeric(subscriptions, "monthly_revenue") <= 0).sum())
     checks.append(
-        Check(
+        _check(
             "Data Quality",
             "Impossible revenue values",
-            "PASS" if invalid_monthly_revenue == 0 else "FAIL",
-            f"subscriptions.monthly_revenue <= 0 rows: {invalid_monthly_revenue}.",
+            invalid_revenue == 0,
+            f"subscriptions.monthly_revenue <= 0 rows: {invalid_revenue}.",
         )
     )
 
-    overlaps = 0
-    for _customer_id, rows in subs_by_customer.items():
-        intervals: list[tuple[date, date | None]] = []
-        for r in rows:
-            intervals.append((parse_date(r["subscription_start_date"]), parse_date(r["subscription_end_date"])))
-        intervals = [i for i in intervals if i[0] is not None]
-        intervals.sort(key=lambda x: x[0])
-        prev_end: date | None = None
-        for st, en in intervals:
-            if prev_end is not None and st <= prev_end:
-                overlaps += 1
-                break
-            if en is None:
-                prev_end = date(9999, 12, 31)
-            else:
-                prev_end = en if prev_end is None else max(prev_end, en)
+    intervals = subscriptions[["customer_id"]].copy()
+    intervals["start"] = _dates(subscriptions, "subscription_start_date")
+    intervals["end"] = _dates(subscriptions, "subscription_end_date").fillna(pd.Timestamp.max)
+    intervals = intervals.sort_values(["customer_id", "start"])
+    previous_end = intervals.groupby("customer_id")["end"].shift()
+    overlap_customers = int(
+        intervals.loc[intervals["start"] <= previous_end, "customer_id"].nunique()
+    )
     checks.append(
-        Check(
+        _check(
             "Data Quality",
             "Overlapping subscriptions where not expected",
-            "PASS" if overlaps == 0 else "FAIL",
-            f"Customers with overlapping subscription intervals: {overlaps}.",
+            overlap_customers == 0,
+            f"Customers with overlapping subscription intervals: {overlap_customers}.",
         )
     )
 
-    usage_outside_sub = 0
-    for u in usage:
-        d = parse_date(u["usage_date"])
-        if d is None:
-            continue
-        rows = subs_by_customer.get(u["customer_id"], [])
-        valid = False
-        for s in rows:
-            st = parse_date(s["subscription_start_date"])
-            en = parse_date(s["subscription_end_date"])
-            if st and d >= st and (en is None or d <= en):
-                valid = True
-                break
-        if not valid:
-            usage_outside_sub += 1
-
+    windows = subscriptions[["customer_id"]].copy()
+    windows["start"] = _dates(subscriptions, "subscription_start_date")
+    windows["end"] = _dates(subscriptions, "subscription_end_date")
+    windows = windows.groupby("customer_id", as_index=False).agg(
+        start=("start", "min"),
+        end=("end", "max"),
+        open_subscription=("end", lambda values: bool(values.isna().any())),
+    )
+    usage_window = usage[["customer_id", "usage_date"]].merge(windows, on="customer_id", how="left")
+    usage_date = _dates(usage_window, "usage_date")
+    usage_valid = (
+        usage_window["start"].notna()
+        & (usage_date >= usage_window["start"])
+        & (usage_window["open_subscription"] | (usage_date <= usage_window["end"]))
+    )
+    usage_outside = int((~usage_valid).sum())
     checks.append(
-        Check(
+        _check(
             "Data Quality",
             "Usage dates outside subscription periods",
-            "PASS" if usage_outside_sub == 0 else "WARN",
-            f"Usage rows outside active subscription window: {usage_outside_sub}.",
+            usage_outside == 0,
+            f"Usage rows outside active subscription window: {usage_outside}.",
+            "WARN",
         )
     )
 
-    invalid_payment_amount = sum(1 for p in payments if to_float(p["amount"]) <= 0.0)
-    payment_before_start = 0
-    payment_after_end = 0
-    for p in payments:
-        d = parse_date(p["payment_date"])
-        if d is None:
-            continue
-        rows = subs_by_customer.get(p["customer_id"], [])
-        if not rows:
-            continue
-        valid_start = False
-        for s in rows:
-            st = parse_date(s["subscription_start_date"])
-            en = parse_date(s["subscription_end_date"])
-            if st and d >= st:
-                valid_start = True
-            if en is None or (en and d <= en):
-                pass
-        if not valid_start:
-            payment_before_start += 1
-        # Strictly after all known end dates.
-        all_ended = True
-        latest_end: date | None = None
-        for s in rows:
-            en = parse_date(s["subscription_end_date"])
-            if en is None:
-                all_ended = False
-                break
-            latest_end = en if latest_end is None else max(latest_end, en)
-        if all_ended and latest_end and d > latest_end:
-            payment_after_end += 1
-
-    pay_status = "PASS" if (invalid_payment_amount == 0 and payment_before_start == 0 and payment_after_end == 0) else "WARN"
+    payment_window = payments[["customer_id", "payment_date"]].merge(
+        windows, on="customer_id", how="left"
+    )
+    payment_date = _dates(payment_window, "payment_date")
+    invalid_amount = int((_numeric(payments, "amount") <= 0).sum())
+    payment_before_start = int(
+        (payment_window["start"].notna() & (payment_date < payment_window["start"])).sum()
+    )
+    payment_after_end = int(
+        (
+            ~payment_window["open_subscription"]
+            & payment_window["end"].notna()
+            & (payment_date > payment_window["end"])
+        ).sum()
+    )
+    payment_ok = invalid_amount == 0 and payment_before_start == 0 and payment_after_end == 0
     checks.append(
-        Check(
+        _check(
             "Data Quality",
             "Payment consistency",
-            pay_status,
-            f"payment.amount<=0 rows={invalid_payment_amount}; payment_before_subscription_start={payment_before_start}; payment_after_subscription_end={payment_after_end}.",
+            payment_ok,
+            f"payment.amount<=0 rows={invalid_amount}; payment_before_subscription_start={payment_before_start}; payment_after_subscription_end={payment_after_end}.",
+            "WARN",
         )
     )
+    return checks
 
-    # ----------------------------
-    # 2) METRIC CORRECTNESS
-    # ----------------------------
-    sub_status_by_customer = {s["customer_id"]: s["status"] for s in subscriptions}
-    churn_mismatch = 0
-    risk_mismatch = 0
-    both_flags = 0
-    for r in features:
-        status = sub_status_by_customer.get(r["customer_id"])
-        churn = to_int(r["churn_flag"])
-        atrisk = to_int(r["at_risk_flag"])
-        if churn == 1 and atrisk == 1:
-            both_flags += 1
-        expected_churn = 1 if status == "churned" else 0
-        expected_risk = 1 if status == "at_risk" else 0
-        if churn != expected_churn:
-            churn_mismatch += 1
-        if atrisk != expected_risk:
-            risk_mismatch += 1
+
+def metric_correctness_checks(data: ValidationData) -> list[Check]:
+    subscriptions = data["subscriptions"]
+    features = data["features"]
+    cohort = data["cohort"]
+    segment_summary = data["segment_summary"]
+    trend = data["trend"]
+    churn_by_segment = data["churn_by_segment"]
+    checks: list[Check] = []
+
+    status = features[["customer_id", "churn_flag", "at_risk_flag"]].merge(
+        subscriptions[["customer_id", "status", "subscription_end_date"]],
+        on="customer_id",
+        how="left",
+    )
+    churn = _numeric(status, "churn_flag").astype(int)
+    at_risk = _numeric(status, "at_risk_flag").astype(int)
+    expected_churn = status["status"].eq("churned").astype(int)
+    expected_risk = status["status"].eq("at_risk").astype(int)
+    churn_mismatch = int((churn != expected_churn).sum())
+    risk_mismatch = int((at_risk != expected_risk).sum())
+    both_flags = int(((churn == 1) & (at_risk == 1)).sum())
     checks.append(
-        Check(
+        _check(
             "Metric Correctness",
             "churn_flag logic",
-            "PASS" if churn_mismatch == 0 and both_flags == 0 else "FAIL",
+            churn_mismatch == 0 and both_flags == 0,
             f"churn_flag mismatches={churn_mismatch}; rows with churn_flag=1 and at_risk_flag=1={both_flags}.",
         )
     )
     checks.append(
-        Check(
+        _check(
             "Metric Correctness",
             "at_risk_flag logic",
-            "PASS" if risk_mismatch == 0 else "FAIL",
+            risk_mismatch == 0,
             f"at_risk_flag mismatches={risk_mismatch}.",
         )
     )
 
-    sub_by_customer = {s["customer_id"]: s for s in subscriptions}
-    observation_mismatches = 0
-    open_observation_dates: set[date] = set()
-    for r in features:
-        obs = parse_date(r.get("observation_date", ""))
-        sub = sub_by_customer.get(r["customer_id"])
-        if sub is None or obs is None:
-            observation_mismatches += 1
-            continue
-        end = parse_date(sub["subscription_end_date"])
-        if sub["status"] == "churned":
-            if obs != end:
-                observation_mismatches += 1
-        else:
-            open_observation_dates.add(obs)
-    observation_ok = observation_mismatches == 0 and len(open_observation_dates) == 1
+    observations = features[["customer_id", "observation_date"]].merge(
+        subscriptions[["customer_id", "status", "subscription_end_date"]],
+        on="customer_id",
+        how="left",
+    )
+    observation_date = _dates(observations, "observation_date")
+    subscription_end = _dates(observations, "subscription_end_date")
+    churned_mask = observations["status"].eq("churned")
+    observation_mismatch = int(
+        (observation_date.isna() | (churned_mask & (observation_date != subscription_end))).sum()
+    )
+    open_dates = sorted(observation_date[~churned_mask].dropna().dt.date.unique())
     checks.append(
-        Check(
+        _check(
             "Metric Correctness",
             "Feature observation date logic",
-            "PASS" if observation_ok else "FAIL",
-            f"observation_mismatches={observation_mismatches}; open_account_snapshot_dates={sorted(open_observation_dates)}.",
+            observation_mismatch == 0 and len(open_dates) == 1,
+            f"observation_mismatches={observation_mismatch}; open_account_snapshot_dates={open_dates}.",
         )
     )
 
     total_customers = len(features)
-    churned = sum(to_int(r["churn_flag"]) for r in features)
-    cumulative_customer_churn_share = pct(churned, total_customers)
-
-    seg_total = 0
-    seg_churned = 0
-    for r in seg_summary:
-        active = to_int(r["active_customers"])
-        churned_seg = to_int(r["churned_customers"])
-        seg_total += active + churned_seg
-        seg_churned += churned_seg
-    seg_implied_churn_share = pct(seg_churned, seg_total)
-    customer_churn_diff = abs(cumulative_customer_churn_share - seg_implied_churn_share)
+    churned_customers = int(_numeric(features, "churn_flag").sum())
+    feature_churn_share = pct(churned_customers, total_customers)
+    segment_total = int(
+        (
+            _numeric(segment_summary, "active_customers")
+            + _numeric(segment_summary, "churned_customers")
+        ).sum()
+    )
+    segment_churned = int(_numeric(segment_summary, "churned_customers").sum())
+    segment_churn_share = pct(segment_churned, segment_total)
+    churn_share_diff = abs(feature_churn_share - segment_churn_share)
     checks.append(
-        Check(
+        _check(
             "Metric Correctness",
             "Cumulative customer churn share calculation",
-            "PASS" if customer_churn_diff <= 1e-6 else "FAIL",
-            f"features cumulative_churn_share={cumulative_customer_churn_share:.6f}; segment_summary implied={seg_implied_churn_share:.6f}; diff={customer_churn_diff:.8f}.",
+            churn_share_diff <= 1e-6,
+            f"features cumulative_churn_share={feature_churn_share:.6f}; segment_summary implied={segment_churn_share:.6f}; diff={churn_share_diff:.8f}.",
         )
     )
 
-    total_avg_mrr = sum(to_float(r["avg_monthly_revenue"]) for r in features)
-    churned_avg_mrr = sum(to_float(r["avg_monthly_revenue"]) for r in features if to_int(r["churn_flag"]) == 1)
-    cumulative_revenue_loss_share = pct(churned_avg_mrr, total_avg_mrr)
-
-    total_churned_revenue_seg = sum(to_float(r["churned_revenue"]) for r in churn_by_segment)
-    rev_churn_diff = abs(churned_avg_mrr - total_churned_revenue_seg)
+    average_mrr = _numeric(features, "avg_monthly_revenue")
+    churned_average_mrr = float(average_mrr[_numeric(features, "churn_flag").eq(1)].sum())
+    dimensional_churned_mrr = float(_numeric(churn_by_segment, "churned_revenue").sum())
+    revenue_diff = abs(churned_average_mrr - dimensional_churned_mrr)
+    revenue_loss_share = pct(churned_average_mrr, float(average_mrr.sum()))
     checks.append(
-        Check(
+        _check(
             "Metric Correctness",
             "Cumulative revenue loss share calculation",
-            "PASS" if rev_churn_diff <= 1e-6 else "FAIL",
-            f"features churned_monthly_value={churned_avg_mrr:.2f}; churn_by_segment churned_revenue sum={total_churned_revenue_seg:.2f}; cumulative_revenue_loss_share={cumulative_revenue_loss_share:.6f}.",
+            revenue_diff <= 1e-6,
+            f"features churned_monthly_value={churned_average_mrr:.2f}; churn_by_segment churned_revenue sum={dimensional_churned_mrr:.2f}; cumulative_revenue_loss_share={revenue_loss_share:.6f}.",
         )
     )
 
-    seg_risk_recompute_diff = 0.0
-    features_by_segment: dict[str, list[dict[str, str]]] = defaultdict(list)
-    for r in features:
-        features_by_segment[r["segment"]].append(r)
-    for row in seg_summary:
-        segment = row["segment"]
-        rows = features_by_segment.get(segment, [])
-        current_risk = sum(to_float(x["current_mrr"]) for x in rows if to_int(x["at_risk_flag"]) == 1)
-        churned_value = sum(to_float(x["avg_monthly_revenue"]) for x in rows if to_int(x["churn_flag"]) == 1)
-        seg_risk_recompute_diff = max(
-            seg_risk_recompute_diff,
-            abs(current_risk - to_float(row["current_mrr_at_risk"])),
-            abs(churned_value - to_float(row["churned_monthly_value_proxy"])),
-        )
+    feature_values = features.assign(
+        current_risk=_numeric(features, "current_mrr") * _numeric(features, "at_risk_flag"),
+        churned_value=_numeric(features, "avg_monthly_revenue") * _numeric(features, "churn_flag"),
+    )
+    recomputed = feature_values.groupby("segment", as_index=False).agg(
+        current_risk=("current_risk", "sum"), churned_value=("churned_value", "sum")
+    )
+    exposure = segment_summary.merge(recomputed, on="segment", how="outer").fillna(0)
+    exposure_diff = max(
+        float(
+            (_numeric(exposure, "current_mrr_at_risk") - _numeric(exposure, "current_risk"))
+            .abs()
+            .max()
+        ),
+        float(
+            (
+                _numeric(exposure, "churned_monthly_value_proxy")
+                - _numeric(exposure, "churned_value")
+            )
+            .abs()
+            .max()
+        ),
+    )
     checks.append(
-        Check(
+        _check(
             "Metric Correctness",
             "Segment exposure calculation",
-            "PASS" if seg_risk_recompute_diff <= 0.01 else "FAIL",
-            f"Max segment-level absolute diff vs recompute: {seg_risk_recompute_diff:.4f}.",
+            exposure_diff <= 0.01,
+            f"Max segment-level absolute diff vs recompute: {exposure_diff:.4f}.",
         )
     )
 
-    cohort_rate_mismatch = 0
-    cohort_bounds_violations = 0
-    for r in cohort:
-        active = to_int(r["active_customers"])
-        retained = to_int(r["retained_customers"])
-        retention_rate = to_float(r["retention_rate"])
-        recompute = pct(retained, active)
-        if abs(retention_rate - recompute) > 1.1e-6:
-            cohort_rate_mismatch += 1
-        if retained > active or retention_rate < 0 or retention_rate > 1:
-            cohort_bounds_violations += 1
+    cohort_active = _numeric(cohort, "active_customers")
+    cohort_retained = _numeric(cohort, "retained_customers")
+    cohort_rate = _numeric(cohort, "retention_rate")
+    recomputed_rate = cohort_retained.div(cohort_active.where(cohort_active.ne(0), 1))
+    rate_mismatch = int(((cohort_rate - recomputed_rate).abs() > 1.1e-6).sum())
+    bounds_violations = int(((cohort_retained > cohort_active) | ~cohort_rate.between(0, 1)).sum())
     checks.append(
-        Check(
+        _check(
             "Metric Correctness",
             "Retention rate correctness",
-            "PASS" if cohort_rate_mismatch == 0 and cohort_bounds_violations == 0 else "FAIL",
-            f"cohort retention mismatches={cohort_rate_mismatch}; bounds violations={cohort_bounds_violations}.",
+            rate_mismatch == 0 and bounds_violations == 0,
+            f"cohort retention mismatches={rate_mismatch}; bounds violations={bounds_violations}.",
         )
     )
 
-    trend_rate_mismatch = 0
-    for r in trend:
-        active = to_int(r["active_customers_start"])
-        churned_c = to_int(r["churned_customers"])
-        active_mrr = to_float(r["active_mrr_start"])
-        churned_mrr = to_float(r["churned_mrr"])
-        c_rate = to_float(r["customer_churn_rate"])
-        r_rate = to_float(r["revenue_churn_rate"])
-        ret_rate = to_float(r["retention_rate"])
-        c_recompute = pct(churned_c, active)
-        r_recompute = pct(churned_mrr, active_mrr)
-        if abs(c_rate - c_recompute) > 1.1e-6 or abs(r_rate - r_recompute) > 1.0e-4:
-            trend_rate_mismatch += 1
-        if active > 0 and abs(ret_rate - (1 - c_rate)) > 1.1e-6:
-            trend_rate_mismatch += 1
+    active = _numeric(trend, "active_customers_start")
+    active_mrr = _numeric(trend, "active_mrr_start")
+    customer_rate = _numeric(trend, "customer_churn_rate")
+    revenue_rate = _numeric(trend, "revenue_churn_rate")
+    retention_rate = _numeric(trend, "retention_rate")
+    expected_customer_rate = _numeric(trend, "churned_customers").div(active.where(active.ne(0), 1))
+    expected_revenue_rate = _numeric(trend, "churned_mrr").div(
+        active_mrr.where(active_mrr.ne(0), 1)
+    )
+    valid_month = active.gt(0)
+    trend_mismatch = int(
+        (
+            ((customer_rate - expected_customer_rate).abs() > 1.1e-6)
+            | ((revenue_rate - expected_revenue_rate).abs() > 1.0e-4)
+            | (valid_month & ((retention_rate - (1 - customer_rate)).abs() > 1.1e-6))
+        ).sum()
+    )
     checks.append(
-        Check(
+        _check(
             "Metric Correctness",
             "Monthly trend metric correctness",
-            "PASS" if trend_rate_mismatch == 0 else "FAIL",
-            f"overall_retention_trend_monthly inconsistencies={trend_rate_mismatch}.",
+            trend_mismatch == 0,
+            f"overall_retention_trend_monthly inconsistencies={trend_mismatch}.",
         )
     )
 
-    snapshot_date = next(iter(open_observation_dates)) if len(open_observation_dates) == 1 else None
-    expected_last_complete_end = None
+    snapshot_date = open_dates[0] if len(open_dates) == 1 else None
+    expected_last_complete = None
     if snapshot_date:
         snapshot_month = f"{snapshot_date.year:04d}-{snapshot_date.month:02d}"
-        expected_last_complete_end = (
+        expected_last_complete = (
             snapshot_date
             if snapshot_date == month_end(snapshot_month)
             else month_start(snapshot_month) - timedelta(days=1)
         )
-    trend_latest_end = month_end(max(r["month"][:7] for r in trend)) if trend else None
-    cohort_latest_end = month_end(max(r["observation_month"][:7] for r in cohort)) if cohort else None
+    trend_latest = month_end(str(trend["month"].max())[:7]) if not trend.empty else None
+    cohort_latest = (
+        month_end(str(cohort["observation_month"].max())[:7]) if not cohort.empty else None
+    )
     completed_periods_ok = (
-        expected_last_complete_end is not None
-        and trend_latest_end == expected_last_complete_end
-        and cohort_latest_end == expected_last_complete_end
+        expected_last_complete is not None
+        and trend_latest == expected_last_complete
+        and cohort_latest == expected_last_complete
     )
     checks.append(
-        Check(
+        _check(
             "Metric Correctness",
             "Completed-period trend logic",
-            "PASS" if completed_periods_ok else "FAIL",
-            f"snapshot={snapshot_date}; expected_last_complete_end={expected_last_complete_end}; trend_latest_end={trend_latest_end}; cohort_latest_end={cohort_latest_end}.",
+            completed_periods_ok,
+            f"snapshot={snapshot_date}; expected_last_complete_end={expected_last_complete}; trend_latest_end={trend_latest}; cohort_latest_end={cohort_latest}.",
         )
     )
 
-    cohort_date_violations = 0
-    cohort_active_inconsistency = 0
-    cohort_monotonic_violations = 0
-    cohort_group: dict[str, list[dict[str, str]]] = defaultdict(list)
-    for r in cohort:
-        cohort_group[r["cohort_month"]].append(r)
-        c_month = parse_date(r["cohort_month"])
-        o_month = parse_date(r["observation_month"])
-        if c_month and o_month and o_month < c_month:
-            cohort_date_violations += 1
-    for _k, rows in cohort_group.items():
-        active_values = {to_int(r["active_customers"]) for r in rows}
-        if len(active_values) > 1:
-            cohort_active_inconsistency += 1
-        sorted_rows = sorted(rows, key=lambda x: x["observation_month"])
-        prev_ret = None
-        prev_rev = None
-        for r in sorted_rows:
-            curr_ret = to_float(r["retention_rate"])
-            curr_rev = to_float(r["revenue_retention"])
-            if prev_ret is not None and curr_ret > prev_ret + 1e-9:
-                cohort_monotonic_violations += 1
-            if prev_rev is not None and curr_rev > prev_rev + 1e-9:
-                cohort_monotonic_violations += 1
-            prev_ret = curr_ret
-            prev_rev = curr_rev
-    cohort_logic_status = "PASS" if cohort_date_violations == 0 and cohort_active_inconsistency == 0 and cohort_monotonic_violations == 0 else "WARN"
+    cohort_ordered = cohort.assign(
+        cohort_date=_dates(cohort, "cohort_month"),
+        observation_date=_dates(cohort, "observation_month"),
+        retention_value=cohort_rate,
+        revenue_value=_numeric(cohort, "revenue_retention"),
+        active_value=cohort_active,
+    ).sort_values(["cohort_month", "observation_date"])
+    date_violations = int(
+        (cohort_ordered["observation_date"] < cohort_ordered["cohort_date"]).sum()
+    )
+    denominator_violations = int(
+        (cohort_ordered.groupby("cohort_month")["active_value"].nunique() > 1).sum()
+    )
+    retention_increases = cohort_ordered.groupby("cohort_month")["retention_value"].diff().gt(1e-9)
+    revenue_increases = cohort_ordered.groupby("cohort_month")["revenue_value"].diff().gt(1e-9)
+    monotonic_violations = int((retention_increases | revenue_increases).sum())
+    cohort_ok = date_violations == denominator_violations == monotonic_violations == 0
     checks.append(
-        Check(
+        _check(
             "Metric Correctness",
             "Cohort logic correctness",
-            cohort_logic_status,
-            f"observation_before_cohort={cohort_date_violations}; active_denominator_inconsistencies={cohort_active_inconsistency}; monotonicity_violations={cohort_monotonic_violations}.",
+            cohort_ok,
+            f"observation_before_cohort={date_violations}; active_denominator_inconsistencies={denominator_violations}; monotonicity_violations={monotonic_violations}.",
+            "WARN",
         )
     )
+    return checks
 
-    # ----------------------------
-    # 3) ANALYTICAL INTEGRITY
-    # ----------------------------
-    unique_customer_raw = len({r["customer_id"] for r in customers})
-    unique_customer_sub = len({r["customer_id"] for r in subscriptions})
-    unique_customer_features = len({r["customer_id"] for r in features})
-    unique_customer_risk = len({r["customer_id"] for r in risk_scores})
-    no_inflation = (
-        unique_customer_raw == len(customers)
-        and unique_customer_sub == len(subscriptions)
-        and unique_customer_features == len(features)
-        and unique_customer_risk == len(risk_scores)
+
+def analytical_integrity_checks(data: ValidationData) -> list[Check]:
+    customers = data["customers"]
+    subscriptions = data["subscriptions"]
+    features = data["features"]
+    risk_scores = data["risk_scores"]
+    trend = data["trend"]
+    dimensions = [
+        data["churn_by_segment"],
+        data["churn_by_region"],
+        data["churn_by_channel"],
+        data["churn_by_plan"],
+    ]
+    behavioral = data["behavioral"]
+    findings = data["findings"]
+    checks: list[Check] = []
+
+    unique_counts = {
+        "customers": customers["customer_id"].nunique(),
+        "subscriptions": subscriptions["customer_id"].nunique(),
+        "features": features["customer_id"].nunique(),
+        "risk_scores": risk_scores["customer_id"].nunique(),
+    }
+    no_inflation = all(
+        unique_counts[name] == len(frame)
+        for name, frame in (
+            ("customers", customers),
+            ("subscriptions", subscriptions),
+            ("features", features),
+            ("risk_scores", risk_scores),
+        )
     )
     checks.append(
-        Check(
+        _check(
             "Analytical Integrity",
             "Join inflation risk",
-            "PASS" if no_inflation else "FAIL",
-            f"Unique rows -> customers {unique_customer_raw}/{len(customers)}, subscriptions {unique_customer_sub}/{len(subscriptions)}, features {unique_customer_features}/{len(features)}, risk_scores {unique_customer_risk}/{len(risk_scores)}.",
+            no_inflation,
+            f"Unique customer rows: {unique_counts}; physical rows={{'customers': {len(customers)}, 'subscriptions': {len(subscriptions)}, 'features': {len(features)}, 'risk_scores': {len(risk_scores)}}}.",
         )
     )
 
-    low_denom_months = [r["month"] for r in trend if to_int(r["active_customers_start"]) < 100]
-    low_denom_is_prefix = low_denom_months == [r["month"] for r in trend[:len(low_denom_months)]]
+    low_denom_months = trend.loc[_numeric(trend, "active_customers_start") < 100, "month"].tolist()
+    expected_prefix = trend["month"].head(len(low_denom_months)).tolist()
     checks.append(
-        Check(
+        _check(
             "Analytical Integrity",
             "Incomplete period comparison risk",
-            "PASS" if low_denom_is_prefix else "WARN",
+            low_denom_months == expected_prefix,
             f"Low-denominator months form an initial prefix and are excluded from dashboard coverage: {low_denom_months}.",
+            "WARN",
         )
     )
 
-    denom_issues = 0
-    for r in churn_by_segment + churn_by_region + churn_by_channel + churn_by_plan:
-        c = to_int(r["customers"])
-        ch = to_int(r["churned_customers"])
-        rate = to_float(r["cumulative_churn_share"])
-        if c <= 0 or ch > c:
-            denom_issues += 1
-        if abs(rate - pct(ch, c)) > 1.1e-6:
-            denom_issues += 1
+    dimension_frame = pd.concat(dimensions, ignore_index=True)
+    customers_count = _numeric(dimension_frame, "customers")
+    churned_count = _numeric(dimension_frame, "churned_customers")
+    dimension_rate = _numeric(dimension_frame, "cumulative_churn_share")
+    expected_rate = churned_count.div(customers_count.where(customers_count.ne(0), 1))
+    denominator_issues = int(
+        (
+            customers_count.le(0)
+            | churned_count.gt(customers_count)
+            | ((dimension_rate - expected_rate).abs() > 1.1e-6)
+        ).sum()
+    )
     checks.append(
-        Check(
+        _check(
             "Analytical Integrity",
             "Denominator correctness",
-            "PASS" if denom_issues == 0 else "FAIL",
-            f"Dimension-level denominator/rate inconsistencies={denom_issues}.",
+            denominator_issues == 0,
+            f"Dimension-level denominator/rate inconsistencies={denominator_issues}.",
         )
     )
 
-    non_churned_features = sum(1 for r in features if to_int(r["churn_flag"]) == 0)
-    survivorship_status = "PASS" if len(risk_scores) == non_churned_features else "WARN"
+    non_churned = int((_numeric(features, "churn_flag") == 0).sum())
     checks.append(
-        Check(
+        _check(
             "Analytical Integrity",
             "Survivorship bias risk",
-            survivorship_status,
-            f"risk_scores rows={len(risk_scores)}; non-churned feature rows={non_churned_features}; scoring layer excludes churned accounts by design.",
+            len(risk_scores) == non_churned,
+            f"risk_scores rows={len(risk_scores)}; non-churned feature rows={non_churned}; scoring layer excludes churned accounts by design.",
+            "WARN",
         )
     )
 
-    behavioral_map = {r["relationship"]: to_float(r["churn_rate_lift"]) for r in behavioral}
-    negative_or_neutral = {
-        k: v
-        for k, v in behavioral_map.items()
-        if k in {"usage_decline_flag", "high_support_ticket_flag", "failed_payment_flag", "low_nps_flag", "low_feature_adoption_flag"}
-        and v <= 1.0
+    monitored_relationships = {
+        "usage_decline_flag",
+        "high_support_ticket_flag",
+        "failed_payment_flag",
+        "low_nps_flag",
+        "low_feature_adoption_flag",
+    }
+    neutral = {
+        str(row.relationship): float(row.churn_rate_lift)
+        for row in behavioral.itertuples()
+        if row.relationship in monitored_relationships and float(row.churn_rate_lift) <= 1.0
     }
     checks.append(
-        Check(
+        _check(
             "Analytical Integrity",
             "Overclaiming risk",
-            "WARN" if negative_or_neutral else "PASS",
-            f"Behavior signals with churn lift <= 1.0: {negative_or_neutral if negative_or_neutral else 'none'}.",
+            not neutral,
+            f"Behavior signals with churn lift <= 1.0: {neutral if neutral else 'none'}.",
+            "WARN",
         )
     )
 
-    top_seg = max(churn_by_segment, key=lambda x: to_float(x["cumulative_churn_share"]))["segment"] if churn_by_segment else ""
-    top_reg = max(churn_by_region, key=lambda x: to_float(x["cumulative_churn_share"]))["region"] if churn_by_region else ""
-    top_chn = max(churn_by_channel, key=lambda x: to_float(x["cumulative_churn_share"]))["acquisition_channel"] if churn_by_channel else ""
-    top_plan = max(churn_by_plan, key=lambda x: to_float(x["cumulative_churn_share"]))["plan_type"] if churn_by_plan else ""
-    top_rel = max(behavioral, key=lambda x: to_float(x["churn_rate_lift"]))["relationship"] if behavioral else ""
-    sec3 = next((r for r in findings if r.get("section", "").startswith("3.")), None)
-    sec3_result = sec3.get("result", "") if sec3 else ""
-    evidence_supported = all(x in sec3_result for x in [top_seg, top_reg, top_chn, top_plan, top_rel])
+    dimensions_with_names = [
+        (data["churn_by_segment"], "segment"),
+        (data["churn_by_region"], "region"),
+        (data["churn_by_channel"], "acquisition_channel"),
+        (data["churn_by_plan"], "plan_type"),
+    ]
+    top_values = [
+        str(frame.loc[_numeric(frame, "cumulative_churn_share").idxmax(), column])
+        for frame, column in dimensions_with_names
+    ]
+    top_values.append(
+        str(behavioral.loc[_numeric(behavioral, "churn_rate_lift").idxmax(), "relationship"])
+    )
+    section_three = findings[findings["section"].astype(str).str.startswith("3.")]
+    finding_result = str(section_three.iloc[0]["result"]) if not section_three.empty else ""
+    supported = all(value in finding_result for value in top_values)
     checks.append(
-        Check(
+        _check(
             "Analytical Integrity",
             "Conclusions supported by evidence",
-            "PASS" if evidence_supported else "WARN",
-            f"Section 3 finding includes top drivers check -> {evidence_supported}. Top values: segment={top_seg}, region={top_reg}, channel={top_chn}, plan={top_plan}, relationship={top_rel}.",
+            supported,
+            f"Section 3 finding includes computed top drivers={supported}; values={top_values}.",
+            "WARN",
         )
     )
+    return checks
 
-    # ----------------------------
-    # 4) DASHBOARD REVIEW
-    # ----------------------------
-    dashboard_builder = (root / "src" / "churn" / "dashboard.py").read_text(encoding="utf-8")
+
+def _dashboard_payload(html: str) -> tuple[dict[str, Any], str]:
+    match = re.search(r"const DATA = (.+?);\nconst ALL", html, re.S)
+    if not match:
+        return {}, "Unable to locate embedded DATA payload in dashboard HTML."
+    try:
+        payload = json.loads(match.group(1))
+    except (json.JSONDecodeError, TypeError) as exc:
+        return {}, str(exc)
+    return payload, ""
+
+
+def dashboard_checks(data: ValidationData) -> list[Check]:
+    root = data.root
+    trend = data["trend"]
+    risk_scores = data["risk_scores"]
+    builder = (root / "src" / "churn" / "dashboard.py").read_text(encoding="utf-8")
     dashboard_path = root / "outputs" / "dashboard" / "executive-retention-command-center.html"
-    dashboard_html = dashboard_path.read_text(encoding="utf-8")
-    root_index_html = (root / "index.html").read_text(encoding="utf-8")
-    docs_index_html = (root / "docs" / "index.html").read_text(encoding="utf-8")
-    dashboard_htmls = sorted((root / "outputs" / "dashboard").glob("*.html"))
+    html = dashboard_path.read_text(encoding="utf-8")
+    root_index = (root / "index.html").read_text(encoding="utf-8")
+    docs_index = (root / "docs" / "index.html").read_text(encoding="utf-8")
+    dashboard_files = sorted((root / "outputs" / "dashboard").glob("*.html"))
+    checks: list[Check] = []
 
+    unique_output = (
+        len(dashboard_files) == 1
+        and dashboard_files[0].name == "executive-retention-command-center.html"
+    )
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Official dashboard output uniqueness",
-            "PASS" if len(dashboard_htmls) == 1 and dashboard_htmls[0].name == "executive-retention-command-center.html" else "WARN",
-            f"Dashboard HTML files detected: {[p.name for p in dashboard_htmls]}.",
+            unique_output,
+            f"Dashboard HTML files detected: {[path.name for path in dashboard_files]}.",
+            "WARN",
         )
     )
 
     redirect_ok = (
-        ("http-equiv=\"refresh\"" in root_index_html)
-        and ("./outputs/dashboard/executive-retention-command-center.html" in root_index_html)
-        and ("const DATA =" not in root_index_html)
-        and ("http-equiv=\"refresh\"" in docs_index_html)
-        and ("../outputs/dashboard/executive-retention-command-center.html" in docs_index_html)
-        and ("const DATA =" not in docs_index_html)
+        'http-equiv="refresh"' in root_index
+        and "./outputs/dashboard/executive-retention-command-center.html" in root_index
+        and "const DATA =" not in root_index
+        and 'http-equiv="refresh"' in docs_index
+        and "../outputs/dashboard/executive-retention-command-center.html" in docs_index
+        and "const DATA =" not in docs_index
     )
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Single dashboard payload copy",
-            "PASS" if redirect_ok else "FAIL",
-            "Root/docs entrypoints are lightweight redirects and only outputs/dashboard carries full embedded payload.",
+            redirect_ok,
+            "Root/docs entrypoints are lightweight redirects and only outputs/dashboard carries the full payload.",
         )
     )
 
-    governed_source_ok = ("data/raw" not in dashboard_builder) and ("processed" in dashboard_builder) and ("outputs" in dashboard_builder)
+    governed_sources = "data/raw" not in builder and "processed" in builder and "outputs" in builder
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Governed data-source usage",
-            "PASS" if governed_source_ok else "FAIL",
-            "Builder uses governed processed/output artifacts and does not query raw source files directly.",
+            governed_sources,
+            "Builder uses governed processed/output artifacts and does not query raw files.",
         )
     )
 
-    # Region dimension is surfaced via the filterRegion slicer; a dedicated chart is optional.
-    region_coverage_ok = ("filterRegion" in dashboard_html) or (
-        ("chartChurnRegion" in dashboard_html) or ("Churn Rate by Region" in dashboard_html)
-    )
+    region_coverage = "filterRegion" in html or "chartChurnRegion" in html
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Required diagnostics coverage (region)",
-            "PASS" if region_coverage_ok else "FAIL",
-            "Region dimension is accessible via filter control or a dedicated diagnostic chart.",
+            region_coverage,
+            "Region is accessible through a filter or dedicated diagnostic chart.",
         )
     )
 
-    data_match = re.search(r"const DATA = (.+?);\nconst ALL", dashboard_html, re.S)
-    dashboard_payload: dict[str, Any] = {}
-    payload_parse_error = ""
-    if data_match:
-        try:
-            dashboard_payload = json.loads(data_match.group(1))
-        except Exception as exc:  # pragma: no cover - defensive branch
-            payload_parse_error = f"{exc}"
-    else:
-        payload_parse_error = "Unable to locate embedded DATA payload in dashboard HTML."
-
-    payload_ok = bool(dashboard_payload) and all(
-        key in dashboard_payload
-        for key in ["meta", "domains", "months", "monthly_fact_rows", "risk_kpi_cube", "snapshot_agg", "scored_customers", "cohort_rows"]
-    )
+    payload, payload_error = _dashboard_payload(html)
+    required_payload = {
+        "meta",
+        "domains",
+        "months",
+        "monthly_fact_rows",
+        "risk_kpi_cube",
+        "snapshot_agg",
+        "scored_customers",
+        "cohort_rows",
+    }
+    payload_ok = bool(payload) and required_payload.issubset(payload)
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Dashboard payload integrity",
-            "PASS" if payload_ok else "FAIL",
+            payload_ok,
             "Embedded payload contains governed cubes and rendering tables."
             if payload_ok
-            else f"Payload parse/integrity issue: {payload_parse_error}",
+            else f"Payload parse/integrity issue: {payload_error}",
         )
     )
 
-    filter_controls_ok = all(
-        token in dashboard_html
-        for token in [
-            'id="filterStartMonth"',
-            'id="filterEndMonth"',
-            'id="filterSegment"',
-            'id="filterRegion"',
-            'id="filterChannel"',
-            'id="filterPlan"',
-            'id="filterRiskTier"',
-            "getTrendRows(",
-            "getRiskKpi(",
-        ]
-    ) and any(token in dashboard_html for token in ["getSnapshot(", "getFilteredSnapshot("]
-    ) and any(token in dashboard_html for token in ["getScored(", "getFilteredScored("])
+    filters_ok = (
+        all(
+            token in html
+            for token in (
+                'id="filterStartMonth"',
+                'id="filterEndMonth"',
+                'id="filterSegment"',
+                'id="filterRegion"',
+                'id="filterChannel"',
+                'id="filterPlan"',
+                'id="filterRiskTier"',
+                "getTrendRows(",
+                "getRiskKpi(",
+            )
+        )
+        and ("getSnapshot(" in html or "getFilteredSnapshot(" in html)
+        and ("getScored(" in html or "getFilteredScored(" in html)
+    )
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Filtered vs aggregated output consistency",
-            "PASS" if filter_controls_ok else "FAIL",
-            "Date/categorical/risk filters are implemented and connected to trend, risk, and diagnostic retrieval functions.",
+            filters_ok,
+            "Date, dimension, and risk filters are connected to trend, risk, and diagnostic retrieval.",
         )
     )
 
-    kpi_consistency_status = "WARN"
-    kpi_evidence = "Unable to compute KPI consistency due to missing/invalid dashboard payload."
+    kpi_ok = False
+    kpi_evidence = "Unable to compare dashboard and governed trend payloads."
     if payload_ok:
-        fact_rows = dashboard_payload.get("monthly_fact_rows", [])
-        months_list = dashboard_payload.get("months", [])
-        trend_by_month = {r["month"][:7]: r for r in trend}
-        agg_by_month: dict[str, dict[str, float]] = {}
-        for row in fact_rows:
+        months = payload.get("months", [])
+        aggregated: dict[str, list[float]] = {}
+        for row in payload.get("monthly_fact_rows", []):
             if len(row) < 9:
                 continue
-            month_idx = int(float(row[0]))
-            if month_idx < 0 or month_idx >= len(months_list):
+            month_index = int(float(row[0]))
+            if not 0 <= month_index < len(months):
                 continue
-            month = str(months_list[month_idx])
-            cur = agg_by_month.setdefault(
-                month,
-                {
-                    "active_customers_start": 0.0,
-                    "active_mrr_start": 0.0,
-                    "churned_customers": 0.0,
-                    "churned_mrr": 0.0,
-                },
+            values = aggregated.setdefault(str(months[month_index]), [0.0, 0.0, 0.0, 0.0])
+            for index, source_index in enumerate((5, 6, 7, 8)):
+                values[index] += float(row[source_index])
+        source = {str(row.month)[:7]: row for row in trend.itertuples()}
+        differences: list[tuple[float, float]] = []
+        for month, values in aggregated.items():
+            if month not in source:
+                continue
+            customer_rate = pct(values[2], values[0])
+            revenue_rate = pct(values[3], values[1])
+            differences.append(
+                (
+                    abs(customer_rate - float(source[month].customer_churn_rate or 0)),
+                    abs(revenue_rate - float(source[month].revenue_churn_rate or 0)),
+                )
             )
-            cur["active_customers_start"] += float(row[5])
-            cur["active_mrr_start"] += float(row[6])
-            cur["churned_customers"] += float(row[7])
-            cur["churned_mrr"] += float(row[8])
-
-        compared = []
-        for month, agg in agg_by_month.items():
-            if month not in trend_by_month:
-                continue
-            src = trend_by_month[month]
-            c_rate = agg["churned_customers"] / agg["active_customers_start"] if agg["active_customers_start"] > 0 else 0.0
-            r_rate = agg["churned_mrr"] / agg["active_mrr_start"] if agg["active_mrr_start"] > 0 else 0.0
-            c_diff = abs(c_rate - to_float(src["customer_churn_rate"]))
-            r_diff = abs(r_rate - to_float(src["revenue_churn_rate"]))
-            compared.append((month, c_diff, r_diff))
-        if compared:
-            max_c = max(x[1] for x in compared)
-            max_r = max(x[2] for x in compared)
-            kpi_consistency_status = "PASS" if max(max_c, max_r) <= 1.1e-6 else "FAIL"
-            kpi_evidence = f"Compared {len(compared)} overlapping months in all-scope cube vs official trend table; max customer churn diff={max_c:.8f}, max revenue churn diff={max_r:.8f}."
-        else:
-            kpi_consistency_status = "WARN"
-            kpi_evidence = "No overlapping months between dashboard KPI cube and overall retention trend table."
-
+        if differences:
+            max_customer_diff = max(value[0] for value in differences)
+            max_revenue_diff = max(value[1] for value in differences)
+            kpi_ok = max(max_customer_diff, max_revenue_diff) <= 1.1e-6
+            kpi_evidence = f"Compared {len(differences)} overlapping months; max customer churn diff={max_customer_diff:.8f}, max revenue churn diff={max_revenue_diff:.8f}."
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Consistency between KPI cards and trend charts",
-            kpi_consistency_status,
+            kpi_ok,
             kpi_evidence,
         )
     )
 
-    risk_consistency_status = "WARN"
-    risk_consistency_evidence = "Unable to verify risk chart/table consistency due to missing payload."
-    if payload_ok:
-        scored_rows_payload = dashboard_payload.get("scored_customers", [])
-        risk_cube_payload = dashboard_payload.get("risk_kpi_cube", [])
-        required_scored_cols = {
-            "customer_id",
-            "segment",
-            "region",
-            "acquisition_channel",
-            "plan_type",
-            "current_mrr",
-            "churn_risk_score",
-            "customer_value_score",
-            "retention_priority_score",
-            "risk_tier",
-            "main_risk_driver",
-            "recommended_action",
-            "at_risk_flag",
-        }
-        cols_ok = bool(scored_rows_payload) and required_scored_cols.issubset(set(scored_rows_payload[0].keys()))
-        cube_has_all = any(
-            r.get("segment") == "__all__"
-            and r.get("region") == "__all__"
-            and r.get("acquisition_channel") == "__all__"
-            and r.get("plan_type") == "__all__"
-            and r.get("risk_tier_filter") == "__all__"
-            for r in risk_cube_payload
+    scored_payload = payload.get("scored_customers", []) if payload_ok else []
+    cube_payload = payload.get("risk_kpi_cube", []) if payload_ok else []
+    required_score_columns = {
+        "customer_id",
+        "segment",
+        "region",
+        "acquisition_channel",
+        "plan_type",
+        "current_mrr",
+        "churn_risk_score",
+        "customer_value_score",
+        "retention_priority_score",
+        "risk_tier",
+        "main_risk_driver",
+        "recommended_action",
+        "at_risk_flag",
+    }
+    score_columns_ok = bool(scored_payload) and required_score_columns.issubset(scored_payload[0])
+    cube_all_scope = any(
+        all(
+            row.get(key) == "__all__"
+            for key in (
+                "segment",
+                "region",
+                "acquisition_channel",
+                "plan_type",
+                "risk_tier_filter",
+            )
         )
-        risk_consistency_status = "PASS" if cols_ok and cube_has_all else "FAIL"
-        risk_consistency_evidence = (
-            f"scored_customers required columns={cols_ok}; risk_kpi_cube contains all-scope row={cube_has_all}."
-        )
-
+        for row in cube_payload
+    )
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Risk chart/table logic consistency",
-            risk_consistency_status,
-            risk_consistency_evidence,
+            score_columns_ok and cube_all_scope,
+            f"scored_customers required columns={score_columns_ok}; risk_kpi_cube contains all-scope row={cube_all_scope}.",
         )
     )
 
-    priority_table_schema_status = "PASS" if all(
-        c in risk_scores_cols
-        for c in [
-            "customer_id",
-            "segment",
-            "current_mrr",
-            "churn_risk_score",
-            "customer_value_score",
-            "retention_priority_score",
-            "main_risk_driver",
-            "recommended_action",
-        ]
-    ) else "FAIL"
+    required_priority_columns = {
+        "customer_id",
+        "segment",
+        "current_mrr",
+        "churn_risk_score",
+        "customer_value_score",
+        "retention_priority_score",
+        "main_risk_driver",
+        "recommended_action",
+    }
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Priority table schema consistency",
-            priority_table_schema_status,
-            "Priority-table columns are governed by the risk scoring output schema.",
+            required_priority_columns.issubset(risk_scores.columns),
+            "Priority-table columns are governed by the risk-scoring output schema.",
         )
     )
 
-    chart_ids = re.findall(r'id="(chart[A-Za-z0-9_]+)"', dashboard_html)
-    chart_count = len(set(chart_ids))
-    chart_density_status = "PASS" if 4 <= chart_count <= 6 else "WARN"
+    chart_count = len(set(re.findall(r'id="(chart[A-Za-z0-9_]+)"', html)))
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Chart density and readability scope",
-            chart_density_status,
+            4 <= chart_count <= 6,
             f"Unique chart canvases detected: {chart_count}.",
+            "WARN",
         )
     )
 
-    layout_safe = (
-        ("minmax(0, 1fr)" in dashboard_html)
-        and ("@media (max-width: 960px)" in dashboard_html)
-        and ("@media print" in dashboard_html)
-        and ("overflow: hidden" in dashboard_html)
+    layout_safe = all(
+        token in html
+        for token in (
+            "minmax(0, 1fr)",
+            "@media (max-width: 960px)",
+            "@media print",
+            "overflow: hidden",
+        )
     )
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Responsive/layout safety",
-            "PASS" if layout_safe else "WARN",
-            "Layout uses grid-based responsive rules with constrained overflow.",
+            layout_safe,
+            "Layout uses responsive grids with constrained overflow and print rules.",
+            "WARN",
         )
     )
 
-    html_self_contained = (
-        ("__CHART_JS__" not in dashboard_html)
-        and ("src=\"http://" not in dashboard_html)
-        and ("src=\"https://" not in dashboard_html)
-        and ("href=\"http://" not in dashboard_html)
-        and ("href=\"https://" not in dashboard_html)
+    self_contained = all(
+        token not in html
+        for token in (
+            "__CHART_JS__",
+            'src="http://',
+            'src="https://',
+            'href="http://',
+            'href="https://',
+        )
     )
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Offline/self-contained packaging",
-            "PASS" if html_self_contained else "WARN",
-            "Dashboard HTML is packaged without external network script/style dependencies.",
+            self_contained,
+            "Dashboard is packaged without external network script or style dependencies.",
+            "WARN",
         )
     )
 
     payload_bytes = dashboard_path.stat().st_size
-    payload_status = "PASS" if 250_000 <= payload_bytes <= 3_000_000 else "WARN"
     checks.append(
-        Check(
+        _check(
             "Dashboard Review",
             "Payload size/performance sanity",
-            payload_status,
+            250_000 <= payload_bytes <= 5_000_000,
             f"Dashboard HTML payload size={payload_bytes} bytes.",
+            "WARN",
         )
     )
 
-    version_stamp_ok = all(
-        token in dashboard_html
-        for token in [
+    versioned = all(
+        token in html
+        for token in (
             "dashboard_version",
             "data_snapshot_month",
             "coverage_start_month",
             "coverage_end_month",
             'id="filterPeriodPreset"',
             'id="periodLabel"',
-        ]
-    )
-    checks.append(
-        Check(
-            "Dashboard Review",
-            "Version stamping and traceability",
-            "PASS" if version_stamp_ok else "FAIL",
-            "Dashboard embeds version metadata in governed payload and exposes period traceability controls in the UI.",
         )
     )
-
-    # ----------------------------
-    # 6) GOVERNANCE / STABILITY / RELEASE DISCIPLINE
-    # ----------------------------
-    risk_summary_rows, _risk_summary_cols = load_csv(outputs_tables / "risk_tier_summary.csv")
-
-    # Cross-output consistency: risk tier summary vs risk score table.
-    recompute_tier_counts = Counter(r["risk_tier"] for r in risk_scores)
-    summary_tier_counts = {r["risk_tier"]: to_int(r["customers"]) for r in risk_summary_rows}
-    tier_count_diff = sum(abs(recompute_tier_counts.get(k, 0) - summary_tier_counts.get(k, 0)) for k in set(recompute_tier_counts) | set(summary_tier_counts))
     checks.append(
-        Check(
+        _check(
+            "Dashboard Review",
+            "Version stamping and traceability",
+            versioned,
+            "Dashboard embeds governed version and period metadata.",
+        )
+    )
+    return checks
+
+
+def score_stability_check(risk_scores: pd.DataFrame, baseline_path: Path) -> Check:
+    if not baseline_path.exists():
+        return Check(
+            "Governance & Release",
+            "Score stability baseline drift",
+            "WARN",
+            f"Baseline not found at {baseline_path}.",
+        )
+
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    current_share = risk_scores["risk_tier"].value_counts(normalize=True).to_dict()
+    max_tier_drift = max(
+        abs(float(current_share.get(tier, 0.0)) - float(baseline["tier_share"].get(tier, 0.0)))
+        for tier in RISK_TIERS
+    )
+    current_average = float(_numeric(risk_scores, "retention_priority_score").mean())
+    average_drift = abs(current_average - float(baseline["avg_priority_score"]))
+    baseline_population = max(int(baseline["population"]), 1)
+    population_drift = abs(len(risk_scores) - baseline_population) / baseline_population
+    thresholds = baseline.get("thresholds", {})
+    passed = (
+        max_tier_drift <= float(thresholds.get("max_tier_share_drift", 0.03))
+        and average_drift <= float(thresholds.get("max_avg_priority_drift", 3.0))
+        and population_drift <= float(thresholds.get("max_population_relative_drift", 0.02))
+    )
+    return _check(
+        "Governance & Release",
+        "Score stability baseline drift",
+        passed,
+        f"max_tier_share_drift={max_tier_drift:.4f}; avg_priority_drift={average_drift:.4f}; population_relative_drift={population_drift:.4f}; baseline_version={baseline.get('baseline_version', 'n/a')}.",
+        "WARN",
+    )
+
+
+def governance_checks(data: ValidationData) -> list[Check]:
+    risk_scores = data["risk_scores"]
+    risk_summary = data["risk_summary"]
+    features = data["features"]
+    segment_risk = data["segment_risk"]
+    checks: list[Check] = []
+
+    score_counts = risk_scores["risk_tier"].value_counts().to_dict()
+    summary_counts = dict(
+        zip(
+            risk_summary["risk_tier"],
+            _numeric(risk_summary, "customers").astype(int),
+            strict=True,
+        )
+    )
+    tier_count_diff = sum(
+        abs(int(score_counts.get(tier, 0)) - int(summary_counts.get(tier, 0)))
+        for tier in set(score_counts) | set(summary_counts)
+    )
+    checks.append(
+        _check(
             "Governance & Release",
             "Risk tier summary cross-output consistency",
-            "PASS" if tier_count_diff == 0 else "FAIL",
+            tier_count_diff == 0,
             f"Tier count absolute diff between risk_scores and risk_tier_summary: {tier_count_diff}.",
         )
     )
 
-    # Ranking discipline: the canonical score table must be globally sorted.
-    rank_order_violations = 0
-    prev_priority = None
-    for row in risk_scores:
-        cur = to_float(row.get("retention_priority_score"))
-        if prev_priority is not None and cur > prev_priority + 1e-9:
-            rank_order_violations += 1
-        prev_priority = cur
+    priority = _numeric(risk_scores, "retention_priority_score")
+    ranking_violations = int(priority.diff().fillna(0).gt(1e-9).sum())
     checks.append(
-        Check(
+        _check(
             "Governance & Release",
             "Priority ranking monotonicity",
-            "PASS" if rank_order_violations == 0 else "FAIL",
-            f"Rows violating non-increasing priority order: {rank_order_violations}.",
+            ranking_violations == 0,
+            f"Rows violating non-increasing priority order: {ranking_violations}.",
         )
     )
 
-    # Score stability: risk tiers should be monotonic in average priority where present.
-    tier_priority_avg: dict[str, float] = {}
-    for tier in ["critical", "high", "medium", "low"]:
-        vals = [to_float(r["retention_priority_score"]) for r in risk_scores if r.get("risk_tier") == tier]
-        if vals:
-            tier_priority_avg[tier] = sum(vals) / len(vals)
-    tier_order = ["critical", "high", "medium", "low"]
-    tier_monotonic_violations = 0
-    for i in range(len(tier_order) - 1):
-        a = tier_order[i]
-        b = tier_order[i + 1]
-        if a in tier_priority_avg and b in tier_priority_avg and tier_priority_avg[a] < tier_priority_avg[b] - 1e-9:
-            tier_monotonic_violations += 1
+    tier_average = risk_scores.assign(priority=priority).groupby("risk_tier")["priority"].mean()
+    present_tiers = [tier for tier in RISK_TIERS if tier in tier_average]
+    tier_violations = sum(
+        float(tier_average.loc[first]) < float(tier_average.loc[second]) - 1e-9
+        for first, second in pairwise(present_tiers)
+    )
     checks.append(
-        Check(
+        _check(
             "Governance & Release",
             "Risk tier score monotonicity",
-            "PASS" if tier_monotonic_violations == 0 else "FAIL",
-            f"Tier average priority monotonicity violations={tier_monotonic_violations}; averages={tier_priority_avg}.",
+            tier_violations == 0,
+            f"Tier average priority monotonicity violations={tier_violations}; averages={tier_average.to_dict()}.",
         )
     )
 
-    zero_risk_priority_violations = sum(
-        1
-        for r in risk_scores
-        if to_float(r.get("churn_risk_score")) == 0.0
-        and (
-            to_float(r.get("retention_priority_score")) != 0.0
-            or r.get("risk_tier") != "low"
-            or r.get("main_risk_driver") != "no material signal"
-        )
+    zero_risk = _numeric(risk_scores, "churn_risk_score").eq(0)
+    zero_risk_violations = int(
+        (
+            zero_risk
+            & (
+                priority.ne(0)
+                | risk_scores["risk_tier"].ne("low")
+                | risk_scores["main_risk_driver"].ne("no material signal")
+            )
+        ).sum()
     )
     checks.append(
-        Check(
+        _check(
             "Governance & Release",
             "Value cannot create churn priority",
-            "PASS" if zero_risk_priority_violations == 0 else "FAIL",
-            f"Zero-churn-risk rows with nonzero priority, non-low tier, or false driver: {zero_risk_priority_violations}.",
+            zero_risk_violations == 0,
+            f"Zero-churn-risk rows with nonzero priority, non-low tier, or false driver: {zero_risk_violations}.",
         )
     )
 
-    # Decision logic consistency: recommended action should be aligned with driver/tier constraints.
-    action_mismatch = 0
-    for r in risk_scores:
-        tier = r.get("risk_tier", "")
-        action = r.get("recommended_action", "")
-        main_driver = r.get("main_risk_driver", "")
-        churn_risk = to_float(r.get("churn_risk_score"))
-        customer_value = to_float(r.get("customer_value_score"))
-        renewal_near = to_int(r.get("renewal_near_flag"))
-
-        if action == "executive save motion" and not (tier == "critical" and customer_value >= 70.0):
-            action_mismatch += 1
-        if action == "billing intervention" and not (main_driver == "failed payments" and churn_risk >= 45.0):
-            action_mismatch += 1
-        if action == "product adoption campaign" and not (main_driver in {"usage decline", "low adoption"} and churn_risk >= 35.0):
-            action_mismatch += 1
-        if action == "renewal conversation" and not (renewal_near == 1 and tier in {"medium", "high", "critical"}):
-            action_mismatch += 1
+    action = risk_scores["recommended_action"]
+    tier = risk_scores["risk_tier"]
+    driver = risk_scores["main_risk_driver"]
+    churn_risk = _numeric(risk_scores, "churn_risk_score")
+    customer_value = _numeric(risk_scores, "customer_value_score")
+    renewal_near = _numeric(risk_scores, "renewal_near_flag").astype(int)
+    action_mismatch = int(
+        (
+            (action.eq("executive save motion") & ~(tier.eq("critical") & customer_value.ge(70)))
+            | (
+                action.eq("billing intervention")
+                & ~(driver.eq("failed payments") & churn_risk.ge(45))
+            )
+            | (
+                action.eq("product adoption campaign")
+                & ~(driver.isin({"usage decline", "low adoption"}) & churn_risk.ge(35))
+            )
+            | (
+                action.eq("renewal conversation")
+                & ~(renewal_near.eq(1) & tier.isin({"medium", "high", "critical"}))
+            )
+        ).sum()
+    )
     checks.append(
-        Check(
+        _check(
             "Governance & Release",
             "Recommended-action rule consistency",
-            "PASS" if action_mismatch == 0 else "FAIL",
+            action_mismatch == 0,
             f"Action rows violating scoring policy rules: {action_mismatch}.",
         )
     )
 
-    # Financial consistency: segment-level risk table should tie to overall proxies.
-    seg_total_future_risk = sum(to_float(r.get("current_mrr_at_risk")) for r in seg_risk)
-    seg_total_churned_value = sum(to_float(r.get("churned_monthly_value_proxy")) for r in seg_risk)
-    recompute_future_risk = sum(to_float(r["current_mrr"]) for r in features if to_int(r["at_risk_flag"]) == 1)
-    recompute_churned_value = sum(to_float(r["avg_monthly_revenue"]) for r in features if to_int(r["churn_flag"]) == 1)
-    finance_diff = max(
-        abs(seg_total_future_risk - recompute_future_risk),
-        abs(seg_total_churned_value - recompute_churned_value),
+    segment_future_risk = float(_numeric(segment_risk, "current_mrr_at_risk").sum())
+    segment_churned_value = float(_numeric(segment_risk, "churned_monthly_value_proxy").sum())
+    feature_future_risk = float(
+        _numeric(features, "current_mrr")[_numeric(features, "at_risk_flag").eq(1)].sum()
+    )
+    feature_churned_value = float(
+        _numeric(features, "avg_monthly_revenue")[_numeric(features, "churn_flag").eq(1)].sum()
+    )
+    financial_diff = max(
+        abs(segment_future_risk - feature_future_risk),
+        abs(segment_churned_value - feature_churned_value),
     )
     checks.append(
-        Check(
+        _check(
             "Governance & Release",
             "Financial tie-out consistency",
-            "PASS" if finance_diff <= 0.01 else "FAIL",
-            f"Max absolute diff between segment financial outputs and feature recomputation: {finance_diff:.4f}.",
+            financial_diff <= 0.01,
+            f"Max absolute diff between segment financial outputs and feature recomputation: {financial_diff:.4f}.",
         )
     )
-
-    # Drift guardrail vs governance baseline.
-    baseline_file = root / "config" / "governance" / "score_stability_baseline.json"
-    baseline_status = "WARN"
-    baseline_evidence = f"Baseline not found at {baseline_file}."
-    if baseline_file.exists():
-        baseline = json.loads(baseline_file.read_text(encoding="utf-8"))
-        current_tier_share = {
-            t: (sum(1 for r in risk_scores if r.get("risk_tier") == t) / max(len(risk_scores), 1))
-            for t in ["critical", "high", "medium", "low"]
-        }
-        current_avg_priority = (
-            sum(to_float(r.get("retention_priority_score")) for r in risk_scores) / max(len(risk_scores), 1)
-        )
-        max_tier_drift = max(
-            abs(current_tier_share.get(t, 0.0) - float(baseline.get("tier_share", {}).get(t, 0.0)))
-            for t in ["critical", "high", "medium", "low"]
-        )
-        avg_priority_drift = abs(current_avg_priority - float(baseline.get("avg_priority_score", 0.0)))
-        baseline_status = "PASS" if (max_tier_drift <= 0.03 and avg_priority_drift <= 3.0) else "WARN"
-        baseline_evidence = (
-            f"max_tier_share_drift={max_tier_drift:.4f}; avg_priority_drift={avg_priority_drift:.4f}; "
-            f"baseline_version={baseline.get('baseline_version', 'n/a')}."
-        )
     checks.append(
-        Check(
-            "Governance & Release",
-            "Score stability baseline drift",
-            baseline_status,
-            baseline_evidence,
+        score_stability_check(
+            risk_scores,
+            data.root / "config" / "governance" / "score_stability_baseline.json",
+        )
+    )
+    return checks
+
+
+def strategic_expansion_checks(data: ValidationData) -> list[Check]:
+    checks: list[Check] = []
+    bridge = data["revenue_bridge"]
+    economics = data["channel_economics"]
+    performance = data["model_performance"]
+    calibration = data["model_calibration"]
+    probabilities = data["probabilities"]
+    assignments = data["experiment_assignments"]
+    outcomes = data["experiment_outcomes"]
+    incrementality = data["intervention_incrementality"]
+    balance = data["intervention_balance"]
+    transitions = data["risk_transitions"]
+    alerts = data["monitoring_alerts"]
+
+    max_bridge_diff = _numeric(bridge, "reconciliation_diff").abs().max()
+    checks.append(
+        _check(
+            "Strategic Expansions",
+            "Monthly MRR bridge reconciliation",
+            max_bridge_diff <= 0.01,
+            f"Maximum absolute bridge reconciliation difference={max_bridge_diff:.6f}.",
         )
     )
 
-    # ----------------------------
-    # Outputs
-    # ----------------------------
+    expected_cac = _numeric(economics, "total_acquisition_spend") / _numeric(
+        economics, "acquired_customers"
+    ).replace(0, pd.NA)
+    expected_ltv_ratio = _numeric(economics, "modelled_ltv_24m") / _numeric(
+        economics, "cac"
+    ).replace(0, pd.NA)
+    economics_diff = max(
+        float((expected_cac - _numeric(economics, "cac")).abs().max()),
+        float((expected_ltv_ratio - _numeric(economics, "ltv_to_cac_24m")).abs().max()),
+    )
+    checks.append(
+        _check(
+            "Strategic Expansions",
+            "Unit-economics formula reconciliation",
+            economics_diff <= 0.001,
+            f"Maximum CAC or LTV:CAC formula difference={economics_diff:.6f}.",
+        )
+    )
+
+    model_config = yaml.safe_load(
+        (data.root / "config" / "modeling.yml").read_text(encoding="utf-8")
+    )
+    test = performance.loc[performance["split"].eq("test")].iloc[0]
+    thresholds = model_config["quality_thresholds"]
+    model_gate = (
+        float(test["roc_auc"]) >= float(thresholds["minimum_test_roc_auc"])
+        and float(test["average_precision"]) >= float(thresholds["minimum_test_average_precision"])
+        and float(test["brier_score"]) <= float(thresholds["maximum_test_brier_score"])
+        and abs(float(test["calibration_intercept"]))
+        <= float(thresholds["maximum_absolute_calibration_intercept"])
+        and float(thresholds["minimum_calibration_slope"])
+        <= float(test["calibration_slope"])
+        <= float(thresholds["maximum_calibration_slope"])
+    )
+    checks.append(
+        _check(
+            "Strategic Expansions",
+            "Out-of-time probability-model quality gate",
+            model_gate,
+            f"test_auc={float(test['roc_auc']):.4f}; AP={float(test['average_precision']):.4f}; brier={float(test['brier_score']):.4f}; calibration_intercept={float(test['calibration_intercept']):.4f}; slope={float(test['calibration_slope']):.4f}.",
+        )
+    )
+    max_calibration_gap = _numeric(calibration, "calibration_gap").abs().max()
+    probability = _numeric(probabilities, "churn_probability_90d")
+    probability_ok = probability.between(0, 1, inclusive="both").all()
+    checks.extend(
+        [
+            _check(
+                "Strategic Expansions",
+                "Calibrated probability bounds",
+                bool(probability_ok),
+                f"Scored rows={len(probabilities)}; min={probability.min():.6f}; max={probability.max():.6f}.",
+            ),
+            _check(
+                "Strategic Expansions",
+                "Calibration-bin reliability",
+                max_calibration_gap <= 0.03,
+                f"Maximum absolute test calibration-bin gap={max_calibration_gap:.6f}.",
+            ),
+        ]
+    )
+
+    assigned_ids = set(assignments["customer_id"])
+    outcome_ids = set(outcomes["customer_id"])
+    arm_counts = assignments["assignment"].value_counts()
+    holdout_consistent = (
+        assignments["holdout_flag"]
+        .astype(str)
+        .eq(assignments["assignment"].eq("control").astype(int).astype(str))
+    )
+    checks.append(
+        _check(
+            "Strategic Expansions",
+            "Randomized holdout integrity",
+            assigned_ids == outcome_ids
+            and set(arm_counts.index) == {"treatment", "control"}
+            and bool(holdout_consistent.all()),
+            f"arm_counts={arm_counts.to_dict()}; assignment_outcome_id_diff={len(assigned_ids ^ outcome_ids)}; holdout_mismatches={int((~holdout_consistent).sum())}.",
+        )
+    )
+    numeric_balance = balance[balance["statistic_name"].eq("standardized_mean_difference")]
+    max_smd = _numeric(numeric_balance, "balance_statistic").abs().max()
+    experiment_config = yaml.safe_load(
+        (data.root / "config" / "experiments.yml").read_text(encoding="utf-8")
+    )
+    smd_threshold = float(
+        experiment_config["quality_thresholds"]["maximum_absolute_standardized_mean_difference"]
+    )
+    checks.append(
+        _check(
+            "Strategic Expansions",
+            "Experiment baseline balance",
+            max_smd <= smd_threshold,
+            f"Maximum absolute numeric SMD={max_smd:.6f}; threshold={smd_threshold:.6f}.",
+        )
+    )
+
+    saved_row = incrementality.loc[incrementality["metric"].eq("lost_mrr_90d")].iloc[0]
+    estimation_status = str(saved_row.get("estimation_status", "estimable"))
+    if estimation_status == "estimable":
+        expected_saved_mrr = -float(saved_row["treatment_minus_control"]) * int(
+            saved_row["treatment_n"]
+        )
+        observed_saved_mrr = float(saved_row["incremental_saved_mrr"])
+        saved_mrr_diff = abs(expected_saved_mrr - observed_saved_mrr)
+        saved_mrr_ok = saved_mrr_diff <= 0.01
+        saved_mrr_evidence = (
+            f"Reported=${observed_saved_mrr:.2f}; recomputed=${expected_saved_mrr:.2f}; "
+            f"absolute_diff={saved_mrr_diff:.6f}."
+        )
+    else:
+        reported_saved_mrr = saved_row["incremental_saved_mrr"]
+        effect_is_blank = pd.isna(reported_saved_mrr) or not str(reported_saved_mrr).strip()
+        saved_mrr_ok = data.source_adapter in {"csv", "postgresql"} and effect_is_blank
+        saved_mrr_evidence = (
+            f"estimation_status={estimation_status}; adapter={data.source_adapter}; "
+            f"completion_share={float(saved_row['outcome_completion_share']):.6f}."
+        )
+    if data.source_adapter == "synthetic":
+        outcome_provenance_ok = set(outcomes["outcome_status"]) == {"simulated"} and set(
+            outcomes["outcome_source"]
+        ) == {"synthetic_counterfactual_simulation"}
+    else:
+        outcome_provenance_ok = (
+            "simulated" not in set(outcomes["outcome_status"])
+            and set(outcomes["outcome_status"]).issubset({"observed", "pending"})
+            and set(outcomes["outcome_source"]).issubset(
+                {"observed_outcome_file", "awaiting_observed_outcomes"}
+            )
+        )
+    checks.extend(
+        [
+            _check(
+                "Strategic Expansions",
+                "Incremental saved-MRR identity",
+                saved_mrr_ok,
+                saved_mrr_evidence,
+            ),
+            _check(
+                "Strategic Expansions",
+                "Experiment outcome provenance",
+                outcome_provenance_ok,
+                f"adapter={data.source_adapter}; outcome_status={sorted(set(outcomes['outcome_status']))}; sources={sorted(set(outcomes['outcome_source']))}.",
+            ),
+        ]
+    )
+
+    complete_transitions = transitions[_numeric(transitions, "complete_monthly_interval").eq(1)]
+    transitions_ok = (
+        not complete_transitions.empty
+        and _numeric(complete_transitions, "interval_days").ge(27).all()
+    )
+    alerts_ok = set(alerts["status"]).issubset({"ok", "alert"}) and set(
+        alerts["severity"]
+    ).issubset({"info", "medium", "high"})
+    checks.extend(
+        [
+            _check(
+                "Strategic Expansions",
+                "Complete-period risk transition monitoring",
+                bool(transitions_ok),
+                f"Complete monthly transitions={len(complete_transitions)}; total transitions={len(transitions)}.",
+            ),
+            _check(
+                "Strategic Expansions",
+                "Monitoring alert schema",
+                alerts_ok,
+                f"status_values={sorted(set(alerts['status']))}; severity_values={sorted(set(alerts['severity']))}.",
+            ),
+        ]
+    )
+    return checks
+
+
+def write_validation_outputs(checks: list[Check], root: Path) -> tuple[int, int, int]:
     check_rows: list[dict[str, Any]] = []
     issue_rows: list[dict[str, Any]] = []
-    for c in checks:
-        severity = severity_for_check(c.status, c.category, c.check_name)
-        is_blocker = is_blocker_check(c.category, c.check_name)
-        gate_level = gate_level_for_check(c.category)
-        check_rows.append(
-            {
-                "category": c.category,
-                "check_name": c.check_name,
-                "status": c.status,
-                "severity": severity,
-                "gate_level": gate_level,
-                "is_blocker": is_blocker,
-                "evidence": c.evidence,
-            }
-        )
-        if c.status in {"FAIL", "WARN"}:
-            issue_rows.append(
-                {
-                    "category": c.category,
-                    "check_name": c.check_name,
-                    "severity": severity,
-                    "gate_level": gate_level,
-                    "is_blocker": is_blocker,
-                    "status": c.status,
-                    "evidence": c.evidence,
-                    "fix_applied": "No (validation-only scope)",
-                }
-            )
+    for check in checks:
+        row = {
+            "category": check.category,
+            "check_name": check.check_name,
+            "status": check.status,
+            "severity": severity_for_check(check.status, check.category, check.check_name),
+            "gate_level": gate_level_for_check(check.category),
+            "is_blocker": is_blocker_check(check.category, check.check_name),
+            "evidence": check.evidence,
+        }
+        check_rows.append(row)
+        if check.status in {"FAIL", "WARN"}:
+            issue_rows.append({**row, "fix_applied": "No (validation-only scope)"})
 
-    write_csv(
-        outputs_tables / "final_validation_checks.csv",
-        check_rows,
-        ["category", "check_name", "status", "severity", "gate_level", "is_blocker", "evidence"],
-    )
-    write_csv(
-        outputs_tables / "final_validation_issues.csv",
-        issue_rows,
-        ["category", "check_name", "severity", "gate_level", "is_blocker", "status", "evidence", "fix_applied"],
-    )
-
-    pass_count = sum(1 for c in checks if c.status == "PASS")
-    warn_count = sum(1 for c in checks if c.status == "WARN")
-    fail_count = sum(1 for c in checks if c.status == "FAIL")
-    total = len(checks)
-
-    if fail_count > 0:
-        confidence = "Needs revision"
-    elif warn_count > 0:
-        confidence = "Share with caveats"
-    else:
-        confidence = "Ready to share"
+    tables = root / "outputs" / "tables"
+    check_fields = [
+        "category",
+        "check_name",
+        "status",
+        "severity",
+        "gate_level",
+        "is_blocker",
+        "evidence",
+    ]
+    issue_fields = [
+        "category",
+        "check_name",
+        "severity",
+        "gate_level",
+        "is_blocker",
+        "status",
+        "evidence",
+        "fix_applied",
+    ]
+    write_csv(tables / "final_validation_checks.csv", check_rows, check_fields)
+    write_csv(tables / "final_validation_issues.csv", issue_rows, issue_fields)
 
     policy = yaml.safe_load(
         (root / "config" / "governance" / "release_policy.yml").read_text(encoding="utf-8")
     )
     warn_policy = policy["warn_policy"]
-    matrix_rows, _recommended_release_state = release_matrix(
+    manifest_path = root / "data" / "raw" / "_ingestion_manifest.json"
+    source_adapter = "unknown"
+    if manifest_path.is_file():
+        source_adapter = str(json.loads(manifest_path.read_text(encoding="utf-8"))["adapter"])
+    matrix, _recommended = release_matrix(
         checks,
-        synthetic_data=True,
+        synthetic_data=source_adapter != "postgresql" and source_adapter != "csv",
         analytical_warn_limit=int(warn_policy["major_warn_threshold_for_analytical_acceptance"]),
         decision_support_warn_limit=int(warn_policy["major_warn_threshold_for_decision_support"]),
     )
     write_csv(
-        outputs_tables / "release_readiness_matrix.csv",
-        matrix_rows,
+        tables / "release_readiness_matrix.csv",
+        matrix,
         ["state", "active", "criterion", "evidence"],
     )
+    return (
+        sum(check.status == "PASS" for check in checks),
+        sum(check.status == "WARN" for check in checks),
+        sum(check.status == "FAIL" for check in checks),
+    )
 
+
+CHECK_SUITES: tuple[Callable[[ValidationData], list[Check]], ...] = (
+    data_quality_checks,
+    metric_correctness_checks,
+    analytical_integrity_checks,
+    dashboard_checks,
+    governance_checks,
+    strategic_expansion_checks,
+)
+
+
+def main() -> int:
+    data = load_validation_data()
+    checks = [check for suite in CHECK_SUITES for check in suite(data)]
+    passed, warned, failed = write_validation_outputs(checks, data.root)
+    confidence = (
+        "Needs revision" if failed else "Share with caveats" if warned else "Ready to share"
+    )
     print("Validation complete.")
-    print("Checks:", total, "| PASS:", pass_count, "| WARN:", warn_count, "| FAIL:", fail_count)
-    print("Confidence:", confidence)
-    return 1 if fail_count > 0 else 0
+    print(f"Checks: {len(checks)} | PASS: {passed} | WARN: {warned} | FAIL: {failed}")
+    print(f"Confidence: {confidence}")
+    return int(failed > 0)
 
 
 if __name__ == "__main__":

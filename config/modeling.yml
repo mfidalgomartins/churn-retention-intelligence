@@ -1,0 +1,41 @@
+version: 1
+outcome_horizon_days: 90
+minimum_history_days: 60
+splits:
+  train_start: 2022-04-30
+  train_end: 2024-06-30
+  calibration_start: 2024-10-31
+  calibration_end: 2025-03-31
+  test_start: 2025-07-31
+  test_end: 2025-11-30
+categorical_features:
+  - segment
+  - region
+  - acquisition_channel
+  - plan_type
+numeric_features:
+  - tenure_days
+  - current_mrr
+  - recent_sessions_30d
+  - recent_sessions_90d
+  - usage_trend
+  - feature_adoption_score_recent
+  - support_tickets_30d
+  - support_tickets_90d
+  - nps_score_recent
+  - failed_payments_90d
+  - payment_failure_flag
+  - renewal_near_flag
+probability_tiers:
+  critical: 0.20
+  high: 0.10
+  medium: 0.05
+regularization_c: 0.5
+minimum_split_rows: 500
+quality_thresholds:
+  minimum_test_roc_auc: 0.70
+  minimum_test_average_precision: 0.15
+  maximum_test_brier_score: 0.06
+  maximum_absolute_calibration_intercept: 0.50
+  minimum_calibration_slope: 0.60
+  maximum_calibration_slope: 1.40

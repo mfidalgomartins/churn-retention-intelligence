@@ -4,14 +4,30 @@ Deterministic given (SEED, REFERENCE_DATE). The simulator embeds realistic
 commercial heterogeneity and pre-churn deterioration patterns so downstream
 analytics behaves like a real retention problem.
 """
+
 from __future__ import annotations
+
+from datetime import UTC
 
 import numpy as np
 import pandas as pd
 
-from churn.common import REFERENCE_DATE, SEED, raw_dir
+from churn.common import REFERENCE_DATE, SEED, project_root, raw_dir
+from churn.ingest import CsvSourceAdapter, load_contracts, publish_frames, validate_source_frames
 
 N_CUSTOMERS = 3500
+
+# Time-to-event parameters. Churn timing is sampled independently of the
+# portfolio snapshot and then right-censored at REFERENCE_DATE. This avoids the
+# artificial end-of-window spike created by sampling churn dates as a fraction
+# of each customer's observed lifetime.
+CHURN_WEIBULL_SHAPE = 0.90
+CHURN_BASE_SCALE_DAYS = 4200.0
+CHURN_MIN_LIFETIME_DAYS = 30.0
+CHURN_RISK_DAMPING = 0.45
+AT_RISK_INTERCEPT = -2.70
+PRE_CHURN_SESSION_FLOOR = 0.78
+PRE_CHURN_NPS_DECAY = 6.0
 
 
 def _sigmoid(x: np.ndarray) -> np.ndarray:
@@ -40,32 +56,32 @@ def generate_customers(rng: np.random.Generator) -> pd.DataFrame:
 
     channels = np.array(["Organic", "Referral", "Partner", "Paid Search", "Affiliate", "Outbound"])
     channel_mix = {
-        "Startup":    [0.18, 0.11, 0.07, 0.34, 0.20, 0.10],
-        "SMB":        [0.22, 0.12, 0.09, 0.28, 0.14, 0.15],
+        "Startup": [0.18, 0.11, 0.07, 0.34, 0.20, 0.10],
+        "SMB": [0.22, 0.12, 0.09, 0.28, 0.14, 0.15],
         "Mid-Market": [0.25, 0.11, 0.18, 0.17, 0.06, 0.23],
         "Enterprise": [0.21, 0.09, 0.28, 0.10, 0.02, 0.30],
     }
-    acquisition_channels = np.array(
-        [rng.choice(channels, p=channel_mix[s]) for s in segments]
-    )
+    acquisition_channels = np.array([rng.choice(channels, p=channel_mix[s]) for s in segments])
 
     plans = np.array(["Basic", "Growth", "Pro", "Enterprise"])
     plan_mix = {
-        "Startup":    [0.53, 0.33, 0.13, 0.01],
-        "SMB":        [0.36, 0.41, 0.20, 0.03],
+        "Startup": [0.53, 0.33, 0.13, 0.01],
+        "SMB": [0.36, 0.41, 0.20, 0.03],
         "Mid-Market": [0.14, 0.38, 0.37, 0.11],
         "Enterprise": [0.03, 0.14, 0.43, 0.40],
     }
     plan_types = np.array([rng.choice(plans, p=plan_mix[s]) for s in segments])
 
-    return pd.DataFrame({
-        "customer_id": customer_ids,
-        "signup_date": signup_dates,
-        "segment": segments,
-        "region": regions,
-        "acquisition_channel": acquisition_channels,
-        "plan_type": plan_types,
-    })
+    return pd.DataFrame(
+        {
+            "customer_id": customer_ids,
+            "signup_date": signup_dates,
+            "segment": segments,
+            "region": regions,
+            "acquisition_channel": acquisition_channels,
+            "plan_type": plan_types,
+        }
+    )
 
 
 def generate_subscriptions(customers: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
@@ -77,11 +93,16 @@ def generate_subscriptions(customers: pd.DataFrame, rng: np.random.Generator) ->
 
     base_price = {"Basic": 55.0, "Growth": 160.0, "Pro": 460.0, "Enterprise": 1400.0}
     sigma = {"Basic": 0.45, "Growth": 0.40, "Pro": 0.42, "Enterprise": 0.55}
-    monthly_revenue = np.round(np.clip(
-        np.array([base_price[p] * rng.lognormal(0.0, sigma[p])
-                  for p in customers["plan_type"]]),
-        20, 20000,
-    ), 2)
+    monthly_revenue = np.round(
+        np.clip(
+            np.array(
+                [base_price[p] * rng.lognormal(0.0, sigma[p]) for p in customers["plan_type"]]
+            ),
+            20,
+            20000,
+        ),
+        2,
+    )
 
     contract_type, billing_cycle = [], []
     for seg, plan in zip(customers["segment"], customers["plan_type"], strict=False):
@@ -98,59 +119,56 @@ def generate_subscriptions(customers: pd.DataFrame, rng: np.random.Generator) ->
         contract_type.append(c)
         billing_cycle.append(b)
 
-    tenure_months = ((REFERENCE_DATE - sub_start).dt.days / 30.4).to_numpy()
-
     seg_coef = {"Startup": 1.00, "SMB": 0.62, "Mid-Market": 0.18, "Enterprise": -0.42}
-    chn_coef = {"Organic": 0.00, "Referral": -0.38, "Partner": -0.24,
-                "Paid Search": 0.74, "Affiliate": 0.86, "Outbound": 0.34}
+    chn_coef = {
+        "Organic": 0.00,
+        "Referral": -0.38,
+        "Partner": -0.24,
+        "Paid Search": 0.74,
+        "Affiliate": 0.86,
+        "Outbound": 0.34,
+    }
     reg_coef = {"North America": 0.00, "Europe": 0.11, "LATAM": 0.52, "APAC": 0.31}
     pln_coef = {"Basic": 0.64, "Growth": 0.23, "Pro": -0.07, "Enterprise": -0.45}
-    ten_coef = np.select(
-        [tenure_months < 6, tenure_months < 12, tenure_months < 24],
-        [0.56, 0.26, 0.00],
-        default=-0.20,
-    )
     log_rev = np.log(monthly_revenue)
     rev_coef = -0.20 * (log_rev - np.mean(log_rev))
 
-    churn_logit = (
-        -2.05
-        + np.array([seg_coef[s] for s in customers["segment"]])
+    risk_linear = (
+        np.array([seg_coef[s] for s in customers["segment"]])
         + np.array([chn_coef[c] for c in customers["acquisition_channel"]])
         + np.array([reg_coef[r] for r in customers["region"]])
         + np.array([pln_coef[p] for p in customers["plan_type"]])
-        + ten_coef
         + rev_coef
     )
-    churn_prob = np.clip(_sigmoid(churn_logit), 0.03, 0.82)
 
     max_life_days = (REFERENCE_DATE - sub_start).dt.days.to_numpy()
-    eligible = max_life_days >= 90
-    churned = (rng.random(n) < churn_prob) & eligible
-
-    churn_offsets = np.zeros(n, dtype=int)
-    for i in np.where(churned)[0]:
-        max_days = int(max_life_days[i])
-        sampled = int(rng.beta(12.0, 1.4) * max_days)
-        churn_offsets[i] = int(np.clip(sampled, 60, max(max_days - 1, 60)))
+    risk_multiplier = np.exp(CHURN_RISK_DAMPING * risk_linear)
+    churn_offsets = np.ceil(
+        CHURN_MIN_LIFETIME_DAYS
+        + (CHURN_BASE_SCALE_DAYS / np.power(risk_multiplier, 1.0 / CHURN_WEIBULL_SHAPE))
+        * rng.weibull(CHURN_WEIBULL_SHAPE, size=n)
+    ).astype(int)
+    churned = churn_offsets <= max_life_days
 
     sub_end = pd.Series(pd.NaT, index=customers.index, dtype="datetime64[ns]")
     sub_end[churned] = sub_start[churned] + pd.to_timedelta(churn_offsets[churned], unit="D")
 
-    at_risk_prob = np.clip(_sigmoid(churn_logit + 0.52) * 0.56, 0.05, 0.75)
+    at_risk_prob = np.clip(_sigmoid(AT_RISK_INTERCEPT + risk_linear), 0.03, 0.60)
     at_risk = (~churned) & (rng.random(n) < at_risk_prob)
     status = np.where(churned, "churned", np.where(at_risk, "at_risk", "active"))
 
-    return pd.DataFrame({
-        "subscription_id": [f"SUB{i:06d}" for i in range(1, n + 1)],
-        "customer_id": customers["customer_id"],
-        "subscription_start_date": sub_start,
-        "subscription_end_date": sub_end,
-        "monthly_revenue": monthly_revenue,
-        "contract_type": contract_type,
-        "billing_cycle": billing_cycle,
-        "status": status,
-    })
+    return pd.DataFrame(
+        {
+            "subscription_id": [f"SUB{i:06d}" for i in range(1, n + 1)],
+            "customer_id": customers["customer_id"],
+            "subscription_start_date": sub_start,
+            "subscription_end_date": sub_end,
+            "monthly_revenue": monthly_revenue,
+            "contract_type": contract_type,
+            "billing_cycle": billing_cycle,
+            "status": status,
+        }
+    )
 
 
 def generate_payments(
@@ -160,7 +178,7 @@ def generate_payments(
 ) -> pd.DataFrame:
     cycle_months = {"Monthly": 1, "Quarterly": 3, "Annual": 12}
     churned_ids = set(subscriptions.loc[subscriptions["status"] == "churned", "customer_id"])
-    forced_failed_ids = {cid for cid in sorted(churned_ids) if rng.random() < 0.55}
+    forced_failed_ids = {cid for cid in sorted(churned_ids) if rng.random() < 0.20}
 
     rows: list[dict] = []
     idx = 1
@@ -169,7 +187,9 @@ def generate_payments(
     for row in merged.itertuples(index=False):
         cid = row.customer_id
         start = pd.Timestamp(row.subscription_start_date)
-        churn_date = pd.Timestamp(row.subscription_end_date) if pd.notna(row.subscription_end_date) else None
+        churn_date = (
+            pd.Timestamp(row.subscription_end_date) if pd.notna(row.subscription_end_date) else None
+        )
         end = churn_date if churn_date is not None else REFERENCE_DATE
         months = cycle_months[row.billing_cycle]
 
@@ -177,31 +197,44 @@ def generate_payments(
         forced_written = False
         while current <= end:
             amount = row.monthly_revenue * months * rng.normal(1.0, 0.025)
-            amount = round(float(np.clip(amount, row.monthly_revenue * months * 0.7,
-                                                 row.monthly_revenue * months * 1.3)), 2)
+            amount = round(
+                float(
+                    np.clip(
+                        amount,
+                        row.monthly_revenue * months * 0.7,
+                        row.monthly_revenue * months * 1.3,
+                    )
+                ),
+                2,
+            )
 
             fail_prob = 0.018
             if row.status == "at_risk" and (REFERENCE_DATE - current).days <= 90:
                 fail_prob += 0.03
             if churn_date is not None and 0 <= (churn_date - current).days <= 90:
-                fail_prob += 0.26
+                fail_prob += 0.07
                 if row.segment in {"Startup", "SMB"}:
-                    fail_prob += 0.08
+                    fail_prob += 0.02
 
             failed = rng.random() < fail_prob
-            if (cid in forced_failed_ids and churn_date is not None
-                    and 0 <= (churn_date - current).days <= 60
-                    and not forced_written):
+            if (
+                cid in forced_failed_ids
+                and churn_date is not None
+                and 0 <= (churn_date - current).days <= 60
+                and not forced_written
+            ):
                 failed = True
                 forced_written = True
 
-            rows.append({
-                "payment_id": f"PAY{idx:08d}",
-                "customer_id": cid,
-                "payment_date": current,
-                "amount": amount,
-                "payment_status": "failed" if failed else "paid",
-            })
+            rows.append(
+                {
+                    "payment_id": f"PAY{idx:08d}",
+                    "customer_id": cid,
+                    "payment_date": current,
+                    "amount": amount,
+                    "payment_status": "failed" if failed else "paid",
+                }
+            )
             idx += 1
             current = current + pd.DateOffset(months=months)
 
@@ -226,7 +259,9 @@ def generate_product_usage(
     idx = 1
     for row in merged.itertuples(index=False):
         start = pd.Timestamp(row.subscription_start_date)
-        churn_date = pd.Timestamp(row.subscription_end_date) if pd.notna(row.subscription_end_date) else None
+        churn_date = (
+            pd.Timestamp(row.subscription_end_date) if pd.notna(row.subscription_end_date) else None
+        )
         end = churn_date if churn_date is not None else REFERENCE_DATE
 
         intensity = rng.lognormal(0.0, 0.34)
@@ -241,9 +276,10 @@ def generate_product_usage(
             if churn_date is not None:
                 days_to_churn = (churn_date - d).days
                 if 0 <= days_to_churn <= 180:
-                    decay *= 0.24 + 0.76 * (days_to_churn / 180)
-                    nps_decay += (180 - days_to_churn) * 0.20
-                    ticket_boost *= 4.0 if row.segment in {"Startup", "SMB"} else 2.8
+                    deterioration = 1.0 - (days_to_churn / 180)
+                    decay *= 1.0 - (1.0 - PRE_CHURN_SESSION_FLOOR) * deterioration
+                    nps_decay += PRE_CHURN_NPS_DECAY * deterioration
+                    ticket_boost *= 1.35 if row.segment in {"Startup", "SMB"} else 1.2
 
             if row.status == "at_risk":
                 days_to_ref = (REFERENCE_DATE - d).days
@@ -255,29 +291,243 @@ def generate_product_usage(
             expected = max(0.5, baseline * seasonal * decay)
             sessions = int(rng.poisson(expected))
 
-            adoption = (plan_adoption[row.plan_type] + seg_adoption[row.segment]
-                        + 0.48 * sessions + rng.normal(0, 8) - nps_decay * 0.45)
+            adoption = (
+                plan_adoption[row.plan_type]
+                + seg_adoption[row.segment]
+                + 0.48 * sessions
+                + rng.normal(0, 8)
+                - nps_decay * 0.35
+            )
             adoption = float(np.clip(adoption, 0, 100))
 
             tickets = int(rng.poisson(seg_tickets[row.segment] * ticket_boost))
-            nps = int(np.clip(round(plan_nps[row.plan_type] + rng.normal(0, 11)
-                                     - nps_decay - tickets * 2.5), -100, 100))
+            nps = int(
+                np.clip(
+                    round(plan_nps[row.plan_type] + rng.normal(0, 11) - nps_decay - tickets * 2.5),
+                    -100,
+                    100,
+                )
+            )
 
-            rows.append({
-                "usage_id": f"USG{idx:09d}",
-                "customer_id": row.customer_id,
-                "usage_date": d,
-                "sessions": sessions,
-                "feature_adoption_score": round(adoption, 2),
-                "support_tickets": tickets,
-                "nps_score": nps,
-            })
+            rows.append(
+                {
+                    "usage_id": f"USG{idx:09d}",
+                    "customer_id": row.customer_id,
+                    "usage_date": d,
+                    "sessions": sessions,
+                    "feature_adoption_score": round(adoption, 2),
+                    "support_tickets": tickets,
+                    "nps_score": nps,
+                }
+            )
             idx += 1
 
     return pd.DataFrame(rows)
 
 
-def _write(customers, subscriptions, usage, payments) -> None:
+def generate_revenue_movements(
+    customers: pd.DataFrame,
+    subscriptions: pd.DataFrame,
+    rng: np.random.Generator,
+) -> pd.DataFrame:
+    """Generate a contract-MRR event ledger that reconciles to the subscription snapshot."""
+    merged = customers[["customer_id"]].merge(
+        subscriptions,
+        on="customer_id",
+        how="inner",
+        validate="one_to_one",
+    )
+    rows: list[dict] = []
+    movement_index = 1
+
+    for row in merged.itertuples(index=False):
+        start = pd.Timestamp(row.subscription_start_date)
+        end = (
+            pd.Timestamp(row.subscription_end_date)
+            if pd.notna(row.subscription_end_date)
+            else REFERENCE_DATE
+        )
+        months = pd.period_range(start=start, end=end, freq="M")
+        final_mrr = float(row.monthly_revenue)
+
+        if len(months) >= 4:
+            initial_mrr = round(
+                float(np.clip(final_mrr / np.exp(rng.normal(0.10, 0.24)), 20.0, 20000.0)),
+                2,
+            )
+        else:
+            initial_mrr = final_mrr
+
+        events: list[tuple[pd.Timestamp, str, float]] = [(start, "new", initial_mrr)]
+        commercial_delta = round(final_mrr - initial_mrr, 2)
+        if abs(commercial_delta) >= 0.01:
+            event_index = min(max(len(months) // 2, 1), len(months) - 1)
+            event_date = months[event_index].to_timestamp()
+            events.append(
+                (
+                    event_date,
+                    "expansion" if commercial_delta > 0 else "contraction",
+                    commercial_delta,
+                )
+            )
+
+        is_open = row.status != "churned"
+        if is_open and len(months) >= 15 and rng.random() < 0.05:
+            pause_index = min(max((len(months) * 3) // 4, 2), len(months) - 2)
+            pause_date = months[pause_index].to_timestamp()
+            reactivate_date = months[pause_index + 1].to_timestamp()
+            events.extend(
+                [
+                    (pause_date, "churn", -final_mrr),
+                    (reactivate_date, "reactivation", final_mrr),
+                ]
+            )
+
+        if row.status == "churned":
+            events.append((end, "churn", -final_mrr))
+
+        current_mrr = 0.0
+        for effective_date, movement_type, delta in sorted(events, key=lambda value: value[0]):
+            current_mrr = round(current_mrr + delta, 2)
+            if abs(current_mrr) < 0.01:
+                current_mrr = 0.0
+            rows.append(
+                {
+                    "movement_id": f"MRR{movement_index:08d}",
+                    "customer_id": row.customer_id,
+                    "effective_date": effective_date,
+                    "movement_type": movement_type,
+                    "mrr_delta": round(delta, 2),
+                    "ending_mrr": current_mrr,
+                }
+            )
+            movement_index += 1
+
+    return pd.DataFrame(rows)
+
+
+def generate_acquisition_spend(
+    customers: pd.DataFrame,
+    rng: np.random.Generator,
+) -> pd.DataFrame:
+    """Generate monthly marketing and sales spend at acquisition-channel grain."""
+    channels = sorted(customers["acquisition_channel"].unique())
+    months = pd.period_range(
+        customers["signup_date"].min(),
+        REFERENCE_DATE,
+        freq="M",
+    )
+    acquisition_counts = (
+        customers.assign(spend_month=customers["signup_date"].dt.to_period("M"))
+        .groupby(["spend_month", "acquisition_channel"])
+        .size()
+    )
+    base_cac = {
+        "Affiliate": 760.0,
+        "Organic": 320.0,
+        "Outbound": 1850.0,
+        "Paid Search": 1180.0,
+        "Partner": 920.0,
+        "Referral": 430.0,
+    }
+    sales_share = {
+        "Affiliate": 0.20,
+        "Organic": 0.18,
+        "Outbound": 0.76,
+        "Paid Search": 0.22,
+        "Partner": 0.54,
+        "Referral": 0.28,
+    }
+
+    rows: list[dict] = []
+    spend_index = 1
+    for month in months:
+        for channel in channels:
+            acquired = int(acquisition_counts.get((month, channel), 0))
+            always_on = base_cac[channel] * 0.45
+            total_spend = max(
+                always_on,
+                acquired * base_cac[channel] * float(rng.lognormal(0.0, 0.10)),
+            )
+            sales_spend = total_spend * sales_share[channel]
+            rows.append(
+                {
+                    "spend_id": f"SPD{spend_index:06d}",
+                    "spend_month": month.to_timestamp(),
+                    "acquisition_channel": channel,
+                    "marketing_spend": round(total_spend - sales_spend, 2),
+                    "sales_spend": round(sales_spend, 2),
+                }
+            )
+            spend_index += 1
+    return pd.DataFrame(rows)
+
+
+def generate_service_costs(
+    customers: pd.DataFrame,
+    subscriptions: pd.DataFrame,
+    revenue_movements: pd.DataFrame,
+    rng: np.random.Generator,
+) -> pd.DataFrame:
+    """Generate monthly direct service costs for gross-margin measurement."""
+    merged = customers[["customer_id", "plan_type"]].merge(
+        subscriptions[["customer_id", "subscription_start_date", "subscription_end_date"]],
+        on="customer_id",
+        how="inner",
+        validate="one_to_one",
+    )
+    movement_groups = {
+        customer_id: group.sort_values("effective_date")
+        for customer_id, group in revenue_movements.groupby("customer_id", sort=False)
+    }
+    variable_cost_rate = {"Basic": 0.30, "Growth": 0.24, "Pro": 0.18, "Enterprise": 0.15}
+    fixed_cost = {"Basic": 7.0, "Growth": 14.0, "Pro": 32.0, "Enterprise": 105.0}
+    rows: list[dict] = []
+    cost_index = 1
+
+    for row in merged.itertuples(index=False):
+        start = pd.Timestamp(row.subscription_start_date)
+        end = (
+            pd.Timestamp(row.subscription_end_date)
+            if pd.notna(row.subscription_end_date)
+            else REFERENCE_DATE
+        )
+        events = movement_groups[row.customer_id]
+        current_mrr = 0.0
+        for month in pd.period_range(start, end, freq="M"):
+            opening_mrr = current_mrr
+            month_events = events[
+                pd.to_datetime(events["effective_date"]).dt.to_period("M") == month
+            ]
+            if not month_events.empty:
+                current_mrr = float(month_events.iloc[-1]["ending_mrr"])
+            service_base = max(opening_mrr, current_mrr)
+            if service_base <= 0:
+                continue
+            direct_cost = (
+                fixed_cost[row.plan_type] + service_base * variable_cost_rate[row.plan_type]
+            ) * float(rng.lognormal(0.0, 0.07))
+            rows.append(
+                {
+                    "service_cost_id": f"CST{cost_index:08d}",
+                    "customer_id": row.customer_id,
+                    "cost_month": month.to_timestamp(),
+                    "direct_service_cost": round(direct_cost, 2),
+                }
+            )
+            cost_index += 1
+    return pd.DataFrame(rows)
+
+
+def _write(
+    customers: pd.DataFrame,
+    subscriptions: pd.DataFrame,
+    usage: pd.DataFrame,
+    payments: pd.DataFrame,
+    revenue_movements: pd.DataFrame,
+    acquisition_spend: pd.DataFrame,
+    service_costs: pd.DataFrame,
+) -> None:
     out = raw_dir()
     out.mkdir(parents=True, exist_ok=True)
     for df, name, date_cols in [
@@ -285,6 +535,9 @@ def _write(customers, subscriptions, usage, payments) -> None:
         (subscriptions, "subscriptions", ["subscription_start_date", "subscription_end_date"]),
         (usage, "product_usage", ["usage_date"]),
         (payments, "payments", ["payment_date"]),
+        (revenue_movements, "revenue_movements", ["effective_date"]),
+        (acquisition_spend, "acquisition_spend", ["spend_month"]),
+        (service_costs, "service_costs", ["cost_month"]),
     ]:
         df = df.copy()
         for col in date_cols:
@@ -298,12 +551,37 @@ def main() -> None:
     subscriptions = generate_subscriptions(customers, rng)
     payments = generate_payments(customers, subscriptions, rng)
     usage = generate_product_usage(customers, subscriptions, rng)
-    _write(customers, subscriptions, usage, payments)
+    revenue_movements = generate_revenue_movements(customers, subscriptions, rng)
+    acquisition_spend = generate_acquisition_spend(customers, rng)
+    service_costs = generate_service_costs(customers, subscriptions, revenue_movements, rng)
+    _write(
+        customers,
+        subscriptions,
+        usage,
+        payments,
+        revenue_movements,
+        acquisition_spend,
+        service_costs,
+    )
+    contracts = load_contracts()
+    published = CsvSourceAdapter(raw_dir()).read(contracts)
+    validate_source_frames(published, contracts)
+    publish_frames(
+        published,
+        contracts,
+        project_root(),
+        "synthetic",
+        ingested_at=REFERENCE_DATE.to_pydatetime().replace(tzinfo=UTC),
+        reference_date=REFERENCE_DATE.date().isoformat(),
+    )
 
     status_mix = subscriptions["status"].value_counts(normalize=True).mul(100).round(1).to_dict()
     print(f"Generated synthetic dataset (seed={SEED}, reference={REFERENCE_DATE.date()}).")
-    print(f"  customers={len(customers):,}  subscriptions={len(subscriptions):,}  "
-          f"usage={len(usage):,}  payments={len(payments):,}")
+    print(
+        f"  customers={len(customers):,}  subscriptions={len(subscriptions):,}  "
+        f"usage={len(usage):,}  payments={len(payments):,}  "
+        f"mrr_movements={len(revenue_movements):,}  service_costs={len(service_costs):,}"
+    )
     print(f"  status mix (%): {status_mix}")
 
 

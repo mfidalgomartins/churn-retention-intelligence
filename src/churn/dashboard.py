@@ -54,20 +54,44 @@ def _load_base_tables(project_root: Path) -> dict[str, pd.DataFrame]:
     return {
         "features": pd.read_csv(processed / "customer_retention_features.csv"),
         "risk": pd.read_csv(processed / "customer_risk_scores.csv"),
-        "monthly_dim": pd.read_csv(outputs / "monthly_dimensional_trend.csv", parse_dates=["month"]),
-        "cohort": pd.read_csv(processed / "cohort_retention_table.csv", parse_dates=["cohort_month", "observation_month"]),
+        "monthly_dim": pd.read_csv(
+            outputs / "monthly_dimensional_trend.csv", parse_dates=["month"]
+        ),
+        "cohort": pd.read_csv(
+            processed / "cohort_retention_table.csv",
+            parse_dates=["cohort_month", "observation_month"],
+        ),
         "validation_checks": optional(
             outputs / "final_validation_checks.csv",
-            ["category", "check_name", "status", "severity", "gate_level", "is_blocker", "evidence"],
+            [
+                "category",
+                "check_name",
+                "status",
+                "severity",
+                "gate_level",
+                "is_blocker",
+                "evidence",
+            ],
         ),
         "validation_issues": optional(
             outputs / "final_validation_issues.csv",
-            ["category", "check_name", "severity", "gate_level", "is_blocker", "status", "evidence", "fix_applied"],
+            [
+                "category",
+                "check_name",
+                "severity",
+                "gate_level",
+                "is_blocker",
+                "status",
+                "evidence",
+                "fix_applied",
+            ],
         ),
     }
 
 
-def _build_snapshot_tables(features: pd.DataFrame, risk: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _build_snapshot_tables(
+    features: pd.DataFrame, risk: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     dims = ["segment", "region", "acquisition_channel", "plan_type"]
     risk_cols = [
         "customer_id",
@@ -93,8 +117,12 @@ def _build_snapshot_tables(features: pd.DataFrame, risk: pd.DataFrame) -> tuple[
     snapshot["nps_sum"] = snapshot["nps_score_recent"]
     snapshot["payment_failure_sum"] = snapshot["payment_failure_flag"]
     snapshot["usage_decline_count"] = (snapshot["usage_trend"] < 0).astype(int)
-    snapshot["at_risk_mrr_component"] = np.where(snapshot["at_risk_flag"] == 1, snapshot["current_mrr"], 0.0)
-    snapshot["churned_revenue_component"] = np.where(snapshot["churn_flag"] == 1, snapshot["avg_monthly_revenue"], 0.0)
+    snapshot["at_risk_mrr_component"] = np.where(
+        snapshot["at_risk_flag"] == 1, snapshot["current_mrr"], 0.0
+    )
+    snapshot["churned_revenue_component"] = np.where(
+        snapshot["churn_flag"] == 1, snapshot["avg_monthly_revenue"], 0.0
+    )
 
     snapshot_agg = (
         snapshot.groupby([*dims, "risk_tier", "churn_flag"], as_index=False)
@@ -150,7 +178,9 @@ def _build_snapshot_tables(features: pd.DataFrame, risk: pd.DataFrame) -> tuple[
     return snapshot_agg, scored
 
 
-def _encode_monthly_fact(monthly_dim: pd.DataFrame, domains: dict[str, list[str]]) -> tuple[list[str], list[list[float]]]:
+def _encode_monthly_fact(
+    monthly_dim: pd.DataFrame, domains: dict[str, list[str]]
+) -> tuple[list[str], list[list[float]]]:
     dims = ["segment", "region", "acquisition_channel", "plan_type"]
     fact = monthly_dim[
         [
@@ -246,9 +276,8 @@ def _build_risk_kpi_cube(scored: pd.DataFrame) -> pd.DataFrame:
 def _prepare_cohort_rows(cohort: pd.DataFrame) -> pd.DataFrame:
     rows = cohort.copy()
     rows["cohort_age_months"] = (
-        (rows["observation_month"].dt.year - rows["cohort_month"].dt.year) * 12
-        + (rows["observation_month"].dt.month - rows["cohort_month"].dt.month)
-    )
+        rows["observation_month"].dt.year - rows["cohort_month"].dt.year
+    ) * 12 + (rows["observation_month"].dt.month - rows["cohort_month"].dt.month)
     rows["cohort_month"] = rows["cohort_month"].dt.strftime("%Y-%m")
     rows["observation_month"] = rows["observation_month"].dt.strftime("%Y-%m")
     return rows[
@@ -307,8 +336,11 @@ def load_data(project_root: Path) -> dict:
     mature_months = monthly_base[monthly_base >= 100].index.tolist()
     coverage_start_month = mature_months[0] if mature_months else months[0]
 
-    # Keep the ranking table payload intentionally bounded for fast dashboard load.
-    scored = scored_all.sort_values(["retention_priority_score", "current_mrr"], ascending=[False, False]).head(800).copy()
+    # Keep the complete open-account population so every filtered ranking is exact.
+    # The browser still renders only the first 300 matching rows.
+    scored = scored_all.sort_values(
+        ["retention_priority_score", "current_mrr"], ascending=[False, False]
+    ).copy()
 
     processed = project_root / "data" / "processed"
     outputs = project_root / "outputs" / "tables"
@@ -317,7 +349,13 @@ def load_data(project_root: Path) -> dict:
         processed / "customer_risk_scores.csv",
         processed / "cohort_retention_table.csv",
         outputs / "monthly_dimensional_trend.csv",
-        Path(__file__).resolve(),
+        outputs / "final_validation_checks.csv",
+        outputs / "final_validation_issues.csv",
+        project_root / "config" / "contracts" / "data_contracts.json",
+        project_root / "config" / "governance" / "release_policy.yml",
+        project_root / "config" / "governance" / "score_stability_baseline.json",
+        project_root / "config" / "vendor_assets.json",
+        *sorted((project_root / "src" / "churn").glob("*.py")),
         TEMPLATE_PATH,
         project_root / "assets" / "vendor" / "chart.umd.min.js",
     ]
@@ -351,8 +389,7 @@ def build_html(data_json: str, chart_js: str) -> str:
     # Defensive escaping for inline <script> boundaries.
     safe_chart_js = chart_js.replace("</script", "<\\/script")
     safe_data_json = (
-        data_json
-        .replace("&", "\\u0026")
+        data_json.replace("&", "\\u0026")
         .replace("<", "\\u003c")
         .replace(">", "\\u003e")
         .replace("\u2028", "\\u2028")
@@ -412,6 +449,7 @@ def _enforce_single_official_html(dashboard_dir: Path, official_filename: str) -
 def main() -> None:
     from churn.common import outputs_dashboard_dir
     from churn.common import project_root as _root
+
     root = _root()
     dashboard_dir = outputs_dashboard_dir()
     dashboard_dir.mkdir(parents=True, exist_ok=True)
@@ -434,8 +472,10 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    print(f"Dashboard built: {output_file.relative_to(root)} "
-          f"({len(html.encode('utf-8')):,} bytes, version {data['meta']['dashboard_version']}).")
+    print(
+        f"Dashboard built: {output_file.relative_to(root)} "
+        f"({len(html.encode('utf-8')):,} bytes, version {data['meta']['dashboard_version']})."
+    )
 
 
 if __name__ == "__main__":

@@ -40,3 +40,4 @@ dist/
 /data/processed/
 /outputs/tables/
 /outputs/profiling/
+/outputs/snapshots/

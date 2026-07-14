@@ -1,0 +1,28 @@
+version: 1
+experiment_id: retention-outreach-v1
+assignment_date: 2026-03-01
+assignment_date_env: CHURN_EXPERIMENT_ASSIGNMENT_DATE
+outcome_horizon_days: 90
+eligible_probability_tiers:
+  - critical
+  - high
+allocation:
+  treatment_share: 0.50
+  stratification_columns:
+    - probability_risk_tier
+    - segment
+assignment_store:
+  file_env: CHURN_INTERVENTION_ASSIGNMENTS_FILE
+simulation:
+  enabled: true
+  random_seed: 20260301
+  treatment_odds_ratio: 0.70
+  outcome_source: synthetic_counterfactual_simulation
+observed_outcomes:
+  file_env: CHURN_INTERVENTION_OUTCOMES_FILE
+  source_name: observed_outcome_file
+  minimum_complete_share_for_estimation: 1.0
+quality_thresholds:
+  maximum_absolute_standardized_mean_difference: 0.20
+  maximum_allocation_imbalance: 0.05
+  minimum_arm_size: 100

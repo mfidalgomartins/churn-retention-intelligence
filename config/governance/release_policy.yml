@@ -27,3 +27,8 @@ release_gate_outputs:
   - outputs/tables/final_validation_checks.csv
   - outputs/tables/final_validation_issues.csv
   - outputs/tables/release_readiness_matrix.csv
+  - outputs/tables/model_performance.csv
+  - outputs/tables/model_calibration.csv
+  - outputs/tables/intervention_balance.csv
+  - outputs/tables/intervention_incrementality.csv
+  - outputs/tables/monitoring_alerts.csv
