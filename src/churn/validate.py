@@ -1088,14 +1088,18 @@ def dashboard_checks(data: ValidationData) -> list[Check]:
         )
     )
 
-    layout_safe = all(
-        token in html
-        for token in (
-            "minmax(0, 1fr)",
-            "@media (max-width: 960px)",
-            "@media print",
-            "overflow: hidden",
+    # The breakpoint value is a design choice, so match any width-based media
+    # query rather than one hard-coded px value.
+    layout_safe = (
+        all(
+            token in html
+            for token in (
+                "minmax(0, 1fr)",
+                "@media print",
+                "overflow: hidden",
+            )
         )
+        and re.search(r"@media\s*\(max-width:\s*\d+px\)", html) is not None
     )
     checks.append(
         _check(

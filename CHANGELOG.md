@@ -5,6 +5,21 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Dashboard: scoring-policy plot (churn risk × customer value, tier boundaries
+  drawn from the same constants the scores are computed with) and a work-order
+  capacity view comparing governed, risk-only, and value-weighted contact
+  orderings.
+- README: dedicated flagship-deliverables section with dashboard and report
+  preview images.
+
+### Changed
+
+- `risk.py`: priority-blend and critical-override weights extracted to named
+  constants and exported to the dashboard payload so drawn policy boundaries
+  cannot drift from the scoring code.
+
 ## [2.0.0] - 2026-07-14
 
 ### Added

@@ -4,720 +4,841 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Retention review — Churn &amp; Retention Intelligence</title>
-  <meta name="description" content="Quarterly retention review: where churn lives, what it costs, and which accounts to save first." />
+  <meta name="description" content="Where retention risk sits, what it exposes in revenue, and which accounts the save capacity should reach first." />
   <!-- No-flash theme init: runs before CSS paint -->
   <script>(function(){var s=localStorage.getItem('cri-theme'),d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',s||(d?'dark':'light'));})();</script>
   <style>
-    /* ── Shared tokens ──────────────────────────────────── */
+    /* ═══ Tokens ═══════════════════════════════════════════════════════
+       One encoded hue: red carries risk, and nothing else carries red.
+       Every other surface is neutral ink. The tier ramp and the cohort
+       ramp are ordinal (validated: monotone lightness, ΔL ≥ 0.06, the
+       step nearest the surface clears 2:1).
+    ─────────────────────────────────────────────────────────────────── */
     :root {
-      --serif: ui-serif, "New York", "Iowan Old Style", "Charter", "Cambria", "Times New Roman", Times, serif;
-      --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
-      --mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
-      --container: 1240px;
-      --gutter: 32px;
-      --radius: 5px;
-      --radius-sm: 3px;
+      --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
-      /* ── Light (default) ── */
-      --bg:          #F5F4F1;
-      --surface:     #FFFFFF;
-      --surface-2:   #EEECEA;
-      --ink:         #111110;
-      --ink-2:       #46443C;
-      --ink-3:       #8A8880;
-      --ink-4:       #C0BDB5;
-      --border:      #DEDAD2;
-      --border-2:    #CAC7BE;
-      --loss:        #B83530;
-      --loss-bg:     rgba(184, 53, 48, 0.08);
-      --gain:        #1B6640;
-      --gain-bg:     rgba(27, 102, 64, 0.08);
-      --warn:        #9E6010;
-      --warn-bg:     rgba(158, 96, 16, 0.08);
-      --grid-line:   rgba(17, 17, 16, 0.07);
-      --grid-axis:   rgba(17, 17, 16, 0.15);
-      --topbar-bg:   rgba(245, 244, 241, 0.94);
-      --topbar-blur: saturate(160%) blur(10px);
-      --card-shadow: none;
+      --container: 1300px;
+      --gutter: 28px;
+      --r: 4px;
+
+      --t-micro: 10.5px;
+      --t-meta: 12px;
+      --t-sm: 13px;
+      --t-body: 14.5px;
+      --t-lg: 16.5px;
+      --t-title: 20px;
+      --t-h2: 27px;
+      --t-hero: clamp(44px, 5vw, 64px);
+
+      /* ── Light ── */
+      --plane:     #F2F2F0;
+      --surface:   #FFFFFF;
+      --surface-2: #F7F7F5;
+      --sunken:    #ECECE9;
+      --ink:       #16171A;
+      --ink-2:     #4E5058;
+      --ink-3:     #8A8D96;
+      --ink-4:     #B9BCC3;
+      --hair:      #E4E4E1;
+      --hair-2:    #D2D3D0;
+      --grid:      #E9E9E6;
+      --axis:      #CBCCC9;
+
+      --risk:        #BE3A2E;
+      --risk-deep:   #8C1F19;
+      --risk-wash:   rgba(190, 58, 46, 0.09);
+      --risk-veil:   rgba(190, 58, 46, 0.05);
+
+      /* low is 72% of the book and is not the point: it wears the neutral
+         mark, so red is spent only on the tiers that ask for work. */
+      --tier-low:      #AEB2BA;
+      --tier-medium:   #D9685A;
+      --tier-high:     #BE3A2E;
+      --tier-critical: #8C1F19;
+      --neutral-mark:  #AEB2BA;
+
+      --context:      rgba(22, 23, 26, 0.30);
+      --context-soft: rgba(22, 23, 26, 0.09);
+
+      --ok:      #0CA30C;
+      --warn:    #FAB219;
+      --serious: #EC835A;
+      --bad:     #D03B3B;
+
+      --masthead: rgba(242, 242, 240, 0.88);
+      --blur: saturate(180%) blur(14px);
+      --lift: none;
+      --ring: inset 0 0 0 1px var(--hair);
     }
 
-    /* ── Dark ─────────────────────────────────────────── */
+    /* ── Dark ── */
     :root[data-theme="dark"] {
-      --bg:          #0C0C0B;
-      --surface:     #161614;
-      --surface-2:   #1D1D1B;
-      --ink:         #ECEAE2;
-      --ink-2:       #A09C94;
-      --ink-3:       #737068;
-      --ink-4:       #3A3936;
-      --border:      #242320;
-      --border-2:    #302E2B;
-      --loss:        #DC5245;
-      --loss-bg:     rgba(220, 82, 69, 0.14);
-      --gain:        #38A866;
-      --gain-bg:     rgba(56, 168, 102, 0.11);
-      --warn:        #CE9035;
-      --warn-bg:     rgba(206, 144, 53, 0.11);
-      --grid-line:   rgba(236, 234, 226, 0.055);
-      --grid-axis:   rgba(236, 234, 226, 0.14);
-      --topbar-bg:   #161614;
-      --topbar-blur: none;
-      --card-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+      --plane:     #0B0C0E;
+      --surface:   #141619;
+      --surface-2: #191B1F;
+      --sunken:    #0F1114;
+      --ink:       #EDEEF0;
+      --ink-2:     #A2A5AD;
+      --ink-3:     #70737B;
+      --ink-4:     #4A4D55;
+      --hair:      #23262B;
+      --hair-2:    #2E3138;
+      --grid:      #202329;
+      --axis:      #34373D;
+
+      --risk:        #DE7565;
+      --risk-deep:   #F5A092;
+      --risk-wash:   rgba(222, 117, 101, 0.15);
+      --risk-veil:   rgba(222, 117, 101, 0.07);
+
+      --tier-low:      #454A55;
+      --tier-medium:   #B85040;
+      --tier-high:     #DE7565;
+      --tier-critical: #F5A092;
+      --neutral-mark:  #454A55;
+
+      --context:      rgba(237, 238, 240, 0.32);
+      --context-soft: rgba(237, 238, 240, 0.10);
+
+      --masthead: rgba(11, 12, 14, 0.86);
+      --lift: 0 1px 3px rgba(0, 0, 0, 0.5);
     }
 
-    /* ── Reset ──────────────────────────────────────────── */
+    /* ═══ Reset ═══ */
     *, *::before, *::after { box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; }
+    html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
     body {
       margin: 0;
-      background: var(--bg);
+      background: var(--plane);
       color: var(--ink);
       font-family: var(--sans);
-      font-size: 14px;
+      font-size: var(--t-body);
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
+      font-synthesis-weight: none;
     }
+    h1, h2, h3, p, dl, dd, figure, figcaption { margin: 0; }
 
-    /* ── Accessibility ──────────────────────────────────── */
-    .skip-link {
-      position: absolute; left: -9999px; top: 0;
-      background: var(--ink); color: var(--surface); padding: 8px 12px;
+    /* ═══ A11y ═══ */
+    .skip {
+      position: absolute; left: -9999px; top: 0; z-index: 100;
+      background: var(--ink); color: var(--plane); padding: 9px 14px; border-radius: var(--r);
     }
-    .skip-link:focus { left: 16px; top: 16px; z-index: 100; }
+    .skip:focus { left: 14px; top: 14px; }
     .sr-only {
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
+    :focus-visible { outline: 2px solid var(--risk); outline-offset: 2px; border-radius: 2px; }
 
-    /* ── Topbar ─────────────────────────────────────────── */
-    .topbar {
-      position: sticky; top: 0; z-index: 20;
-      background: var(--topbar-bg);
-      backdrop-filter: var(--topbar-blur);
-      -webkit-backdrop-filter: var(--topbar-blur);
-      border-bottom: 1px solid var(--border);
+    /* ═══ Masthead ═══ */
+    .masthead {
+      position: sticky; top: 0; z-index: 30;
+      background: var(--masthead);
+      backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+      border-bottom: 1px solid var(--hair);
     }
-    .topbar-inner {
+    .mast-row {
       max-width: var(--container); margin: 0 auto;
-      padding: 11px var(--gutter);
-      display: flex; align-items: center; gap: 18px;
+      padding: 0 var(--gutter);
+      display: flex; align-items: center; gap: 16px;
+      min-height: 52px;
     }
-    .brand {
-      display: flex; align-items: center; gap: 10px;
-      font-family: var(--serif); font-size: 15px;
-      letter-spacing: -0.01em; color: var(--ink);
-      text-decoration: none;
+    .mast-row + .mast-row {
+      border-top: 1px solid var(--hair);
+      min-height: 46px;
     }
-    .brand-mark {
-      width: 22px; height: 22px;
-      border-radius: 3px;
-      background: var(--ink); color: var(--bg);
-      display: grid; place-items: center;
-      font-family: var(--serif); font-weight: 500; font-size: 12px;
-      flex-shrink: 0;
-    }
-    .brand-name { font-weight: 500; }
-    .brand-name em { font-style: italic; color: var(--ink-2); font-weight: 400; }
-    .topbar-spacer { flex: 1; }
+    .spacer { flex: 1 1 auto; }
 
-    .control-group { display: flex; align-items: center; gap: 7px; }
-    .control-label {
-      font-size: 11px; letter-spacing: 0.06em;
-      text-transform: uppercase; color: var(--ink-3); font-weight: 500;
+    .wordmark { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+    .wordmark b {
+      font-size: var(--t-sm); font-weight: 620;
+      letter-spacing: -0.005em; color: var(--ink); white-space: nowrap;
     }
-    .control {
-      font: inherit; font-size: 13px;
-      padding: 5px 26px 5px 9px;
-      border: 1px solid var(--border-2);
-      border-radius: var(--radius-sm);
-      background: var(--surface); color: var(--ink);
-      appearance: none; -webkit-appearance: none;
+    .wordmark span {
+      font-size: var(--t-micro); letter-spacing: 0.09em; text-transform: uppercase;
+      color: var(--ink-3); font-weight: 500; white-space: nowrap;
+    }
+    /* Risk meridian: the one ornament, and it is a reading of the data —
+       four ticks weighted by the tier mix of the accounts in scope. */
+    .meridian { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
+    .meridian i { width: 3px; border-radius: 1px; display: block; }
+
+    .field { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .field > label {
+      font-size: var(--t-micro); letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--ink-3); font-weight: 560; white-space: nowrap;
+    }
+    select.ctl {
+      font: inherit; font-size: var(--t-sm); color: var(--ink);
+      padding: 4px 22px 4px 8px;
+      border: 1px solid transparent; border-radius: 3px;
+      background-color: transparent;
       background-image:
-        linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
-        linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
-      background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
-      background-size: 4px 4px, 4px 4px;
-      background-repeat: no-repeat;
-      cursor: pointer; min-width: 106px;
-      transition: border-color 0.1s;
+        linear-gradient(45deg, transparent 50%, currentColor 50%),
+        linear-gradient(135deg, currentColor 50%, transparent 50%);
+      background-position: calc(100% - 10px) calc(50% + 1px), calc(100% - 6px) calc(50% + 1px);
+      background-size: 4px 4px; background-repeat: no-repeat;
+      appearance: none; -webkit-appearance: none;
+      cursor: pointer; max-width: 148px; font-weight: 520;
+      transition: background-color .12s, border-color .12s;
     }
-    .control:hover { border-color: var(--ink-3); }
-    .control:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-    .control[type="date"] {
-      background-image: none; padding-right: 9px; min-width: 134px;
-      font-family: var(--mono); font-size: 12px;
-    }
+    select.ctl:hover { background-color: var(--sunken); border-color: var(--hair-2); }
+    select.ctl[data-active="1"] { color: var(--risk); background-color: var(--risk-veil); border-color: transparent; }
 
-    .btn-ghost {
-      font: inherit; font-size: 13px; padding: 5px 11px;
-      border: 1px solid var(--border-2); border-radius: var(--radius-sm);
-      background: var(--surface); color: var(--ink-2); cursor: pointer;
-      transition: background 0.1s, border-color 0.1s;
+    .btn {
+      font: inherit; font-size: var(--t-sm); font-weight: 520;
+      padding: 4px 10px; border-radius: 3px;
+      border: 1px solid var(--hair-2); background: var(--surface); color: var(--ink-2);
+      cursor: pointer; white-space: nowrap;
+      transition: background .12s, color .12s, border-color .12s, opacity .12s;
     }
-    .btn-ghost:hover { background: var(--surface-2); border-color: var(--ink-3); color: var(--ink); }
+    .btn:hover { background: var(--sunken); color: var(--ink); border-color: var(--ink-4); }
+    .btn[hidden] { display: none; }
+    .btn-sq {
+      display: grid; place-items: center; width: 27px; height: 27px; padding: 0;
+      color: var(--ink-3); flex: 0 0 auto;
+    }
+    .btn-sq svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    [data-theme="light"] .i-sun { display: none; }
+    [data-theme="dark"] .i-moon { display: none; }
 
-    .btn-icon {
-      display: flex; align-items: center; justify-content: center;
-      width: 28px; height: 28px;
-      border: 1px solid var(--border-2); border-radius: var(--radius-sm);
-      background: var(--surface); color: var(--ink-3);
-      cursor: pointer; padding: 0; flex-shrink: 0;
-      transition: background 0.1s, color 0.1s;
-    }
-    .btn-icon:hover { background: var(--surface-2); color: var(--ink); }
-    .btn-icon svg {
-      width: 13px; height: 13px; fill: none;
-      stroke: currentColor; stroke-width: 1.6;
-      stroke-linecap: round; stroke-linejoin: round;
-    }
-    [data-theme="light"] .icon-sun  { display: none; }
-    [data-theme="dark"]  .icon-moon { display: none; }
+    /* ═══ Shell ═══ */
+    main { max-width: var(--container); margin: 0 auto; padding: 0 var(--gutter) 8px; }
+    .band { padding: 56px 0; border-top: 1px solid var(--hair); }
+    .band:first-of-type { border-top: 0; padding-top: 44px; }
 
-    /* ── Layout ─────────────────────────────────────────── */
-    main {
-      max-width: var(--container); margin: 0 auto;
-      padding: 50px var(--gutter) 64px;
+    /* ═══ Section headers ═══ */
+    .head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 22px; }
+    .head-tools { margin-left: auto; flex: 0 0 auto; display: flex; align-items: center; gap: 10px; }
+    .head-tools select.ctl { max-width: none; border-color: var(--hair-2); background-color: var(--surface); }
+    .ord {
+      font-family: var(--mono); font-size: var(--t-meta); font-weight: 500;
+      color: var(--risk); letter-spacing: 0.04em; flex: 0 0 auto;
+      font-variant-numeric: tabular-nums;
     }
-    section + section { margin-top: 52px; }
+    .head-txt { min-width: 0; }
+    h2 {
+      font-size: var(--t-h2); font-weight: 600;
+      letter-spacing: -0.021em; line-height: 1.2; color: var(--ink);
+    }
+    .dek { font-size: var(--t-sm); color: var(--ink-3); margin-top: 5px; max-width: 74ch; line-height: 1.5; }
 
-    .eyebrow {
-      font-size: 11px; letter-spacing: 0.08em;
-      text-transform: uppercase; color: var(--ink-3);
-      margin: 0 0 13px; font-weight: 500;
+    /* ═══ Brief ═══ */
+    /* The text column keeps a reading measure; the tiles take a fixed slab wide
+       enough for a label and its delta to sit on one line. */
+    .brief { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 60px; align-items: start; }
+    .kicker {
+      font-size: var(--t-micro); letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--ink-3); font-weight: 560; margin-bottom: 18px;
+      display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
     }
-    .eyebrow-bar {
-      display: flex; align-items: baseline;
-      justify-content: space-between; gap: 16px; margin-bottom: 13px;
-    }
-    .eyebrow-bar .eyebrow { margin: 0; }
-    .eyebrow-note { font-size: 12px; color: var(--ink-3); }
+    .kicker em { font-style: normal; color: var(--risk); }
+    .kicker .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--ink-4); }
 
-    /* ── Hero ───────────────────────────────────────────── */
-    .h1 {
-      font-family: var(--serif); font-weight: 400;
-      font-size: clamp(32px, 3.8vw, 50px);
-      line-height: 1.09; letter-spacing: -0.022em;
-      margin: 0 0 20px; color: var(--ink);
+    .hero {
+      font-size: var(--t-hero); font-weight: 630;
+      letter-spacing: -0.038em; line-height: 0.95; color: var(--ink);
+      display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
     }
-    .h1 .h1-accent { color: var(--loss); font-style: italic; }
+    .hero-unit {
+      font-size: var(--t-sm); font-weight: 520; letter-spacing: 0.01em;
+      color: var(--ink-3); line-height: 1.4; max-width: 21ch;
+      padding-bottom: 3px;
+    }
+    .hero-rule { height: 1px; background: var(--hair); margin: 22px 0 20px; }
 
-    .lede {
-      font-family: var(--serif); font-size: 17px;
-      line-height: 1.6; color: var(--ink-2);
-      max-width: 62ch; margin: 0;
-    }
-    .lede strong { color: var(--ink); font-weight: 500; }
+    .statement { font-size: var(--t-lg); line-height: 1.58; color: var(--ink-2); max-width: 68ch; }
+    .statement + .statement { margin-top: 11px; }
+    .statement b { color: var(--ink); font-weight: 600; }
+    .statement .fig-num { font-variant-numeric: tabular-nums; }
 
-    .hero-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-      gap: 52px; align-items: start;
+    /* ═══ Stat tiles — the form follows each tile's data, not a grid ═══ */
+    .tiles {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px;
+      background: var(--hair); border: 1px solid var(--hair);
+      border-radius: var(--r); overflow: hidden;
     }
-    .hero-meta { border-top: 1px solid var(--border); padding-top: 18px; }
-    .hero-meta dl {
-      margin: 0;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px;
-    }
-    .hero-meta dt {
-      font-size: 11px; text-transform: uppercase;
-      letter-spacing: 0.07em; color: var(--ink-3);
-      margin-bottom: 2px; font-weight: 500;
-    }
-    .hero-meta dd { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--ink); }
-    .hero-meta dd.big {
-      font-family: var(--serif); font-size: 24px;
-      line-height: 1.1; letter-spacing: -0.02em;
-    }
-    .hero-meta dd.big.loss { color: var(--loss); }
+    .tile { background: var(--surface); padding: 15px 16px 13px; display: grid; gap: 8px; }
+    .tile-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+    .tile-k { font-size: var(--t-micro); letter-spacing: 0.075em; text-transform: uppercase; color: var(--ink-3); font-weight: 560; }
+    .tile-v { font-size: 25px; font-weight: 630; letter-spacing: -0.028em; line-height: 1; color: var(--ink); }
+    .tile-v.risk { color: var(--risk); }
+    .tile-note { font-size: var(--t-meta); color: var(--ink-3); font-variant-numeric: tabular-nums; }
 
-    /* ── KPI strip ──────────────────────────────────────── */
-    .kpi-row {
-      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 1px; background: var(--border);
-      border: 1px solid var(--border); border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .kpi {
-      background: var(--surface); padding: 20px 20px 16px; display: grid; gap: 6px;
-    }
-    .kpi-label {
-      font-size: 11px; color: var(--ink-3); letter-spacing: 0.05em;
-      text-transform: uppercase; font-weight: 500;
-    }
-    .kpi-value {
-      font-family: var(--serif); font-size: 34px;
-      line-height: 1; letter-spacing: -0.024em;
-      color: var(--ink); font-feature-settings: "tnum" 1;
-    }
-    .kpi-value.loss { color: var(--loss); }
-    .kpi-foot {
-      display: flex; justify-content: space-between;
-      align-items: baseline; gap: 8px;
-      font-size: 12px; color: var(--ink-3);
-    }
     .delta {
-      font-family: var(--mono); font-size: 11px;
-      padding: 2px 5px; border-radius: 2px;
-      background: var(--surface-2); color: var(--ink-3); white-space: nowrap;
+      font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+      padding: 2px 5px; border-radius: 2px; white-space: nowrap;
+      background: var(--sunken); color: var(--ink-3); font-variant-numeric: tabular-nums;
     }
-    .delta.up   { color: var(--loss); background: var(--loss-bg); }
-    .delta.down { color: var(--gain); background: var(--gain-bg); }
-    .delta.flat { color: var(--ink-3); }
+    .delta.up { color: var(--risk); background: var(--risk-wash); }
+    .delta.down { color: var(--ink-2); background: var(--context-soft); }
 
-    /* ── Section titles ─────────────────────────────────── */
-    .h2 {
-      font-family: var(--serif); font-weight: 400;
-      font-size: 24px; line-height: 1.2;
-      letter-spacing: -0.015em; margin: 0;
+    .spark { display: block; width: 100%; height: 26px; overflow: visible; }
+    .spark path { fill: none; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+    .spark .fillband { stroke: none; }
+    .spark circle { stroke: var(--surface); stroke-width: 1.5; }
+
+    /* Sits in the same 26px band as the sparkline, so all four tiles share
+       one internal rhythm even though they carry different instruments. */
+    .meter {
+      height: 4px; margin: 11px 0; background: var(--sunken);
+      border-radius: 2px; overflow: hidden; display: flex;
     }
-    .section-sub { font-size: 13px; color: var(--ink-3); margin: 4px 0 0; max-width: 68ch; }
+    .meter i { display: block; height: 100%; background: var(--risk); min-width: 2px; }
 
-    /* ── Cards ──────────────────────────────────────────── */
+    /* ═══ Figures ═══ */
     .card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px 20px 16px;
-      box-shadow: var(--card-shadow);
+      background: var(--surface); border: 1px solid var(--hair);
+      border-radius: var(--r); box-shadow: var(--lift);
     }
-    .card-head {
-      display: flex; align-items: baseline;
-      justify-content: space-between; gap: 12px 20px;
-      flex-wrap: wrap; margin-bottom: 14px;
+    .fig-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 16px; padding: 15px 16px 12px;
     }
-    .card-head h3 {
-      font-family: var(--serif); font-weight: 400;
-      font-size: 17px; letter-spacing: -0.01em; margin: 0; color: var(--ink);
-    }
-    .card-note { font-size: 12px; color: var(--ink-3); font-family: var(--mono); text-align: right; max-width: 52ch; }
-    .canvas-wrap { position: relative; height: 292px; }
-    .canvas-wrap.tall { height: 332px; }
+    .fig-title { font-size: var(--t-lg); font-weight: 600; letter-spacing: -0.012em; color: var(--ink); }
+    .fig-sub { font-size: var(--t-meta); color: var(--ink-3); margin-top: 3px; max-width: 62ch; line-height: 1.45; }
+    .fig-tools { display: flex; align-items: center; gap: 16px; flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; }
 
-    /* Trend layout */
-    .trend-layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1.6fr) minmax(196px, 1fr);
-      gap: 22px;
+    .swap {
+      font: inherit; font-size: var(--t-micro); font-weight: 560; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--ink-3); background: transparent; border: 1px solid var(--hair-2);
+      border-radius: 3px; padding: 3px 7px; cursor: pointer;
+      transition: color .12s, border-color .12s, background .12s;
     }
-    .trend-stats { display: grid; gap: 12px; align-content: start; padding-top: 2px; }
-    .trend-stat { border-top: 1px solid var(--border); padding-top: 11px; }
-    .trend-stat-label {
-      font-size: 11px; letter-spacing: 0.07em;
-      text-transform: uppercase; color: var(--ink-3); font-weight: 500;
-    }
-    .trend-stat-value {
-      font-family: var(--serif); font-size: 21px;
-      letter-spacing: -0.01em; color: var(--ink); margin-top: 3px;
-    }
-    .trend-stat-value.loss { color: var(--loss); }
-    .trend-stat-note { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+    .swap:hover { color: var(--ink); border-color: var(--ink-4); }
+    .swap[aria-pressed="true"] { color: var(--risk); border-color: var(--risk); background: var(--risk-veil); }
 
-    /* Two-column grid */
-    .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .plot { position: relative; padding: 0 12px 12px; }
+    .plot canvas { display: block; }
+    .h-sm { height: 250px; }
+    .h-md { height: 300px; }
+    .h-lg { height: 400px; }
 
-    /* Behavioral gap strip */
-    .gap-strip {
-      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 1px; background: var(--border); border: 1px solid var(--border);
-      border-radius: var(--radius); overflow: hidden; margin-top: 18px;
+    /* Table twin — every figure is readable without color */
+    .tbl-wrap { padding: 0 16px 14px; overflow-x: auto; }
+    .tbl-wrap[hidden] { display: none; }
+    table.data { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
+    table.data th, table.data td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--hair); white-space: nowrap; }
+    table.data th {
+      font-size: var(--t-micro); letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--ink-3); font-weight: 560;
     }
-    .gap { background: var(--surface-2); padding: 13px 15px; display: grid; gap: 3px; }
-    .gap-label {
-      font-size: 11px; text-transform: uppercase;
-      letter-spacing: 0.07em; color: var(--ink-3); font-weight: 500;
-    }
-    .gap-value { font-family: var(--serif); font-size: 17px; color: var(--ink); letter-spacing: -0.01em; }
-    .gap-note { font-size: 11px; color: var(--ink-3); font-family: var(--mono); }
+    table.data td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    table.data td:first-child { color: var(--ink); }
+    table.data tr:last-child td { border-bottom: 0; }
+    table.data .n { text-align: right; font-family: var(--mono); font-size: var(--t-meta); }
 
-    /* ── Queue ──────────────────────────────────────────── */
-    .queue-card { padding: 0; overflow: hidden; }
-    .queue-head {
-      padding: 18px 20px 15px;
-      display: flex; align-items: baseline;
-      justify-content: space-between; gap: 20px;
-      border-bottom: 1px solid var(--border);
-    }
-    .queue-head h3 {
-      font-family: var(--serif); font-weight: 400;
-      font-size: 17px; letter-spacing: -0.01em; margin: 0;
-    }
+    /* ═══ Grids ═══ */
+    .g-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .g-trend { display: grid; grid-template-columns: minmax(0, 1fr) 216px; }
+    .rail { border-left: 1px solid var(--hair); padding: 15px 16px; display: grid; gap: 14px; align-content: start; }
+    .rail-item { display: grid; gap: 2px; }
+    .rail-k { font-size: var(--t-micro); letter-spacing: 0.075em; text-transform: uppercase; color: var(--ink-3); font-weight: 560; }
+    .rail-v { font-size: 19px; font-weight: 620; letter-spacing: -0.022em; color: var(--ink); }
+    .rail-v.risk { color: var(--risk); }
+    .rail-n { font-size: var(--t-meta); color: var(--ink-3); line-height: 1.4; font-variant-numeric: tabular-nums; }
 
-    .tier-distribution {
-      display: flex; align-items: center; gap: 14px;
-      padding: 12px 20px; border-bottom: 1px solid var(--border);
-      background: var(--surface-2);
-    }
-    .tier-bar { flex: 1; height: 4px; overflow: hidden; display: flex; background: var(--border); }
-    .tier-bar > span { display: block; height: 100%; }
-    .tier-legend { display: flex; gap: 12px; font-size: 11px; color: var(--ink-3); font-family: var(--mono); }
-    .tier-legend span.dot {
-      display: inline-block; width: 7px; height: 7px;
-      border-radius: 1px; margin-right: 5px; vertical-align: middle;
-    }
+    /* ═══ Signal gaps ═══ */
+    .gaps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--hair); border: 1px solid var(--hair); border-radius: var(--r); overflow: hidden; margin-top: 16px; }
+    .gap { background: var(--surface); padding: 13px 15px; display: grid; gap: 7px; }
+    .gap-k { font-size: var(--t-micro); letter-spacing: 0.075em; text-transform: uppercase; color: var(--ink-3); font-weight: 560; }
+    .gap-pair { display: flex; align-items: baseline; gap: 7px; font-variant-numeric: tabular-nums; }
+    .gap-a { font-size: var(--t-lg); font-weight: 620; color: var(--ink); letter-spacing: -0.018em; }
+    .gap-arrow { font-size: var(--t-meta); color: var(--ink-4); }
+    .gap-b { font-size: var(--t-lg); font-weight: 620; color: var(--risk); letter-spacing: -0.018em; }
+    .gap-n { font-size: 11px; color: var(--ink-3); }
 
-    .table-scroll { max-height: 520px; overflow: auto; border-bottom: 1px solid var(--border); }
-    table.queue { width: 100%; border-collapse: collapse; font-size: 13px; }
-    table.queue thead th {
-      position: sticky; top: 0;
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      text-align: left; padding: 9px 13px;
-      font-weight: 500; font-size: 11px; letter-spacing: 0.05em;
-      text-transform: uppercase; color: var(--ink-3);
-      cursor: pointer; user-select: none; white-space: nowrap;
-      transition: color 0.1s;
-    }
-    table.queue thead th:hover { color: var(--ink); }
-    table.queue thead th.sort-asc::after  { content: " ↑"; color: var(--ink); }
-    table.queue thead th.sort-desc::after { content: " ↓"; color: var(--ink); }
-    table.queue td {
-      padding: 9px 13px; border-bottom: 1px solid var(--border);
-      color: var(--ink); white-space: nowrap;
-    }
-    table.queue tbody tr:last-child td { border-bottom: 0; }
-    table.queue tbody tr:hover td { background: var(--surface-2); }
-    table.queue .num {
-      font-family: var(--mono); font-size: 12px;
-      font-feature-settings: "tnum" 1; text-align: right;
-    }
-    /* Critical row — left accent bar */
-    table.queue tbody tr:has(.tier-chip.critical) td:first-child {
-      border-left: 2px solid var(--loss); padding-left: 11px;
-    }
+    /* ═══ Legends ═══ */
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .lg { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-meta); color: var(--ink-2); white-space: nowrap; }
+    .lg i { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 auto; }
+    .lg i.ln { height: 2px; width: 13px; border-radius: 1px; }
+    .lg-n { color: var(--ink-3); font-variant-numeric: tabular-nums; }
 
-    .tier-chip {
-      display: inline-block; padding: 2px 7px;
-      border-radius: 2px; font-size: 11px;
-      font-family: var(--mono); letter-spacing: 0.04em;
-      text-transform: uppercase; font-weight: 500; border: 1px solid transparent;
-    }
-    .tier-chip.critical { background: var(--loss); color: #fff; border-color: var(--loss); }
-    .tier-chip.high     { background: var(--loss-bg); color: var(--loss); border-color: var(--loss); }
-    .tier-chip.medium   { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); }
-    .tier-chip.low      { background: var(--surface-2); color: var(--ink-3); border-color: var(--border-2); }
+    /* ═══ Queue ═══ */
+    .q-head { padding: 15px 16px 12px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .q-bar { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); background: var(--surface-2); flex-wrap: wrap; }
+    .tierbar { flex: 1 1 220px; height: 5px; display: flex; gap: 2px; min-width: 180px; }
+    .tierbar i { display: block; height: 100%; border-radius: 1px; }
 
-    /* ── Footer ─────────────────────────────────────────── */
+    .q-scroll { max-height: 560px; overflow: auto; }
+    table.q { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
+    table.q thead th {
+      position: sticky; top: 0; z-index: 1;
+      background: var(--surface); border-bottom: 1px solid var(--hair);
+      text-align: left; padding: 9px 12px; font-weight: 560;
+      font-size: var(--t-micro); letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--ink-3); cursor: pointer; user-select: none; white-space: nowrap;
+    }
+    table.q thead th:hover { color: var(--ink); }
+    table.q thead th[aria-sort="ascending"]::after { content: "↑"; margin-left: 5px; color: var(--risk); }
+    table.q thead th[aria-sort="descending"]::after { content: "↓"; margin-left: 5px; color: var(--risk); }
+    table.q td { padding: 8px 12px; border-bottom: 1px solid var(--hair); color: var(--ink-2); white-space: nowrap; }
+    table.q tbody tr:hover td { background: var(--surface-2); }
+    table.q tbody tr:last-child td { border-bottom: 0; }
+    table.q .n { text-align: right; font-family: var(--mono); font-size: var(--t-meta); font-variant-numeric: tabular-nums; }
+    table.q .id { font-family: var(--mono); font-size: var(--t-meta); color: var(--ink); }
+    table.q .rank { font-family: var(--mono); font-size: 11px; color: var(--ink-4); font-variant-numeric: tabular-nums; text-align: right; }
+    table.q .mrr { color: var(--ink); font-weight: 560; }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: var(--t-micro); font-weight: 560; letter-spacing: 0.055em; text-transform: uppercase;
+      color: var(--ink-2); white-space: nowrap;
+    }
+    .chip i { width: 7px; height: 7px; border-radius: 1.5px; flex: 0 0 auto; }
+    .chip.critical { color: var(--risk); font-weight: 620; }
+
+    .q-foot { padding: 10px 16px; font-size: var(--t-meta); color: var(--ink-3); border-top: 1px solid var(--hair); display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+
+    /* ═══ Playbook ═══ */
+    .play { display: grid; gap: 1px; background: var(--hair); border: 1px solid var(--hair); border-radius: var(--r); overflow: hidden; }
+    .play-r { background: var(--surface); padding: 12px 15px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 74px 92px; gap: 14px; align-items: center; }
+    .play-r.hd { background: var(--surface-2); }
+    .play-r.hd span { font-size: var(--t-micro); letter-spacing: 0.075em; text-transform: uppercase; color: var(--ink-3); font-weight: 560; }
+    .play-a { font-size: var(--t-sm); font-weight: 580; color: var(--ink); }
+    .play-d { font-size: var(--t-meta); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+    .play-n { font-size: var(--t-sm); color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: var(--t-meta); }
+    .play-m { font-size: var(--t-sm); color: var(--ink); text-align: right; font-weight: 560; font-variant-numeric: tabular-nums; }
+
+    /* ═══ Footer ═══ */
     footer {
-      margin-top: 52px; border-top: 1px solid var(--border);
-      padding: 18px 0 40px; font-size: 12px; color: var(--ink-3);
-      display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between;
+      border-top: 1px solid var(--hair); margin-top: 8px;
+      padding: 22px 0 44px; font-size: var(--t-meta); color: var(--ink-3);
+      display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
     }
-    footer .badge {
+    .pill {
       display: inline-flex; align-items: center; gap: 7px;
       padding: 3px 9px; border-radius: 3px;
-      border: 1px solid var(--border-2); background: var(--surface);
-      color: var(--ink-3); font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em;
+      border: 1px solid var(--hair-2); background: var(--surface);
+      font-family: var(--mono); font-size: 11px; color: var(--ink-2);
     }
-    footer .badge .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--gain); }
-    footer .badge.warn .dot { background: var(--warn); }
-    footer .badge.fail .dot { background: var(--loss); }
+    .pill i { width: 5px; height: 5px; border-radius: 50%; background: var(--ok); flex: 0 0 auto; }
+    .pill.warn i { background: var(--warn); }
+    .pill.fail i { background: var(--bad); }
     footer code { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+    footer .fnote { color: var(--ink-4); }
 
-    /* ── Print ──────────────────────────────────────────── */
+    /* ═══ Empty ═══ */
+    .void { padding: 30px 16px; text-align: center; color: var(--ink-3); font-size: var(--t-sm); }
+
+    /* ═══ Print ═══ */
     @media print {
       :root[data-theme="dark"] {
-        --bg: #fff; --surface: #fff; --surface-2: #f4f4f2;
-        --ink: #000; --ink-2: #333; --ink-3: #666; --ink-4: #999;
-        --border: #ddd; --border-2: #ccc;
-        --loss: #b83530; --loss-bg: rgba(184,53,48,.07);
-        --gain: #1b6640; --gain-bg: rgba(27,102,64,.07);
-        --warn: #9e6010; --card-shadow: none;
+        --plane: #fff; --surface: #fff; --surface-2: #f7f7f5; --sunken: #ececE9;
+        --ink: #000; --ink-2: #3a3a3a; --ink-3: #6b6b6b; --ink-4: #a5a5a5;
+        --hair: #dedede; --hair-2: #c8c8c8; --grid: #e9e9e6; --axis: #cbccc9;
+        --risk: #BE3A2E; --risk-deep: #8C1F19;
+        --risk-wash: rgba(190,58,46,.09); --risk-veil: rgba(190,58,46,.05);
+        --tier-low: #AEB2BA; --tier-medium: #D9685A; --tier-high: #BE3A2E; --tier-critical: #8C1F19;
+        --neutral-mark: #AEB2BA;
+        --context: rgba(22,23,26,.30); --context-soft: rgba(22,23,26,.09);
+        --lift: none; --masthead: #fff;
       }
-      .topbar { position: static; }
-      .topbar .control, .topbar .btn-ghost, .topbar .btn-icon { display: none; }
+      .masthead { position: static; background: #fff; backdrop-filter: none; }
+      .mast-row + .mast-row, .btn, select.ctl, .swap, .field { display: none; }
+      .band { break-inside: avoid; padding: 26px 0; }
+      .q-scroll { max-height: none; overflow: visible; }
       main { padding: 0; }
-      section { break-inside: avoid; }
     }
 
-    /* ── Responsive ─────────────────────────────────────── */
-    @media (max-width: 960px) {
-      :root { --gutter: 20px; }
-      .hero-grid { grid-template-columns: 1fr; gap: 26px; }
-      .kpi-row { grid-template-columns: repeat(2, 1fr); }
-      .trend-layout { grid-template-columns: 1fr; }
-      .two-col { grid-template-columns: 1fr; }
-      .gap-strip { grid-template-columns: repeat(2, 1fr); }
-      .topbar-inner { flex-wrap: wrap; gap: 10px; }
-      main { padding: 28px var(--gutter) 48px; }
+    /* ═══ Responsive ═══ */
+    @media (max-width: 1120px) {
+      .brief { grid-template-columns: 1fr; gap: 32px; }
+      /* The tiles now span the full width, so they read as a strip, not a column. */
+      .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .g-trend { grid-template-columns: 1fr; }
+      .rail { border-left: 0; border-top: 1px solid var(--hair); grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    }
+    @media (max-width: 860px) {
+      :root { --gutter: 18px; }
+      /* The scope row wraps to several lines here; pinned, it would eat the
+         viewport, so the masthead scrolls away instead. */
+      .masthead { position: static; }
+      .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .head { flex-wrap: wrap; }
+      /* Indent under the section number without adding to the 100% width. */
+      .head-tools { margin-left: 0; width: 100%; padding-left: 24px; justify-content: flex-start; }
+      .g-2 { grid-template-columns: 1fr; }
+      .gaps { grid-template-columns: repeat(2, 1fr); }
+      .band { padding: 40px 0; }
+      .mast-row { flex-wrap: wrap; gap: 10px; padding-top: 8px; padding-bottom: 8px; }
+      .play-r { grid-template-columns: minmax(0, 1fr) 64px 84px; }
+      .play-d { display: none; }
+    }
+    @media (max-width: 560px) {
+      .rail { grid-template-columns: 1fr 1fr; }
+      .gaps { grid-template-columns: 1fr; }
+      .tiles { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to dashboard</a>
+  <a class="skip" href="#main">Skip to content</a>
 
-  <header class="topbar" role="banner">
-    <div class="topbar-inner">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true">C</span>
-        <span class="brand-name">Churn &amp; Retention <em>— Intelligence</em></span>
+  <header class="masthead">
+    <div class="mast-row">
+      <div class="wordmark">
+        <div class="meridian" id="meridian" role="img" aria-label="Risk mix of accounts in scope"></div>
+        <b>Churn &amp; Retention Intelligence</b>
+        <span id="periodLabel">—</span>
       </div>
-      <div class="topbar-spacer"></div>
+      <div class="spacer"></div>
+      <span class="pill" id="validationBadge" title="Release validation gate">
+        <i></i><span id="validationText">—</span>
+      </span>
+      <button class="btn btn-sq" id="themeToggle" type="button" aria-label="Switch to dark mode">
+        <svg class="i-moon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.8A6 6 0 0 1 6.2 2.5a6.2 6.2 0 1 0 7.3 7.3z"/></svg>
+        <svg class="i-sun" viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="8" cy="8" r="2.8"/><line x1="8" y1="1.2" x2="8" y2="2.8"/><line x1="8" y1="13.2" x2="8" y2="14.8"/>
+          <line x1="1.2" y1="8" x2="2.8" y2="8"/><line x1="13.2" y1="8" x2="14.8" y2="8"/>
+          <line x1="3.15" y1="3.15" x2="4.27" y2="4.27"/><line x1="11.73" y1="11.73" x2="12.85" y2="12.85"/>
+          <line x1="3.15" y1="12.85" x2="4.27" y2="11.73"/><line x1="11.73" y1="4.27" x2="12.85" y2="3.15"/>
+        </svg>
+      </button>
+      <button class="btn" id="printBtn" type="button">Print</button>
+    </div>
 
-      <div class="control-group">
-        <label class="control-label" for="filterPeriodPreset">Period</label>
-        <select class="control" id="filterPeriodPreset">
-          <option value="all">All</option>
+    <!-- One scope row, above everything it scopes -->
+    <div class="mast-row" role="search" aria-label="Scope">
+      <div class="field">
+        <label for="filterPeriodPreset">Period</label>
+        <select class="ctl" id="filterPeriodPreset">
+          <option value="all">Full history</option>
           <option value="12m">Last 12 months</option>
           <option value="6m">Last 6 months</option>
           <option value="3m">Last 3 months</option>
           <option value="custom">Custom</option>
         </select>
       </div>
-
-      <div class="control-group">
-        <label class="control-label" for="filterSegment">Segment</label>
-        <select class="control" id="filterSegment"></select>
-      </div>
-
-      <div class="control-group">
-        <label class="control-label" for="filterChannel">Channel</label>
-        <select class="control" id="filterChannel"></select>
-      </div>
-
-      <button class="btn-icon" id="themeToggle" type="button" aria-label="Switch to dark mode">
-        <!-- Moon: visible in light mode -->
-        <svg class="icon-moon" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M13.5 9.8A6 6 0 0 1 6.2 2.5a6.2 6.2 0 1 0 7.3 7.3z" stroke-width="1.5"/>
-        </svg>
-        <!-- Sun: visible in dark mode -->
-        <svg class="icon-sun" viewBox="0 0 16 16" aria-hidden="true">
-          <circle cx="8" cy="8" r="2.8"/>
-          <line x1="8" y1="1.2" x2="8" y2="2.8"/>
-          <line x1="8" y1="13.2" x2="8" y2="14.8"/>
-          <line x1="1.2" y1="8" x2="2.8" y2="8"/>
-          <line x1="13.2" y1="8" x2="14.8" y2="8"/>
-          <line x1="3.15" y1="3.15" x2="4.27" y2="4.27"/>
-          <line x1="11.73" y1="11.73" x2="12.85" y2="12.85"/>
-          <line x1="3.15" y1="12.85" x2="4.27" y2="11.73"/>
-          <line x1="11.73" y1="4.27" x2="12.85" y2="3.15"/>
-        </svg>
-      </button>
-
-      <button class="btn-ghost" id="printBtn" type="button">Print</button>
+      <div class="field"><label for="filterSegment">Segment</label><select class="ctl" id="filterSegment"></select></div>
+      <div class="field"><label for="filterRegion">Region</label><select class="ctl" id="filterRegion"></select></div>
+      <div class="field"><label for="filterChannel">Channel</label><select class="ctl" id="filterChannel"></select></div>
+      <div class="field"><label for="filterPlan">Plan</label><select class="ctl" id="filterPlan"></select></div>
+      <div class="field"><label for="filterRiskTier">Tier</label><select class="ctl" id="filterRiskTier"></select></div>
+      <button class="btn" id="resetBtn" type="button" hidden>Clear scope</button>
+      <div class="spacer"></div>
+      <span class="tile-note" id="scopeDigest">—</span>
     </div>
-    <!-- Hidden controls retained for date logic and extended filters -->
     <div class="sr-only">
-      <input type="date" id="filterStartMonth" />
-      <input type="date" id="filterEndMonth" />
-      <select id="filterRegion"></select>
-      <select id="filterPlan"></select>
-      <select id="filterRiskTier"></select>
+      <input type="date" id="filterStartMonth" /><input type="date" id="filterEndMonth" />
     </div>
   </header>
 
   <main id="main">
 
-    <!-- Hero -->
-    <section aria-labelledby="heroTitle">
-      <div class="eyebrow">Retention review · <span id="periodLabel">—</span></div>
-      <div class="hero-grid">
+    <!-- ═══ Brief ═══ -->
+    <section class="band" aria-labelledby="briefTitle">
+      <h2 class="sr-only" id="briefTitle">Executive brief</h2>
+      <div class="brief">
         <div>
-          <h1 class="h1" id="heroTitle"><span id="heroHeadline"></span></h1>
-          <p class="lede" id="heroLede"></p>
+          <div class="kicker">
+            <span>Retention review</span><span class="sep"></span>
+            <span id="kickerScope">—</span><span class="sep"></span>
+            <em id="kickerSnapshot">—</em>
+          </div>
+          <div class="hero">
+            <span id="heroFigure">—</span>
+            <span class="hero-unit" id="heroUnit">—</span>
+          </div>
+          <div class="hero-rule"></div>
+          <p class="statement" id="stmtExposure">—</p>
+          <p class="statement" id="stmtMix">—</p>
+          <p class="statement" id="stmtCapacity">—</p>
         </div>
-        <div class="hero-meta">
-          <dl>
-            <div>
-              <dt>Critical accounts</dt>
-              <dd class="big loss" id="heroCritical">—</dd>
+
+        <div class="tiles" id="tiles">
+          <div class="tile">
+            <div class="tile-top">
+              <span class="tile-k">Customer churn</span>
+              <span class="delta" id="kpiCustChurnDelta">—</span>
             </div>
-            <div>
-              <dt>High-risk accounts</dt>
-              <dd class="big" id="heroHigh">—</dd>
+            <div class="tile-v risk" id="kpiCustChurn">—</div>
+            <svg class="spark" id="sparkCust" viewBox="0 0 200 26" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <div class="tile-note" id="kpiCustChurnNote">—</div>
+          </div>
+          <div class="tile">
+            <div class="tile-top">
+              <span class="tile-k">Revenue churn</span>
+              <span class="delta" id="kpiRevChurnDelta">—</span>
             </div>
-            <div>
-              <dt>Scored base</dt>
-              <dd id="heroScored">—</dd>
+            <div class="tile-v" id="kpiRevChurn">—</div>
+            <svg class="spark" id="sparkRev" viewBox="0 0 200 26" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <div class="tile-note" id="kpiRevChurnNote">—</div>
+          </div>
+          <div class="tile">
+            <div class="tile-top">
+              <span class="tile-k">MRR in save scope</span>
+              <span class="delta" id="kpiRevRiskDelta">—</span>
             </div>
-            <div>
-              <dt>Coverage</dt>
-              <dd id="heroCoverage">—</dd>
+            <div class="tile-v" id="kpiRevRisk">—</div>
+            <div class="meter" role="img" id="kpiRevRiskMeterWrap" aria-label="Share of scoped MRR in save scope">
+              <i id="kpiRevRiskMeter"></i>
             </div>
-          </dl>
+            <div class="tile-note" id="kpiRevRiskNote">—</div>
+          </div>
+          <div class="tile">
+            <div class="tile-top">
+              <span class="tile-k">Scored accounts</span>
+              <span class="delta" id="kpiActiveDelta">—</span>
+            </div>
+            <div class="tile-v" id="kpiActive">—</div>
+            <div class="meter" role="img" id="kpiActiveMeterWrap" aria-label="Share of scored accounts in save scope">
+              <i id="kpiActiveMeter"></i>
+            </div>
+            <div class="tile-note" id="kpiActiveNote">—</div>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- KPI strip -->
-    <section aria-label="Headline metrics">
-      <div class="kpi-row">
-        <div class="kpi">
-          <div class="kpi-label">Customer churn</div>
-          <div class="kpi-value loss" id="kpiCustChurn">—</div>
-          <div class="kpi-foot"><span id="kpiCustChurnNote">selected period</span><span class="delta flat" id="kpiCustChurnDelta">—</span></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Revenue churn</div>
-          <div class="kpi-value loss" id="kpiRevChurn">—</div>
-          <div class="kpi-foot"><span id="kpiRevChurnNote">selected period</span><span class="delta flat" id="kpiRevChurnDelta">—</span></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Priority MRR</div>
-          <div class="kpi-value" id="kpiRevRisk">—</div>
-          <div class="kpi-foot"><span id="kpiRevRiskNote">snapshot</span><span class="delta flat" id="kpiRevRiskDelta">—</span></div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Scored accounts</div>
-          <div class="kpi-value" id="kpiActive">—</div>
-          <div class="kpi-foot"><span id="kpiActiveNote">in scope</span><span class="delta flat" id="kpiActiveDelta">—</span></div>
+    <!-- ═══ 01 Trajectory ═══ -->
+    <section class="band" aria-labelledby="trajTitle">
+      <div class="head">
+        <span class="ord">01</span>
+        <div class="head-txt">
+          <h2 id="trajTitle">Trajectory</h2>
+          <p class="dek">Monthly losses against the base that started each month. Both series are rates of their own opening base, so they share one axis.</p>
         </div>
       </div>
-    </section>
-
-    <!-- 01 Trend -->
-    <section aria-labelledby="trendTitle">
-      <div class="eyebrow-bar">
-        <p class="eyebrow">01 · Trend</p>
-        <span class="eyebrow-note">monthly · selected window</span>
-      </div>
-      <div class="card">
-        <div class="card-head">
-          <h3 id="trendTitle">Customer and revenue churn, by month</h3>
-          <span class="card-note">% of period-start base</span>
+      <figure class="card" data-fig="trend">
+        <div class="fig-head">
+          <figcaption>
+            <h3 class="fig-title" id="trendTitle">Customer and revenue churn, by month</h3>
+            <div class="fig-sub">Read the gap: where revenue churn sits below customer churn, the accounts leaving are worth less than the average account.</div>
+          </figcaption>
+          <div class="fig-tools">
+            <div class="legend" id="trendLegend"></div>
+            <button class="swap" type="button" data-swap="trend" aria-pressed="false">Table</button>
+          </div>
         </div>
-        <div class="trend-layout">
+        <div class="g-trend">
           <div>
-            <div class="canvas-wrap">
-              <canvas id="chartTrend" role="img" aria-label="Monthly customer and revenue churn"></canvas>
-            </div>
+            <div class="plot h-md"><canvas id="chartTrend" aria-label="Monthly customer and revenue churn rate"></canvas></div>
+            <div class="tbl-wrap" id="tbl-trend" hidden></div>
           </div>
-          <div class="trend-stats">
-            <div class="trend-stat">
-              <div class="trend-stat-label">Latest — customer</div>
-              <div class="trend-stat-value loss" id="trendLastCust">—</div>
-              <div class="trend-stat-note" id="trendLastCustNote">—</div>
+          <div class="rail">
+            <div class="rail-item">
+              <span class="rail-k">Latest month</span>
+              <span class="rail-v risk" id="trendLastCust">—</span>
+              <span class="rail-n" id="trendLastCustNote">—</span>
             </div>
-            <div class="trend-stat">
-              <div class="trend-stat-label">Latest — revenue</div>
-              <div class="trend-stat-value" id="trendLastRev">—</div>
-              <div class="trend-stat-note" id="trendLastRevNote">—</div>
+            <div class="rail-item">
+              <span class="rail-k">Latest revenue churn</span>
+              <span class="rail-v" id="trendLastRev">—</span>
+              <span class="rail-n" id="trendLastRevNote">—</span>
             </div>
-            <div class="trend-stat">
-              <div class="trend-stat-label">Spread, first → last</div>
-              <div class="trend-stat-value" id="trendSpread">—</div>
-              <div class="trend-stat-note" id="trendSpreadNote">—</div>
+            <div class="rail-item">
+              <span class="rail-k">Drift, first → last</span>
+              <span class="rail-v" id="trendSpread">—</span>
+              <span class="rail-n" id="trendSpreadNote">—</span>
             </div>
           </div>
         </div>
-      </div>
+      </figure>
     </section>
 
-    <!-- 02 Concentration -->
-    <section aria-labelledby="concentrationTitle">
-      <div class="eyebrow-bar">
-        <p class="eyebrow">02 · Concentration</p>
-        <span class="eyebrow-note">cumulative churn share · historical base</span>
-      </div>
-      <h2 class="h2" id="concentrationTitle">Where the losses concentrate</h2>
-      <p class="section-sub">Cumulative churned accounts as a share of each historical customer group.</p>
-
-      <div class="two-col" style="margin-top: 16px;">
-        <div class="card">
-          <div class="card-head">
-            <h3>By segment</h3>
-            <span class="card-note" id="segHotspot">—</span>
-          </div>
-          <div class="canvas-wrap">
-            <canvas id="chartChurnSegment" role="img" aria-label="Churn rate by segment"></canvas>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head">
-            <h3>By acquisition channel</h3>
-            <span class="card-note" id="chnHotspot">—</span>
-          </div>
-          <div class="canvas-wrap">
-            <canvas id="chartChurnChannel" role="img" aria-label="Churn rate by acquisition channel"></canvas>
-          </div>
+    <!-- ═══ 02 Structure ═══ -->
+    <section class="band" aria-labelledby="structTitle">
+      <div class="head">
+        <span class="ord">02</span>
+        <div class="head-txt">
+          <h2 id="structTitle">Structure</h2>
+          <p class="dek">Cumulative churn as a share of each historical group, and the behavioural signals that separate the accounts that stayed from the ones that left.</p>
         </div>
       </div>
 
-      <div class="gap-strip" aria-label="Behavioural gaps between retained and churned accounts">
+      <div class="g-2">
+        <figure class="card" data-fig="seg">
+          <div class="fig-head">
+            <figcaption>
+              <h3 class="fig-title">By segment</h3>
+              <div class="fig-sub" id="segHotspot">—</div>
+            </figcaption>
+            <button class="swap" type="button" data-swap="seg" aria-pressed="false">Table</button>
+          </div>
+          <div class="plot h-sm"><canvas id="chartChurnSegment" aria-label="Cumulative churn share by segment"></canvas></div>
+          <div class="tbl-wrap" id="tbl-seg" hidden></div>
+        </figure>
+        <figure class="card" data-fig="chn">
+          <div class="fig-head">
+            <figcaption>
+              <h3 class="fig-title">By acquisition channel</h3>
+              <div class="fig-sub" id="chnHotspot">—</div>
+            </figcaption>
+            <button class="swap" type="button" data-swap="chn" aria-pressed="false">Table</button>
+          </div>
+          <div class="plot h-sm"><canvas id="chartChurnChannel" aria-label="Cumulative churn share by acquisition channel"></canvas></div>
+          <div class="tbl-wrap" id="tbl-chn" hidden></div>
+        </figure>
+      </div>
+
+      <div class="gaps" id="gapStrip">
         <div class="gap">
-          <div class="gap-label">Usage trend</div>
-          <div class="gap-value" id="diagUsage">—</div>
-          <div class="gap-note">retained vs churned · sessions Δ30d</div>
+          <span class="gap-k">Usage trend</span>
+          <div class="gap-pair"><span class="gap-a" id="diagUsageA">—</span><span class="gap-arrow">vs</span><span class="gap-b" id="diagUsageB">—</span></div>
+          <span class="gap-n">retained vs churned · sessions Δ30d</span>
         </div>
         <div class="gap">
-          <div class="gap-label">Support load</div>
-          <div class="gap-value" id="diagSupport">—</div>
-          <div class="gap-note">retained vs churned · tickets 90d</div>
+          <span class="gap-k">Support load</span>
+          <div class="gap-pair"><span class="gap-a" id="diagSupportA">—</span><span class="gap-arrow">vs</span><span class="gap-b" id="diagSupportB">—</span></div>
+          <span class="gap-n">retained vs churned · tickets 90d</span>
         </div>
         <div class="gap">
-          <div class="gap-label">Failed payments</div>
-          <div class="gap-value" id="diagFailed">—</div>
-          <div class="gap-note">retained vs churned · 90-day rate</div>
+          <span class="gap-k">Failed payments</span>
+          <div class="gap-pair"><span class="gap-a" id="diagFailedA">—</span><span class="gap-arrow">vs</span><span class="gap-b" id="diagFailedB">—</span></div>
+          <span class="gap-n">retained vs churned · 90-day rate</span>
         </div>
         <div class="gap">
-          <div class="gap-label">NPS score</div>
-          <div class="gap-value" id="diagNps">—</div>
-          <div class="gap-note">retained vs churned · recent mean</div>
+          <span class="gap-k">NPS</span>
+          <div class="gap-pair"><span class="gap-a" id="diagNpsA">—</span><span class="gap-arrow">vs</span><span class="gap-b" id="diagNpsB">—</span></div>
+          <span class="gap-n">retained vs churned · recent mean</span>
         </div>
       </div>
+
+      <figure class="card" data-fig="cohort" style="margin-top: 16px;">
+        <div class="fig-head">
+          <figcaption>
+            <h3 class="fig-title" id="cohortTitle">Retention by cohort age</h3>
+            <div class="fig-sub">Six cohorts sampled evenly across the acquisition history and aligned on months since signup. The legend runs oldest to newest, and the newest cohort is drawn heaviest. Read down a vertical to compare cohorts at the same age.</div>
+          </figcaption>
+          <div class="fig-tools">
+            <div class="legend" id="cohortLegend"></div>
+            <button class="swap" type="button" data-swap="cohort" aria-pressed="false">Table</button>
+          </div>
+        </div>
+        <div class="plot h-md"><canvas id="chartCohort" aria-label="Retention curves by cohort age in months"></canvas></div>
+        <div class="tbl-wrap" id="tbl-cohort" hidden></div>
+      </figure>
     </section>
 
-    <!-- 03 Cohorts -->
-    <section aria-labelledby="cohortTitle">
-      <div class="eyebrow-bar">
-        <p class="eyebrow">03 · Cohorts</p>
-        <span class="eyebrow-note">8 most recent cohorts</span>
-      </div>
-      <div class="card">
-        <div class="card-head">
-          <h3 id="cohortTitle">Retention by cohort age</h3>
-          <span class="card-note" id="cohortNote">Each line is a starting cohort; X axis is months since acquisition.</span>
-        </div>
-        <div class="canvas-wrap tall">
-          <canvas id="chartCohort" role="img" aria-label="Cohort retention curves by age in months"></canvas>
+    <!-- ═══ 03 Decision surface ═══ -->
+    <section class="band" aria-labelledby="surfTitle">
+      <div class="head">
+        <span class="ord">03</span>
+        <div class="head-txt">
+          <h2 id="surfTitle">The decision surface</h2>
+          <p class="dek">Priority is not a black box: it is <code>churn risk × (0.65 + 0.35 × value/100)</code>. Plotted on its own two axes, every account and every tier boundary lands in one picture — the scoring policy, drawn exactly as written.</p>
         </div>
       </div>
+      <figure class="card" data-fig="surface">
+        <div class="fig-head">
+          <figcaption>
+            <h3 class="fig-title">Every open account, by churn risk and customer value</h3>
+            <div class="fig-sub" id="surfaceNote">—</div>
+          </figcaption>
+          <div class="fig-tools">
+            <div class="legend" id="surfaceLegend"></div>
+            <button class="swap" type="button" data-swap="surface" aria-pressed="false">Table</button>
+          </div>
+        </div>
+        <div class="plot h-lg"><canvas id="chartSurface" aria-label="Scatter of open accounts by churn risk and customer value, with tier boundaries"></canvas></div>
+        <div class="tbl-wrap" id="tbl-surface" hidden></div>
+        <div class="q-foot"><span id="surfaceReading">—</span></div>
+      </figure>
     </section>
 
-    <!-- 04 Action queue -->
-    <section aria-labelledby="queueTitle">
-      <div class="eyebrow-bar">
-        <p class="eyebrow">04 · Action queue</p>
-        <span class="eyebrow-note">top 300 in scope · sorted by priority</span>
+    <!-- ═══ 04 Capacity ═══ -->
+    <section class="band" aria-labelledby="capTitle">
+      <div class="head">
+        <span class="ord">04</span>
+        <div class="head-txt">
+          <h2 id="capTitle">Capacity</h2>
+          <p class="dek">Nobody calls every account. This is how much of the exposed revenue each ordering reaches for a given number of contacts — and the order chosen here is the order the queue below is worked in.</p>
+        </div>
+        <!-- Scopes both this section and the queue, so it sits above them, not inside a card. -->
+        <div class="head-tools">
+          <div class="field">
+            <label for="orderBy">Work order</label>
+            <select class="ctl" id="orderBy">
+              <option value="priority">Priority index (governed)</option>
+              <option value="mrr">Revenue exposed</option>
+              <option value="expected">Risk × revenue</option>
+            </select>
+          </div>
+        </div>
       </div>
-      <div class="card queue-card">
-        <div class="queue-head">
-          <h3 id="queueTitle">Accounts to save first</h3>
-          <span class="card-note">Click a column header to re-sort.</span>
+      <figure class="card" data-fig="frontier">
+        <div class="fig-head">
+          <figcaption>
+            <h3 class="fig-title">Revenue reached per account contacted</h3>
+            <div class="fig-sub" id="frontierNote">—</div>
+          </figcaption>
+          <div class="fig-tools">
+            <div class="legend" id="frontierLegend"></div>
+            <button class="swap" type="button" data-swap="frontier" aria-pressed="false">Table</button>
+          </div>
         </div>
+        <div class="plot h-md"><canvas id="chartFrontier" aria-label="Cumulative share of exposed revenue reached by number of accounts contacted, under three work orders"></canvas></div>
+        <div class="tbl-wrap" id="tbl-frontier" hidden></div>
+        <div class="q-foot"><span id="frontierReading">—</span></div>
+      </figure>
+    </section>
 
-        <div class="tier-distribution" role="img" aria-label="Risk tier distribution">
-          <div class="tier-bar" id="tierBar"></div>
-          <div class="tier-legend" id="tierLegend"></div>
+    <!-- ═══ 05 Queue ═══ -->
+    <section class="band" aria-labelledby="queueSectionTitle">
+      <div class="head">
+        <span class="ord">05</span>
+        <div class="head-txt">
+          <h2 id="queueSectionTitle">The queue</h2>
+          <p class="dek">The accounts in save scope, in the work order selected above, with the play the scoring policy assigns to each.</p>
         </div>
+      </div>
 
-        <div class="table-scroll">
-          <table class="queue" id="queueTable">
-            <caption class="sr-only">Highest-priority accounts in current scope.</caption>
+      <div class="play" id="playbook" style="margin-bottom: 16px;">
+        <div class="play-r hd">
+          <span>Play</span><span>Leading driver</span><span style="text-align:right">Accounts</span><span style="text-align:right">MRR</span>
+        </div>
+      </div>
+
+      <figure class="card" data-fig="queue">
+        <div class="q-head">
+          <figcaption>
+            <h3 class="fig-title" id="queueTitle">Accounts in save scope</h3>
+            <div class="fig-sub" id="queueSub">—</div>
+          </figcaption>
+        </div>
+        <div class="q-bar">
+          <div class="tierbar" id="tierBar" role="img" aria-label="Risk tier distribution in scope"></div>
+          <div class="legend lg-n" id="tierLegend"></div>
+        </div>
+        <div class="q-scroll">
+          <table class="q" id="queueTable">
+            <caption class="sr-only">Accounts in save scope, ordered by the selected work order.</caption>
             <thead>
               <tr>
-                <th data-sort="risk_tier">Tier</th>
-                <th data-sort="customer_id">Account</th>
-                <th data-sort="segment">Segment</th>
-                <th data-sort="current_mrr" class="num">MRR</th>
-                <th data-sort="churn_risk_score" class="num">Churn risk</th>
-                <th data-sort="customer_value_score" class="num">Value</th>
-                <th data-sort="retention_priority_score" class="num sort-desc">Priority</th>
-                <th data-sort="main_risk_driver">Driver</th>
-                <th data-sort="recommended_action">Play</th>
+                <th scope="col" class="rank" style="cursor:default">#</th>
+                <th scope="col" data-sort="risk_tier">Tier</th>
+                <th scope="col" data-sort="customer_id">Account</th>
+                <th scope="col" data-sort="segment">Segment</th>
+                <th scope="col" data-sort="current_mrr" class="n">MRR</th>
+                <th scope="col" data-sort="churn_risk_score" class="n">Risk</th>
+                <th scope="col" data-sort="customer_value_score" class="n">Value</th>
+                <th scope="col" data-sort="retention_priority_score" class="n">Priority</th>
+                <th scope="col" data-sort="main_risk_driver">Leading driver</th>
+                <th scope="col" data-sort="recommended_action">Play</th>
               </tr>
             </thead>
             <tbody id="queueBody"></tbody>
           </table>
         </div>
-      </div>
+        <div class="q-foot">
+          <span id="queueCount">—</span>
+          <span>Click a column to re-sort. Sorting is a view; it does not change the work order.</span>
+        </div>
+      </figure>
     </section>
 
     <footer>
-      <div>
-        <span class="badge" id="validationBadge"><span class="dot"></span><span id="validationText">—</span></span>
-        &nbsp;Synthetic data · decision-support only.
-      </div>
-      <div>
-        <code id="versionTag">—</code> &nbsp; data through <code id="snapshotMonth">—</code>
-      </div>
+      <span class="pill" id="validationBadgeFoot"><i></i><span id="validationTextFoot">—</span></span>
+      <span id="validationIssue" class="fnote">—</span>
+      <div class="spacer" style="flex:1 1 auto"></div>
+      <span>Synthetic data · decision support only · risk score is a prioritisation index, not a calibrated probability</span>
+      <code id="versionTag">—</code>
+      <code id="snapshotMonth">—</code>
     </footer>
   </main>
 
@@ -727,110 +848,103 @@ __CHART_JS__
   <script>
 const DATA = __DATA_JSON__;
 const ALL = '__all__';
-const charts = {};
 const MONTHS = DATA.months || [];
+const charts = {};
+
+/* The scoring policy travels in the payload, emitted from risk.py, so the curves
+   drawn here cannot drift from the constants the scores were computed with. */
+const POLICY = DATA.policy;
+/* Inverse of retention_priority = risk * (base + weight * value/100): the churn
+   risk at which an account of a given value reaches a priority threshold. */
+const riskForPriority = (t, value) => t / (POLICY.base + POLICY.value_weight * value / 100);
+
 const DIM_INDEX = {
   segment:             new Map((DATA.domains.segment || []).map((v, i) => [v, i])),
   region:              new Map((DATA.domains.region || []).map((v, i) => [v, i])),
   acquisition_channel: new Map((DATA.domains.acquisition_channel || []).map((v, i) => [v, i])),
   plan_type:           new Map((DATA.domains.plan_type || []).map((v, i) => [v, i])),
 };
-const tableSort = { key: 'retention_priority_score', dir: 'desc' };
 
+const TIERS = ['critical', 'high', 'medium', 'low'];
+const NUMERIC_KEYS = ['current_mrr', 'churn_risk_score', 'customer_value_score', 'retention_priority_score'];
+const tableSort = { key: null, dir: 'desc' };
+let workOrder = 'priority';
+
+/* Each ordering owns a dash pattern, so the two context curves stay tellable
+   apart when they share the neutral mark colour. */
+const ORDERS = {
+  priority: { label: 'Priority index',  dash: '6 3',     rank: r => Number(r.retention_priority_score || 0) },
+  mrr:      { label: 'Revenue exposed', dash: '2 3',     rank: r => Number(r.current_mrr || 0) },
+  expected: { label: 'Risk × revenue',  dash: '9 3 2 3', rank: r => Number(r.churn_risk_score || 0) * Number(r.current_mrr || 0) },
+};
+
+/* ── Formatting ─────────────────────────────────────────────────────── */
 const nfInt  = new Intl.NumberFormat('en-US');
 const nfUsd  = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-const nfUsd2 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const nfPct1 = new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const nfPct0 = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 0 });
 
-const pct   = (v) => Number.isFinite(v) ? nfPct1.format(v) : '—';
-const money  = (v) => Number.isFinite(v) ? nfUsd.format(v) : '—';
-const money2 = (v) => Number.isFinite(v) ? nfUsd2.format(v) : '—';
-const num    = (v, d = 1) => Number.isFinite(v) ? Number(v).toFixed(d) : '—';
-const intf   = (v) => Number.isFinite(v) ? nfInt.format(v) : '—';
+const pct   = v => Number.isFinite(v) ? nfPct1.format(v) : '—';
+const pct0  = v => Number.isFinite(v) ? nfPct0.format(v) : '—';
+const money = v => Number.isFinite(v) ? nfUsd.format(v) : '—';
+const num   = (v, d = 1) => Number.isFinite(v) ? Number(v).toFixed(d) : '—';
+const intf  = v => Number.isFinite(v) ? nfInt.format(v) : '—';
+const plural = (n, one, many) => `${intf(n)} ${n === 1 ? one : many}`;
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
   ));
 }
-function setText(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = value;
-}
+const $ = id => document.getElementById(id);
+function setText(id, value) { const el = $(id); if (el) el.textContent = value; }
+function setHTML(id, value) { const el = $(id); if (el) el.innerHTML = value; }
 
-/* ── Theme ────────────────────────────────────────────── */
+/* ── Theme & palette ────────────────────────────────────────────────── */
+const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
 
-function isDark() {
-  return document.documentElement.getAttribute('data-theme') === 'dark';
-}
-
-function getPalette() {
+function palette() {
   const cs = getComputedStyle(document.documentElement);
-  const g  = (v) => cs.getPropertyValue(v).trim();
+  const g = v => cs.getPropertyValue(v).trim();
   const dark = isDark();
   return {
-    ink:         g('--ink'),
-    inkSoft:     g('--ink-2'),
-    inkMute:     g('--ink-3'),
-    surface:     g('--surface'),
-    grid:        g('--grid-line'),
-    gridAxis:    g('--grid-axis'),
-    loss:        g('--loss'),
-    lossSoft:    dark ? 'rgba(220, 82, 69, 0.15)'  : 'rgba(184, 53, 48, 0.09)',
-    neutral:     dark ? 'rgba(236, 234, 226, 0.80)' : 'rgba(17, 17, 16, 0.80)',
-    neutralSoft: dark ? 'rgba(236, 234, 226, 0.14)' : 'rgba(17, 17, 16, 0.11)',
+    ink: g('--ink'), ink2: g('--ink-2'), ink3: g('--ink-3'), ink4: g('--ink-4'),
+    surface: g('--surface'), grid: g('--grid'), axis: g('--axis'),
+    risk: g('--risk'), riskDeep: g('--risk-deep'), riskWash: g('--risk-wash'),
+    context: g('--context'), contextSoft: g('--context-soft'), neutralMark: g('--neutral-mark'),
+    tier: {
+      critical: g('--tier-critical'), high: g('--tier-high'),
+      medium: g('--tier-medium'), low: g('--tier-low'),
+    },
+    /* Ordinal ink ramp, oldest → newest. Six steps is the ceiling that keeps
+       every step above 2:1 against the surface with ΔL ≥ 0.06 between them. */
     cohort: dark
-      ? ['#ECEAE2', '#C4C0B8', '#9C9890', '#747270', '#4E4C49', '#363430', '#222120', '#181614']
-      : ['#111110', '#3A3A36', '#5B5B57', '#7A7A75', '#9B9994', '#B5B2AB', '#C9C5BB', '#DCD8CD'],
-    tierColors: dark
-      ? { critical: '#DC5245', high: '#E0826E', medium: '#CE9035', low: '#686562' }
-      : { critical: '#B83530', high: '#D87060', medium: '#A87028', low: '#8A8880' },
+      ? ['#454A55', '#5B6069', '#757A85', '#9095A0', '#ADB2BC', '#CBCFD7']
+      : ['#AEB2BA', '#8F94A0', '#727785', '#585D6B', '#3E4351', '#242833'],
   };
-}
-
-function initTheme() {
-  // Attribute already set by the no-flash head script; just sync the icon.
-  updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
 }
 
 function toggleTheme() {
   const next = isDark() ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('cri-theme', next);
-  updateThemeIcon(next);
-  renderDashboard();
+  syncThemeLabel(next);
+  render();
+}
+function syncThemeLabel(theme) {
+  const b = $('themeToggle');
+  if (b) b.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
 }
 
-function updateThemeIcon(theme) {
-  const btn = document.getElementById('themeToggle');
-  if (btn) btn.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-}
-
-/* ── Chart defaults ───────────────────────────────────── */
-
-function applyChartDefaults() {
-  if (!window.Chart) return;
-  const p = getPalette();
-  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', Roboto, Arial, sans-serif";
-  Chart.defaults.font.size   = 12;
-  Chart.defaults.color       = p.inkSoft;
-}
-
-/* ── Filters ──────────────────────────────────────────── */
-
-function monthToStart(m) { return `${m}-01`; }
-function monthToEnd(m) {
+/* ── Filters ────────────────────────────────────────────────────────── */
+const monthToStart = m => `${m}-01`;
+const monthToEnd = m => {
   const [y, mm] = m.split('-').map(Number);
   return new Date(Date.UTC(y, mm, 0)).toISOString().slice(0, 10);
-}
-function dateToMonth(d, fallback) {
-  if (!d || d.length < 7) return fallback;
-  return d.slice(0, 7);
-}
-function addOption(select, value, label) {
-  const opt = document.createElement('option');
-  opt.value = value; opt.textContent = label; select.appendChild(opt);
-}
+};
+const dateToMonth = (d, fallback) => (!d || d.length < 7) ? fallback : d.slice(0, 7);
+
+const DIM_FILTERS = ['filterSegment', 'filterRegion', 'filterChannel', 'filterPlan', 'filterRiskTier'];
 
 function populateFilters() {
   [
@@ -840,93 +954,111 @@ function populateFilters() {
     ['filterPlan',     DATA.domains.plan_type],
     ['filterRiskTier', DATA.domains.risk_tier],
   ].forEach(([id, values]) => {
-    const el = document.getElementById(id);
+    const el = $(id);
     if (!el) return;
     el.innerHTML = '';
-    addOption(el, 'all', 'All');
-    (values || []).forEach(v => addOption(el, v, v));
+    const all = document.createElement('option');
+    all.value = 'all'; all.textContent = 'All';
+    el.appendChild(all);
+    (values || []).forEach(v => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      el.appendChild(o);
+    });
   });
 
   const start = DATA.meta.coverage_start_month;
-  const end   = DATA.meta.coverage_end_month;
-  const sEl   = document.getElementById('filterStartMonth');
-  const eEl   = document.getElementById('filterEndMonth');
-  sEl.value = monthToStart(start); sEl.min = monthToStart(start); sEl.max = monthToEnd(end);
-  eEl.value = monthToEnd(end);     eEl.min = monthToStart(start); eEl.max = monthToEnd(end);
-  document.getElementById('filterPeriodPreset').value = 'all';
+  const end = DATA.meta.coverage_end_month;
+  const s = $('filterStartMonth'), e = $('filterEndMonth');
+  s.value = monthToStart(start); s.min = monthToStart(start); s.max = monthToEnd(end);
+  e.value = monthToEnd(end);     e.min = monthToStart(start); e.max = monthToEnd(end);
+  $('filterPeriodPreset').value = 'all';
 
-  ['filterSegment', 'filterChannel', 'filterRegion', 'filterPlan', 'filterRiskTier'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', renderDashboard);
+  DIM_FILTERS.forEach(id => $(id)?.addEventListener('change', render));
+  $('filterPeriodPreset').addEventListener('change', ev => {
+    applyPeriodPreset(ev.target.value);
+    render();
   });
-  document.getElementById('filterPeriodPreset').addEventListener('change', (e) => {
-    applyPeriodPreset(e.target.value);
-    renderDashboard();
+  $('resetBtn').addEventListener('click', () => {
+    DIM_FILTERS.forEach(id => { $(id).value = 'all'; });
+    $('filterPeriodPreset').value = 'all';
+    applyPeriodPreset('all');
+    render();
   });
-  document.getElementById('printBtn')?.addEventListener('click', () => window.print());
-  document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+  $('orderBy').addEventListener('change', ev => { workOrder = ev.target.value; render(); });
+  $('printBtn').addEventListener('click', () => window.print());
+  $('themeToggle').addEventListener('click', toggleTheme);
 
-  document.querySelectorAll('#queueTable thead th').forEach(th => {
+  document.querySelectorAll('#queueTable thead th[data-sort]').forEach(th => {
     th.addEventListener('click', () => {
       const key = th.getAttribute('data-sort');
-      if (!key) return;
       if (tableSort.key === key) {
         tableSort.dir = tableSort.dir === 'asc' ? 'desc' : 'asc';
       } else {
         tableSort.key = key;
-        tableSort.dir = ['current_mrr', 'churn_risk_score', 'customer_value_score', 'retention_priority_score'].includes(key)
-          ? 'desc' : 'asc';
+        tableSort.dir = NUMERIC_KEYS.includes(key) ? 'desc' : 'asc';
       }
-      renderDashboard();
+      render();
+    });
+  });
+
+  document.querySelectorAll('.swap').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.getAttribute('data-swap');
+      const on = btn.getAttribute('aria-pressed') === 'true';
+      btn.setAttribute('aria-pressed', String(!on));
+      btn.textContent = on ? 'Table' : 'Chart';
+      const fig = document.querySelector(`[data-fig="${key}"]`);
+      fig.querySelector('.plot').hidden = !on;
+      $(`tbl-${key}`).hidden = on;
+      if (!on) paintTable(key);
     });
   });
 }
 
 function applyPeriodPreset(preset) {
-  const startEl = document.getElementById('filterStartMonth');
-  const endEl   = document.getElementById('filterEndMonth');
-  const end     = DATA.meta.coverage_end_month;
-  const endIdx  = Math.max(0, MONTHS.indexOf(end));
-  let start     = DATA.meta.coverage_start_month;
-  if      (preset === '12m')    start = MONTHS[Math.max(0, endIdx - 11)] || start;
-  else if (preset === '6m')     start = MONTHS[Math.max(0, endIdx - 5)]  || start;
-  else if (preset === '3m')     start = MONTHS[Math.max(0, endIdx - 2)]  || start;
+  const end = DATA.meta.coverage_end_month;
+  const endIdx = Math.max(0, MONTHS.indexOf(end));
+  let start = DATA.meta.coverage_start_month;
+  if (preset === '12m') start = MONTHS[Math.max(0, endIdx - 11)] || start;
+  else if (preset === '6m') start = MONTHS[Math.max(0, endIdx - 5)] || start;
+  else if (preset === '3m') start = MONTHS[Math.max(0, endIdx - 2)] || start;
   else if (preset === 'custom') return;
-  startEl.value = monthToStart(start);
-  endEl.value   = monthToEnd(end);
+  $('filterStartMonth').value = monthToStart(start);
+  $('filterEndMonth').value = monthToEnd(end);
 }
 
 function getFilters() {
-  const startDate = document.getElementById('filterStartMonth').value;
-  const endDate   = document.getElementById('filterEndMonth').value;
+  const startDate = $('filterStartMonth').value;
+  const endDate = $('filterEndMonth').value;
   return {
     startDate, endDate,
     startMonth: dateToMonth(startDate, DATA.meta.coverage_start_month),
-    endMonth:   dateToMonth(endDate,   DATA.meta.coverage_end_month),
-    segment:    document.getElementById('filterSegment').value,
-    region:     document.getElementById('filterRegion').value,
-    channel:    document.getElementById('filterChannel').value,
-    plan:       document.getElementById('filterPlan').value,
-    riskTier:   document.getElementById('filterRiskTier').value,
+    endMonth: dateToMonth(endDate, DATA.meta.coverage_end_month),
+    segment: $('filterSegment').value,
+    region: $('filterRegion').value,
+    channel: $('filterChannel').value,
+    plan: $('filterPlan').value,
+    riskTier: $('filterRiskTier').value,
   };
 }
 
-/* ── Data slicing ─────────────────────────────────────── */
-
-function inRange(month, s, e) { return month >= s && month <= e; }
+/* ── Slicing ────────────────────────────────────────────────────────── */
+const inRange = (m, s, e) => m >= s && m <= e;
 
 function dimsMatch(row, f) {
-  if (f.segment !== 'all' && row.segment              !== f.segment)  return false;
-  if (f.region  !== 'all' && row.region               !== f.region)   return false;
-  if (f.channel !== 'all' && row.acquisition_channel  !== f.channel)  return false;
-  if (f.plan    !== 'all' && row.plan_type             !== f.plan)     return false;
+  if (f.segment !== 'all' && row.segment !== f.segment) return false;
+  if (f.region !== 'all' && row.region !== f.region) return false;
+  if (f.channel !== 'all' && row.acquisition_channel !== f.channel) return false;
+  if (f.plan !== 'all' && row.plan_type !== f.plan) return false;
   return true;
 }
 
 function getTrendRows(f) {
   const seg = f.segment === 'all' ? null : DIM_INDEX.segment.get(f.segment);
-  const reg = f.region  === 'all' ? null : DIM_INDEX.region.get(f.region);
+  const reg = f.region === 'all' ? null : DIM_INDEX.region.get(f.region);
   const chn = f.channel === 'all' ? null : DIM_INDEX.acquisition_channel.get(f.channel);
-  const pln = f.plan    === 'all' ? null : DIM_INDEX.plan_type.get(f.plan);
+  const pln = f.plan === 'all' ? null : DIM_INDEX.plan_type.get(f.plan);
   const agg = new Map();
   (DATA.monthly_fact_rows || []).forEach(row => {
     const m = MONTHS[Number(row[0])];
@@ -947,458 +1079,869 @@ function getTrendRows(f) {
     .map(r => ({
       ...r,
       cust_rate: r.cust_start > 0 ? r.cust_lost / r.cust_start : 0,
-      rev_rate:  r.mrr_start  > 0 ? r.mrr_lost  / r.mrr_start  : 0,
+      rev_rate: r.mrr_start > 0 ? r.mrr_lost / r.mrr_start : 0,
     }));
 }
 
 function aggregateTrend(rows) {
   const t = rows.reduce((a, r) => ({
     cust_start: a.cust_start + r.cust_start,
-    mrr_start:  a.mrr_start  + r.mrr_start,
-    cust_lost:  a.cust_lost  + r.cust_lost,
-    mrr_lost:   a.mrr_lost   + r.mrr_lost,
+    mrr_start: a.mrr_start + r.mrr_start,
+    cust_lost: a.cust_lost + r.cust_lost,
+    mrr_lost: a.mrr_lost + r.mrr_lost,
   }), { cust_start: 0, mrr_start: 0, cust_lost: 0, mrr_lost: 0 });
   return {
     ...t,
     cust_rate: t.cust_start > 0 ? t.cust_lost / t.cust_start : 0,
-    rev_rate:  t.mrr_start  > 0 ? t.mrr_lost  / t.mrr_start  : 0,
+    rev_rate: t.mrr_start > 0 ? t.mrr_lost / t.mrr_start : 0,
   };
 }
 
 function getRiskKpi(f) {
   const cube = DATA.risk_kpi_cube || [];
   return cube.find(r =>
-    r.segment            === (f.segment  === 'all' ? ALL : f.segment)  &&
-    r.region             === (f.region   === 'all' ? ALL : f.region)   &&
-    r.acquisition_channel === (f.channel === 'all' ? ALL : f.channel)  &&
-    r.plan_type          === (f.plan     === 'all' ? ALL : f.plan)     &&
-    r.risk_tier_filter   === (f.riskTier === 'all' ? ALL : f.riskTier)
-  ) || { scored_customers: 0, total_current_mrr: 0, priority_mrr_exposure: 0, priority_accounts: 0, high_risk_customers: 0, critical_customers: 0, avg_priority_score: 0 };
+    r.segment === (f.segment === 'all' ? ALL : f.segment) &&
+    r.region === (f.region === 'all' ? ALL : f.region) &&
+    r.acquisition_channel === (f.channel === 'all' ? ALL : f.channel) &&
+    r.plan_type === (f.plan === 'all' ? ALL : f.plan) &&
+    r.risk_tier_filter === (f.riskTier === 'all' ? ALL : f.riskTier)
+  ) || {
+    scored_customers: 0, total_current_mrr: 0, priority_mrr_exposure: 0,
+    priority_accounts: 0, high_risk_customers: 0, critical_customers: 0, avg_priority_score: 0,
+  };
 }
 
-function getSnapshot(f) {
-  return (DATA.snapshot_agg || []).filter(r => {
-    if (!dimsMatch(r, f)) return false;
-    if (f.riskTier !== 'all' && r.risk_tier !== f.riskTier) return false;
-    return true;
-  });
-}
-function getScored(f) {
-  return (DATA.scored_customers || []).filter(r => {
-    if (!dimsMatch(r, f)) return false;
-    if (f.riskTier !== 'all' && r.risk_tier !== f.riskTier) return false;
-    return true;
-  });
-}
-function getCohort(f) {
-  return (DATA.cohort_rows || [])
-    .filter(r => inRange(r.observation_month, f.startMonth, f.endMonth))
-    .map(r => ({
-      cohort_month:      r.cohort_month,
-      age:               Number(r.cohort_age_months || 0),
-      retention:         Number(r.retention_rate || 0),
-      observation_month: r.observation_month,
-    }));
-}
+const getSnapshot = f => (DATA.snapshot_agg || []).filter(r =>
+  dimsMatch(r, f) && (f.riskTier === 'all' || r.risk_tier === f.riskTier));
 
-function groupByDim(snapshotRows, dim) {
+const getScored = f => (DATA.scored_customers || []).filter(r =>
+  dimsMatch(r, f) && (f.riskTier === 'all' || r.risk_tier === f.riskTier));
+
+/* Save scope — the same predicate the Python cube uses for priority_accounts. */
+const inSaveScope = r => Number(r.at_risk_flag) === 1 || r.risk_tier === 'high' || r.risk_tier === 'critical';
+
+const getCohort = f => (DATA.cohort_rows || [])
+  .filter(r => inRange(r.observation_month, f.startMonth, f.endMonth))
+  .map(r => ({
+    cohort_month: r.cohort_month,
+    age: Number(r.cohort_age_months || 0),
+    retention: Number(r.retention_rate || 0),
+    observation_month: r.observation_month,
+  }));
+
+function groupByDim(rows, dim) {
   const map = new Map();
-  snapshotRows.forEach(r => {
+  rows.forEach(r => {
     const k = String(r[dim] || 'Unknown');
     if (!map.has(k)) map.set(k, { label: k, total: 0, churned: 0 });
     const cur = map.get(k);
-    const cnt = Number(r.customer_count || 0);
-    cur.total += cnt;
-    if (Number(r.churn_flag) === 1) cur.churned += cnt;
+    const n = Number(r.customer_count || 0);
+    cur.total += n;
+    if (Number(r.churn_flag) === 1) cur.churned += n;
   });
   return Array.from(map.values())
-    .map(r => ({ label: r.label, churnShare: r.total > 0 ? r.churned / r.total : 0, count: r.total }))
-    .sort((a, b) => b.churnShare - a.churnShare);
+    .map(r => ({ label: r.label, share: r.total > 0 ? r.churned / r.total : 0, count: r.total, churned: r.churned }))
+    .sort((a, b) => b.share - a.share);
 }
 
-/* ── Renderers ────────────────────────────────────────── */
-
-function setDelta(id, pp) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  if (!Number.isFinite(pp) || Math.abs(pp) < 1e-9) {
-    el.textContent = '— pp MoM'; el.className = 'delta flat'; return;
-  }
-  el.textContent = `${pp > 0 ? '+' : '−'}${Math.abs(pp * 100).toFixed(1)} pp MoM`;
-  el.className = `delta ${pp > 0 ? 'up' : 'down'}`;
-}
-
-function renderHero(f, trendRows, riskKpi) {
-  const period   = aggregateTrend(trendRows);
-  const critical = Number(riskKpi.critical_customers || 0);
-  const high     = Number(riskKpi.high_risk_customers || 0);
-  const exposed  = Number(riskKpi.priority_mrr_exposure || 0);
-  const priority = Number(riskKpi.priority_accounts || 0);
-  const scored   = Number(riskKpi.scored_customers || 0);
-
-  setText('periodLabel', `${f.startMonth} → ${f.endMonth}`);
-
-  document.getElementById('heroHeadline').innerHTML =
-    `<span class="h1-accent">${money(exposed)}</span> of MRR in save scope across `
-    + `<span>${intf(priority)}</span> priority accounts.`;
-
-  const level = period.cust_rate > 0.20 ? 'elevated' : period.cust_rate > 0.10 ? 'manageable' : 'contained';
-  document.getElementById('heroLede').innerHTML =
-    `Customer churn averaged <strong>${pct(period.cust_rate)}</strong> over the selected window, `
-    + `against revenue churn of <strong>${pct(period.rev_rate)}</strong>. `
-    + `The spread is ${period.cust_rate > period.rev_rate
-        ? 'favourable — low-value accounts lead the losses'
-        : 'unfavourable — losses are tilted toward higher-MRR accounts'}. `
-    + `Overall exposure looks <strong>${level}</strong>; the queue below identifies where to act first.`;
-
-  setText('heroCritical', intf(critical));
-  setText('heroHigh',     intf(high));
-  setText('heroScored',   intf(scored));
-  setText('heroCoverage', `${DATA.meta.coverage_start_month} – ${DATA.meta.coverage_end_month}`);
-}
-
-function renderKpis(trendRows, riskKpi) {
-  const period = aggregateTrend(trendRows);
-  const last   = trendRows[trendRows.length - 1];
-  const prev   = trendRows.length > 1 ? trendRows[trendRows.length - 2] : null;
-
-  setText('kpiCustChurn',     pct(period.cust_rate));
-  setText('kpiCustChurnNote', `${intf(period.cust_lost)} lost / ${intf(period.cust_start)} base`);
-  setDelta('kpiCustChurnDelta', last && prev ? last.cust_rate - prev.cust_rate : NaN);
-
-  setText('kpiRevChurn',      pct(period.rev_rate));
-  setText('kpiRevChurnNote',  `${money(period.mrr_lost)} lost / ${money(period.mrr_start)} base`);
-  setDelta('kpiRevChurnDelta', last && prev ? last.rev_rate - prev.rev_rate : NaN);
-
-  const rev      = Number(riskKpi.priority_mrr_exposure || 0);
-  const totalMrr = Number(riskKpi.total_current_mrr || 0);
-  setText('kpiRevRisk',     money(rev));
-  setText('kpiRevRiskNote', `${pct(totalMrr > 0 ? rev / totalMrr : 0)} of scoped MRR`);
-  document.getElementById('kpiRevRiskDelta').className = 'delta flat';
-  setText('kpiRevRiskDelta',
-    `${intf(Number(riskKpi.priority_accounts || 0))} priority accounts`);
-
-  const scored = Number(riskKpi.scored_customers || 0);
-  setText('kpiActive',      intf(scored));
-  setText('kpiActiveNote',  `avg priority ${num(Number(riskKpi.avg_priority_score || 0), 1)}`);
-  document.getElementById('kpiActiveDelta').className = 'delta flat';
-  setText('kpiActiveDelta', `${intf(Number(riskKpi.critical_customers || 0))} critical`);
-}
-
-function upsertChart(id, config) {
-  const el = document.getElementById(id);
+/* ── Chart scaffolding ──────────────────────────────────────────────── */
+function upsert(id, config) {
+  const el = $(id);
   if (!el) return;
   if (charts[id]) charts[id].destroy();
   charts[id] = new Chart(el, config);
 }
 
-function trendChartOpts(p) {
-  return {
-    responsive: true, maintainAspectRatio: false, animation: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: {
-        position: 'top', align: 'end',
-        labels: {
-          boxWidth: 8, boxHeight: 8, padding: 12,
-          usePointStyle: true, pointStyle: 'rectRounded',
-          color: p.inkSoft, font: { size: 12 },
-        },
-      },
-      tooltip: {
-        backgroundColor: p.ink, titleColor: p.surface, bodyColor: p.surface,
-        borderColor: p.ink, borderWidth: 0, padding: 10, cornerRadius: 3,
-        callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${nfPct1.format(ctx.parsed.y)}` },
-      },
-    },
-    scales: {
-      x: {
-        grid: { display: false },
-        ticks: { autoSkip: true, maxTicksLimit: 12, color: p.inkMute },
-        border: { color: p.gridAxis },
-      },
-      y: {
-        beginAtZero: true,
-        grid: { color: p.grid, drawTicks: false },
-        ticks: { maxTicksLimit: 6, color: p.inkMute, callback: v => `${(Number(v) * 100).toFixed(0)}%` },
-        border: { display: false },
-      },
-    },
-  };
+function chartDefaults() {
+  if (!window.Chart) return;
+  const p = palette();
+  Chart.defaults.font.family = getComputedStyle(document.documentElement).getPropertyValue('--sans').trim();
+  Chart.defaults.font.size = 11.5;
+  Chart.defaults.color = p.ink3;
+  Chart.defaults.animation = false;
+  Chart.defaults.maintainAspectRatio = false;
+  Chart.defaults.responsive = true;
 }
 
-function barChartOpts(p, maxTicks = 8, yPercent = true) {
-  return {
-    responsive: true, maintainAspectRatio: false, animation: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: p.ink, titleColor: p.surface, bodyColor: p.surface,
-        padding: 10, cornerRadius: 3, displayColors: false,
-        callbacks: {
-          label: (ctx) => yPercent ? ` ${nfPct1.format(ctx.parsed.y)}` : ` ${intf(ctx.parsed.y)}`,
-        },
-      },
-    },
-    scales: {
-      x: {
-        grid: { display: false },
-        ticks: { color: p.inkSoft, maxRotation: 0, autoSkip: true, maxTicksLimit: maxTicks },
-        border: { color: p.gridAxis },
-      },
-      y: {
-        beginAtZero: true,
-        grid: { color: p.grid },
-        ticks: {
-          color: p.inkMute, maxTicksLimit: 5,
-          callback: yPercent ? (v => `${(Number(v) * 100).toFixed(0)}%`) : (v => intf(v)),
-        },
-        border: { display: false },
-      },
-    },
-  };
+const tooltipStyle = p => ({
+  backgroundColor: p.ink, titleColor: p.surface, bodyColor: p.surface,
+  borderWidth: 0, padding: 9, cornerRadius: 3, displayColors: false,
+  titleFont: { size: 11.5, weight: '600' }, bodyFont: { size: 11.5 },
+  caretSize: 4,
+});
+
+const axisX = p => ({ grid: { display: false }, border: { color: p.axis }, ticks: { color: p.ink3, maxRotation: 0, autoSkip: true } });
+const axisPct = p => ({
+  beginAtZero: true,
+  grid: { color: p.grid, drawTicks: false },
+  border: { display: false },
+  ticks: { color: p.ink3, maxTicksLimit: 5, padding: 6, callback: v => `${Math.round(Number(v) * 100)}%` },
+});
+
+/* Legends are HTML, so they sit in the figure head and stay readable in print.
+   Line swatches are drawn as SVG carrying the dataset's own dash pattern —
+   two context curves that share a colour must not share a swatch. */
+function paintLegend(id, items) {
+  const el = $(id);
+  if (!el) return;
+  el.innerHTML = items.map(it => {
+    const swatch = it.line
+      ? `<svg width="14" height="9" aria-hidden="true" style="flex:0 0 auto;overflow:visible">
+           <line x1="0" y1="4.5" x2="14" y2="4.5" stroke="${it.color}" stroke-width="${it.width || 2}"
+                 stroke-linecap="round"${it.dash ? ` stroke-dasharray="${it.dash}"` : ''}/>
+         </svg>`
+      : `<i style="background:${it.color}"></i>`;
+    return `<span class="lg">${swatch}${esc(it.label)}${it.note ? `<span class="lg-n">${esc(it.note)}</span>` : ''}</span>`;
+  }).join('');
 }
 
-function renderTrend(trendRows) {
-  const p      = getPalette();
-  const labels = trendRows.map(r => r.month);
-  upsertChart('chartTrend', {
+/* ── Sparklines ─────────────────────────────────────────────────────── */
+function sparkline(id, values, color, fill) {
+  const el = $(id);
+  if (!el) return;
+  if (values.length < 2) { el.innerHTML = ''; return; }
+  const W = 200, H = 26, pad = 2;
+  const max = Math.max(...values), min = Math.min(...values);
+  const span = max - min || 1;
+  const x = i => (i / (values.length - 1)) * W;
+  const y = v => H - pad - ((v - min) / span) * (H - pad * 2);
+  const line = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(2)},${y(v).toFixed(2)}`).join('');
+  const area = `${line}L${W},${H}L0,${H}Z`;
+  const lastX = x(values.length - 1), lastY = y(values[values.length - 1]);
+  el.innerHTML =
+    `<path class="fillband" d="${area}" fill="${fill}"/>` +
+    `<path d="${line}" stroke="${color}"/>` +
+    `<circle cx="${lastX.toFixed(2)}" cy="${lastY.toFixed(2)}" r="2" fill="${color}"/>`;
+}
+
+/* ── Brief ──────────────────────────────────────────────────────────── */
+function renderBrief(f, trendRows, kpi, scoped) {
+  const period = aggregateTrend(trendRows);
+  const exposed = Number(kpi.priority_mrr_exposure || 0);
+  const priorityAccounts = Number(kpi.priority_accounts || 0);
+  const scored = Number(kpi.scored_customers || 0);
+  const totalMrr = Number(kpi.total_current_mrr || 0);
+
+  setText('periodLabel', `${f.startMonth} → ${f.endMonth}`);
+  setText('kickerScope', describeScope(f));
+  setText('kickerSnapshot', `Scored at ${DATA.meta.data_snapshot_month}`);
+
+  setText('heroFigure', money(exposed));
+  setText('heroUnit', 'of monthly recurring revenue in save scope');
+
+  setHTML('stmtExposure',
+    `That is <b>${plural(priorityAccounts, 'account', 'accounts')}</b> carrying an at-risk flag or a high-to-critical tier — `
+    + `<b class="fig-num">${pct0(totalMrr > 0 ? exposed / totalMrr : 0)}</b> of the ${money(totalMrr)} `
+    + `booked across ${plural(scored, 'scored account', 'scored accounts')}.`);
+
+  // The spread between the two churn rates says which end of the book is leaving.
+  const spread = period.cust_rate - period.rev_rate;
+  const mechanism = Math.abs(spread) < 0.001
+    ? `Customer churn and revenue churn are running level at <b class="fig-num">${pct(period.cust_rate)}</b>, so losses are spread evenly across the value range.`
+    : spread > 0
+      ? `Customer churn (<b class="fig-num">${pct(period.cust_rate)}</b>) is running above revenue churn (<b class="fig-num">${pct(period.rev_rate)}</b>): `
+        + `the accounts leaving are worth less than the average account, so the damage is in count rather than revenue.`
+      : `Revenue churn (<b class="fig-num">${pct(period.rev_rate)}</b>) is running above customer churn (<b class="fig-num">${pct(period.cust_rate)}</b>): `
+        + `the accounts leaving are worth more than the average account, and the losses are landing on the revenue base.`;
+  setHTML('stmtMix', mechanism);
+
+  setHTML('stmtCapacity', capacityStatement(scoped));
+}
+
+function describeScope(f) {
+  const parts = [];
+  if (f.segment !== 'all') parts.push(f.segment);
+  if (f.region !== 'all') parts.push(f.region);
+  if (f.channel !== 'all') parts.push(f.channel);
+  if (f.plan !== 'all') parts.push(f.plan);
+  if (f.riskTier !== 'all') parts.push(`${f.riskTier} tier`);
+  return parts.length ? parts.join(' · ') : 'Whole book';
+}
+
+/* ── Capacity ───────────────────────────────────────────────────────── */
+/* Cumulative share of the exposed MRR reached after contacting the first n
+   accounts under a given ordering. Descriptive only: no probability is implied. */
+function frontierCurve(scope, orderKey) {
+  const rank = ORDERS[orderKey].rank;
+  const sorted = scope.slice().sort((a, b) => rank(b) - rank(a));
+  const total = sorted.reduce((s, r) => s + Number(r.current_mrr || 0), 0);
+  const pts = [{ x: 0, y: 0 }];
+  let run = 0;
+  sorted.forEach((r, i) => {
+    run += Number(r.current_mrr || 0);
+    pts.push({ x: i + 1, y: total > 0 ? run / total : 0 });
+  });
+  return { pts, total };
+}
+
+function coverageAt(curve, n) {
+  const i = Math.min(n, curve.pts.length - 1);
+  return i > 0 ? curve.pts[i].y : 0;
+}
+
+function capacityStatement(scope) {
+  if (scope.length < 12) {
+    return `Fewer than a dozen accounts sit in save scope here, so ordering the queue makes no material difference — work all of them.`;
+  }
+  const n = Math.max(10, Math.round(scope.length / 6));
+  const gov = coverageAt(frontierCurve(scope, 'priority'), n);
+  const rev = coverageAt(frontierCurve(scope, 'mrr'), n);
+  if (rev - gov < 0.05) {
+    return `Working the first <b class="fig-num">${intf(n)}</b> accounts in the governed priority order reaches `
+      + `<b class="fig-num">${pct0(gov)}</b> of that exposure. Re-ordering by revenue would not meaningfully improve on it here.`;
+  }
+  return `Worked top-down, the first <b class="fig-num">${intf(n)}</b> accounts in the governed priority order reach `
+    + `<b class="fig-num">${pct0(gov)}</b> of that exposure; ordered by revenue instead, the same ${intf(n)} calls reach `
+    + `<b class="fig-num">${pct0(rev)}</b>. Priority is risk-led by design — value only modulates it by a third — `
+    + `so it ranks the likeliest losses, not the largest ones.`;
+}
+
+function renderFrontier(scope) {
+  const p = palette();
+  const curves = Object.keys(ORDERS).map(k => ({ key: k, ...frontierCurve(scope, k) }));
+  const selected = curves.find(c => c.key === workOrder);
+
+  if (!scope.length) {
+    setText('frontierNote', 'No accounts in save scope under the current filters.');
+    setText('frontierReading', '—');
+    paintLegend('frontierLegend', []);
+    upsert('chartFrontier', { type: 'line', data: { datasets: [] }, options: { plugins: { legend: { display: false } } } });
+    return;
+  }
+
+  // Emphasis: the selected ordering is the point, the alternatives are context.
+  const datasets = curves.map(c => {
+    const on = c.key === workOrder;
+    return {
+      label: ORDERS[c.key].label,
+      data: c.pts,
+      borderColor: on ? p.risk : p.neutralMark,
+      backgroundColor: on ? p.riskWash : 'transparent',
+      borderWidth: on ? 2 : 1.25,
+      borderDash: on ? [] : ORDERS[c.key].dash.split(' ').map(Number),
+      pointRadius: 0, pointHitRadius: 14,
+      fill: on ? 'origin' : false,
+      tension: 0, order: on ? 0 : 1,
+    };
+  });
+
+  upsert('chartFrontier', {
+    type: 'line',
+    data: { datasets },
+    options: {
+      parsing: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...tooltipStyle(p),
+          displayColors: true, boxWidth: 8, boxHeight: 8, usePointStyle: true,
+          callbacks: {
+            title: items => `${intf(items[0].parsed.x)} accounts contacted`,
+            label: ctx => ` ${ctx.dataset.label}: ${pct0(ctx.parsed.y)} of exposed MRR`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'linear', min: 0, max: scope.length,
+          title: { display: true, text: 'Accounts contacted, in work order', color: p.ink3, font: { size: 11 } },
+          grid: { display: false }, border: { color: p.axis },
+          ticks: { color: p.ink3, maxTicksLimit: 8, callback: v => intf(v) },
+        },
+        y: { ...axisPct(p), max: 1 },
+      },
+    },
+  });
+
+  paintLegend('frontierLegend', curves.map(c => ({
+    label: ORDERS[c.key].label,
+    color: c.key === workOrder ? p.risk : p.neutralMark,
+    line: true,
+    width: c.key === workOrder ? 2 : 1.25,
+    dash: c.key === workOrder ? null : ORDERS[c.key].dash,
+  })));
+
+  const n = Math.max(10, Math.round(scope.length / 6));
+  const covSel = coverageAt(selected, n);
+  const best = curves.reduce((a, b) => coverageAt(b, n) > coverageAt(a, n) ? b : a);
+  setText('frontierNote',
+    `${plural(scope.length, 'account', 'accounts')} in save scope, holding ${money(selected.total)} of MRR. `
+    + `The curve is cumulative: contact accounts left to right and read the share of that MRR you have touched.`);
+  setText('frontierReading',
+    `At ${intf(n)} contacts — a sixth of the scope — ${ORDERS[workOrder].label.toLowerCase()} order reaches ${pct0(covSel)} of the exposed MRR`
+    + (best.key === workOrder
+      ? `, the best of the three orderings shown.`
+      : `; ${ORDERS[best.key].label.toLowerCase()} order would reach ${pct0(coverageAt(best, n))}.`));
+}
+
+/* ── Decision surface ───────────────────────────────────────────────── */
+function renderSurface(scored) {
+  const p = palette();
+  const open = scored.filter(r => r.risk_tier !== 'churned');
+
+  const xMax = 60, yMax = 100;
+  const byTier = TIERS.map(t => ({
+    tier: t,
+    rows: open.filter(r => r.risk_tier === t),
+  })).filter(g => g.rows.length);
+
+  // Accounts, painted by the tier the policy assigns them.
+  const pointSets = byTier.map(g => ({
+    type: 'scatter',
+    label: g.tier,
+    data: g.rows.map(r => ({
+      x: Number(r.churn_risk_score || 0),
+      y: Number(r.customer_value_score || 0),
+      mrr: Number(r.current_mrr || 0),
+      id: r.customer_id, driver: r.main_risk_driver, tier: g.tier,
+      priority: Number(r.retention_priority_score || 0),
+    })),
+    backgroundColor: p.tier[g.tier],
+    borderColor: 'transparent',
+    /* Size reinforces the ramp, so tier survives greyscale and CVD. */
+    pointRadius: { critical: 4.2, high: 3.2, medium: 2.4, low: 1.7 }[g.tier],
+    pointHoverRadius: 6,
+    pointHitRadius: 8,
+    order: { critical: 0, high: 1, medium: 2, low: 3 }[g.tier],
+  }));
+
+  // The policy itself: each tier threshold is a curve in this space.
+  const isoLines = POLICY.tiers.map(t => {
+    const pts = [];
+    for (let v = 0; v <= yMax; v += 2) {
+      const x = riskForPriority(t.min, v);
+      if (x <= xMax) pts.push({ x, y: v });
+    }
+    return {
+      type: 'line', label: `${t.key} ≥ ${t.min}`,
+      data: pts, parsing: false,
+      borderColor: p.tier[t.key], borderWidth: 1.25, borderDash: [5, 4],
+      pointRadius: 0, pointHitRadius: 0, fill: false, tension: 0, order: 5,
+    };
+  });
+
+  upsert('chartSurface', {
+    data: { datasets: [...isoLines, ...pointSets] },
+    options: {
+      interaction: { mode: 'nearest', intersect: true },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...tooltipStyle(p),
+          filter: item => item.dataset.type === 'scatter',
+          callbacks: {
+            title: items => `${items[0].raw.id} · ${items[0].raw.tier}`,
+            label: ctx => [
+              ` Churn risk ${num(ctx.raw.x, 1)} · value ${num(ctx.raw.y, 1)}`,
+              ` Priority ${num(ctx.raw.priority, 1)} · MRR ${money(ctx.raw.mrr)}`,
+              ` Leading driver: ${ctx.raw.driver}`,
+            ],
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'linear', min: 0, max: xMax,
+          title: { display: true, text: 'Churn risk score', color: p.ink3, font: { size: 11 } },
+          grid: { color: p.grid, drawTicks: false }, border: { color: p.axis },
+          ticks: { color: p.ink3, maxTicksLimit: 7 },
+        },
+        y: {
+          type: 'linear', min: 0, max: yMax,
+          title: { display: true, text: 'Customer value score', color: p.ink3, font: { size: 11 } },
+          grid: { color: p.grid, drawTicks: false }, border: { display: false },
+          ticks: { color: p.ink3, maxTicksLimit: 6, padding: 6 },
+        },
+      },
+    },
+  });
+
+  paintLegend('surfaceLegend', [
+    ...TIERS.filter(t => open.some(r => r.risk_tier === t))
+      .map(t => ({ label: t, color: p.tier[t], note: intf(open.filter(r => r.risk_tier === t).length) })),
+    { label: 'tier boundary', color: p.neutralMark, line: true, width: 1.25, dash: '5 4' },
+  ]);
+
+  // Read the structure out loud rather than leaving it to the eye.
+  const hiRisk = open.filter(r => Number(r.churn_risk_score) >= 35);
+  const hiRiskHiValue = hiRisk.filter(r => Number(r.customer_value_score) >= 70);
+  const overrideHits = open.filter(r =>
+    Number(r.churn_risk_score) >= POLICY.override.risk && Number(r.customer_value_score) >= POLICY.override.value);
+
+  setText('surfaceNote',
+    `${plural(open.length, 'open account', 'open accounts')}. The dashed curves are the tier thresholds; because value multiplies risk `
+    + `rather than adding to it, they bend — a valuable account crosses into a tier at a lower risk score than a small one.`);
+
+  setText('surfaceReading',
+    `${plural(hiRisk.length, 'account', 'accounts')} score 35 or higher on churn risk; ${intf(hiRiskHiValue.length)} of those also clear 70 on value. `
+    + `The critical override (risk ≥ ${POLICY.override.risk} and value ≥ ${POLICY.override.value}) currently captures ${intf(overrideHits.length)} `
+    + `${overrideHits.length === 1 ? 'account' : 'accounts'}: risk and value pull in opposite directions in this book, so the top-right corner stays empty.`);
+}
+
+/* ── Trend ──────────────────────────────────────────────────────────── */
+function renderTrend(rows) {
+  const p = palette();
+  const labels = rows.map(r => r.month);
+
+  upsert('chartTrend', {
     type: 'line',
     data: {
       labels,
       datasets: [
         {
-          label: 'Customer churn',
-          data: trendRows.map(r => r.cust_rate),
-          borderColor: p.loss, backgroundColor: p.lossSoft,
-          borderWidth: 1.8,
-          pointRadius: labels.length > 24 ? 0 : 2.5, pointBackgroundColor: p.loss,
-          tension: 0.18, fill: true,
+          label: 'Customer churn', data: rows.map(r => r.cust_rate),
+          borderColor: p.risk, backgroundColor: p.riskWash,
+          borderWidth: 2, pointRadius: 0, pointHitRadius: 12,
+          tension: 0.16, fill: 'origin', order: 0,
         },
         {
-          label: 'Revenue churn',
-          data: trendRows.map(r => r.rev_rate),
+          label: 'Revenue churn', data: rows.map(r => r.rev_rate),
           borderColor: p.ink, backgroundColor: 'transparent',
-          borderWidth: 1.4, borderDash: [4, 3],
-          pointRadius: labels.length > 24 ? 0 : 2, pointBackgroundColor: p.ink,
-          tension: 0.18, fill: false,
+          borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0, pointHitRadius: 12,
+          tension: 0.16, fill: false, order: 1,
         },
       ],
     },
-    options: trendChartOpts(p),
+    options: {
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...tooltipStyle(p), displayColors: true, boxWidth: 8, boxHeight: 8, usePointStyle: true,
+          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${pct(ctx.parsed.y)}` },
+        },
+      },
+      scales: { x: { ...axisX(p), ticks: { ...axisX(p).ticks, maxTicksLimit: 10 } }, y: axisPct(p) },
+    },
   });
 
-  const last  = trendRows[trendRows.length - 1];
-  const first = trendRows[0];
+  paintLegend('trendLegend', [
+    { label: 'Customer churn', color: p.risk, line: true, width: 2 },
+    { label: 'Revenue churn', color: p.ink, line: true, width: 1.5, dash: '4 3' },
+  ]);
+
+  sparkline('sparkCust', rows.map(r => r.cust_rate), p.risk, p.riskWash);
+  sparkline('sparkRev', rows.map(r => r.rev_rate), p.ink2, p.contextSoft);
+
+  const last = rows[rows.length - 1], first = rows[0];
   if (last) {
-    setText('trendLastCust',     pct(last.cust_rate));
-    setText('trendLastCustNote', `${intf(last.cust_lost)} accounts lost in ${last.month}`);
-    setText('trendLastRev',      pct(last.rev_rate));
-    setText('trendLastRevNote',  `${money(last.mrr_lost)} MRR lost in ${last.month}`);
+    setText('trendLastCust', pct(last.cust_rate));
+    setText('trendLastCustNote', `${plural(last.cust_lost, 'account', 'accounts')} lost in ${last.month}`);
+    setText('trendLastRev', pct(last.rev_rate));
+    setText('trendLastRevNote', `${money(last.mrr_lost)} of MRR lost in ${last.month}`);
   } else {
-    setText('trendLastCust', '—');     setText('trendLastCustNote', '—');
-    setText('trendLastRev',  '—');     setText('trendLastRevNote',  '—');
+    ['trendLastCust', 'trendLastCustNote', 'trendLastRev', 'trendLastRevNote'].forEach(id => setText(id, '—'));
   }
   if (last && first && first !== last) {
-    const dC = last.cust_rate - first.cust_rate;
-    const dR = last.rev_rate  - first.rev_rate;
-    setText('trendSpread',
-      `${dC >= 0 ? '+' : '−'}${Math.abs(dC * 100).toFixed(1)} / ${dR >= 0 ? '+' : '−'}${Math.abs(dR * 100).toFixed(1)} pp`);
-    setText('trendSpreadNote', `Customer / revenue churn delta, ${first.month} → ${last.month}`);
+    const dC = (last.cust_rate - first.cust_rate) * 100;
+    const dR = (last.rev_rate - first.rev_rate) * 100;
+    const fmt = d => `${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(1)}`;
+    setText('trendSpread', `${fmt(dC)} / ${fmt(dR)} pp`);
+    setText('trendSpreadNote', `Customer / revenue churn, ${first.month} → ${last.month}`);
   } else {
-    setText('trendSpread',     '—');
-    setText('trendSpreadNote', 'Need at least two months in scope');
+    setText('trendSpread', '—');
+    setText('trendSpreadNote', 'Needs at least two months in scope');
   }
 }
 
-function renderConcentration(snapshotRows) {
-  const p = getPalette();
+/* ── Structure ──────────────────────────────────────────────────────── */
+function renderStructure(snapshot) {
+  const p = palette();
 
-  const drawBar = (canvasId, hotspotId, dim) => {
-    const rows = groupByDim(snapshotRows, dim).slice(0, 8);
-    upsertChart(canvasId, {
+  const bars = (canvasId, noteId, dim, noun) => {
+    const rows = groupByDim(snapshot, dim).slice(0, 8);
+    // Emphasis, not a value-ramp: the worst group is the point, the rest are context.
+    upsert(canvasId, {
       type: 'bar',
       data: {
         labels: rows.map(r => r.label),
         datasets: [{
-          label: 'Cumulative churn share',
-          data: rows.map(r => r.churnShare),
-          backgroundColor: rows.map((_, i) => i === 0 ? p.loss : p.neutralSoft),
-          borderRadius: 2, borderSkipped: false, maxBarThickness: 36,
+          label: 'Churn share',
+          data: rows.map(r => r.share),
+          backgroundColor: rows.map((_, i) => i === 0 ? p.risk : p.neutralMark),
+          borderRadius: 3, borderSkipped: false, maxBarThickness: 34,
         }],
       },
-      options: barChartOpts(p, 8, true),
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...tooltipStyle(p),
+            callbacks: {
+              title: items => items[0].label,
+              label: ctx => {
+                const r = rows[ctx.dataIndex];
+                return [` ${pct(r.share)} churned`, ` ${intf(r.churned)} of ${intf(r.count)} accounts`];
+              },
+            },
+          },
+        },
+        scales: { x: axisX(p), y: axisPct(p) },
+      },
     });
     const top = rows[0];
-    setText(hotspotId, top ? `Top: ${top.label} · ${pct(top.churnShare)} · ${intf(top.count)} accts` : '—');
+    setText(noteId, top
+      ? `${top.label} leads at ${pct(top.share)} — ${intf(top.churned)} of ${intf(top.count)} accounts ever acquired through this ${noun}.`
+      : 'No accounts in scope.');
   };
 
-  drawBar('chartChurnSegment', 'segHotspot', 'segment');
-  drawBar('chartChurnChannel', 'chnHotspot', 'acquisition_channel');
+  bars('chartChurnSegment', 'segHotspot', 'segment', 'segment');
+  bars('chartChurnChannel', 'chnHotspot', 'acquisition_channel', 'channel');
 
-  const ret = { count: 0, usage: 0, support: 0, nps: 0, failed: 0 };
-  const chu = { count: 0, usage: 0, support: 0, nps: 0, failed: 0 };
-  snapshotRows.forEach(r => {
+  const ret = { n: 0, usage: 0, support: 0, nps: 0, failed: 0 };
+  const chu = { n: 0, usage: 0, support: 0, nps: 0, failed: 0 };
+  snapshot.forEach(r => {
     const t = Number(r.churn_flag) === 1 ? chu : ret;
     const c = Number(r.customer_count || 0);
-    t.count   += c;
-    t.usage   += Number(r.usage_sum || 0);
+    t.n += c;
+    t.usage += Number(r.usage_sum || 0);
     t.support += Number(r.support_sum || 0);
-    t.nps     += Number(r.nps_sum || 0);
-    t.failed  += Number(r.payment_failure_sum || 0);
+    t.nps += Number(r.nps_sum || 0);
+    t.failed += Number(r.payment_failure_sum || 0);
   });
-
-  const sd = (a, b) => b > 0 ? a / b : 0;
-  setText('diagUsage',   `${num(sd(ret.usage,   ret.count), 2)} vs ${num(sd(chu.usage,   chu.count), 2)}`);
-  setText('diagSupport', `${num(sd(ret.support, ret.count), 2)} vs ${num(sd(chu.support, chu.count), 2)}`);
-  setText('diagFailed',  `${pct(sd(ret.failed,  ret.count))} vs ${pct(sd(chu.failed,  chu.count))}`);
-  setText('diagNps',     `${num(sd(ret.nps,     ret.count), 1)} vs ${num(sd(chu.nps,     chu.count), 1)}`);
+  const avg = (a, b) => b > 0 ? a / b : NaN;
+  setText('diagUsageA', num(avg(ret.usage, ret.n), 2));
+  setText('diagUsageB', num(avg(chu.usage, chu.n), 2));
+  setText('diagSupportA', num(avg(ret.support, ret.n), 2));
+  setText('diagSupportB', num(avg(chu.support, chu.n), 2));
+  setText('diagFailedA', pct(avg(ret.failed, ret.n)));
+  setText('diagFailedB', pct(avg(chu.failed, chu.n)));
+  setText('diagNpsA', num(avg(ret.nps, ret.n), 1));
+  setText('diagNpsB', num(avg(chu.nps, chu.n), 1));
 }
 
-function renderCohort(cohortRows) {
-  const p   = getPalette();
+/* Group the observations by cohort, keeping only cohorts with a curve to draw. */
+function cohortSeries(rows) {
   const map = new Map();
-  cohortRows.forEach(r => {
+  rows.forEach(r => {
     if (!map.has(r.cohort_month)) map.set(r.cohort_month, []);
     map.get(r.cohort_month).push(r);
   });
-  const months   = Array.from(map.keys()).sort().slice(-8);
-  const datasets = months.map((cohort, idx) => {
-    const rows = (map.get(cohort) || []).slice().sort((a, b) => a.age - b.age);
-    return {
-      label:           cohort,
-      data:            rows.map(r => ({ x: r.age, y: r.retention })),
-      borderColor:     p.cohort[idx % p.cohort.length],
-      backgroundColor: p.cohort[idx % p.cohort.length],
-      borderWidth:     idx >= months.length - 2 ? 2 : 1.2,
-      pointRadius:     1.5, tension: 0.15,
-    };
-  });
+  for (const [k, v] of map) if (v.length < 2) map.delete(k);
+  return map;
+}
 
-  upsertChart('chartCohort', {
+/* Take k cohorts spread evenly across the acquisition history rather than the
+   k most recent. The newest cohorts are only a few months old, so a "latest k"
+   pick collapses every curve into the top-left corner and shows no decay. */
+function spreadPick(keys, k) {
+  if (keys.length <= k) return keys;
+  const out = [];
+  for (let i = 0; i < k; i++) out.push(keys[Math.round(i * (keys.length - 1) / (k - 1))]);
+  return Array.from(new Set(out));
+}
+
+function renderCohort(rows) {
+  const p = palette();
+  const map = cohortSeries(rows);
+  const months = spreadPick(Array.from(map.keys()).sort(), p.cohort.length);
+  // Spread the ramp across however many cohorts survived: oldest light, newest dark.
+  const step = i => months.length > 1
+    ? Math.round(i * (p.cohort.length - 1) / (months.length - 1))
+    : p.cohort.length - 1;
+  const datasets = months.map((cohort, i) => ({
+    label: cohort,
+    data: (map.get(cohort) || []).slice().sort((a, b) => a.age - b.age).map(r => ({ x: r.age, y: r.retention })),
+    borderColor: p.cohort[step(i)],
+    backgroundColor: p.cohort[step(i)],
+    borderWidth: i === months.length - 1 ? 2.2 : 1.3,
+    pointRadius: 0, pointHitRadius: 10, tension: 0.15,
+  }));
+
+  upsert('chartCohort', {
     type: 'line',
     data: { datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
       parsing: false,
       interaction: { mode: 'nearest', intersect: false },
       plugins: {
-        legend: {
-          position: 'bottom', align: 'start',
-          labels: {
-            boxWidth: 8, boxHeight: 8, padding: 10,
-            usePointStyle: true, pointStyle: 'rectRounded',
-            color: p.inkSoft, font: { size: 11 },
-          },
-        },
+        legend: { display: false },
         tooltip: {
-          backgroundColor: p.ink, titleColor: p.surface, bodyColor: p.surface,
-          padding: 10, cornerRadius: 3,
+          ...tooltipStyle(p),
           callbacks: {
-            title: (items) => `Cohort ${items[0].dataset.label} · age ${items[0].parsed.x} mo`,
-            label: (ctx)   => ` Retention: ${nfPct1.format(ctx.parsed.y)}`,
+            title: items => `Cohort ${items[0].dataset.label} · ${items[0].parsed.x} months in`,
+            label: ctx => ` ${pct(ctx.parsed.y)} still active`,
           },
         },
       },
       scales: {
         x: {
           type: 'linear',
-          title: { display: true, text: 'Cohort age (months)', color: p.inkMute, font: { size: 11 } },
-          ticks: { color: p.inkMute, maxTicksLimit: 10 },
-          grid: { display: false }, border: { color: p.gridAxis },
+          title: { display: true, text: 'Months since acquisition', color: p.ink3, font: { size: 11 } },
+          grid: { display: false }, border: { color: p.axis },
+          ticks: { color: p.ink3, maxTicksLimit: 10 },
         },
-        y: {
-          beginAtZero: true, max: 1.0,
-          ticks: { color: p.inkMute, maxTicksLimit: 6, callback: v => `${(Number(v) * 100).toFixed(0)}%` },
-          grid: { color: p.grid }, border: { display: false },
-        },
+        y: { ...axisPct(p), max: 1 },
       },
     },
   });
+
+  paintLegend('cohortLegend', months.map((m, i) => ({ label: m, color: p.cohort[step(i)], line: true, width: 2 })));
 }
 
-function renderQueue(scoredRows) {
-  const sorted = scoredRows.slice().sort((a, b) => {
-    const av = a[tableSort.key], bv = b[tableSort.key];
-    let cmp = 0;
-    if (typeof av === 'number' || typeof bv === 'number')
-      cmp = Number(av || 0) - Number(bv || 0);
-    else
-      cmp = String(av ?? '').localeCompare(String(bv ?? ''));
-    return tableSort.dir === 'asc' ? cmp : -cmp;
+/* ── Playbook ───────────────────────────────────────────────────────── */
+function renderPlaybook(scope) {
+  const map = new Map();
+  scope.forEach(r => {
+    const k = r.recommended_action || 'monitor only';
+    if (!map.has(k)) map.set(k, { action: k, n: 0, mrr: 0, drivers: new Map() });
+    const cur = map.get(k);
+    cur.n += 1;
+    cur.mrr += Number(r.current_mrr || 0);
+    const d = r.main_risk_driver || 'no material signal';
+    cur.drivers.set(d, (cur.drivers.get(d) || 0) + 1);
   });
-  const top = sorted.slice(0, 300);
+  const rows = Array.from(map.values()).sort((a, b) => b.mrr - a.mrr);
+  const head = `<div class="play-r hd"><span>Play</span><span>Leading driver</span><span style="text-align:right">Accounts</span><span style="text-align:right">MRR</span></div>`;
+  const body = rows.length
+    ? rows.map(r => {
+        const top = Array.from(r.drivers.entries()).sort((a, b) => b[1] - a[1])[0];
+        const share = top ? top[1] / r.n : 0;
+        return `<div class="play-r">
+          <span class="play-a">${esc(r.action)}</span>
+          <span class="play-d">${esc(top ? top[0] : '—')} · ${pct0(share)} of the play</span>
+          <span class="play-n">${intf(r.n)}</span>
+          <span class="play-m">${money(r.mrr)}</span>
+        </div>`;
+      }).join('')
+    : `<div class="play-r"><span class="play-d" style="grid-column:1/-1">No accounts in save scope under the current filters.</span></div>`;
+  $('playbook').innerHTML = head + body;
+}
 
-  document.querySelectorAll('#queueTable thead th').forEach(th => {
-    th.classList.remove('sort-asc', 'sort-desc');
-    if (th.getAttribute('data-sort') === tableSort.key)
-      th.classList.add(tableSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+/* ── Queue ──────────────────────────────────────────────────────────── */
+const RENDER_CAP = 300;
+
+function renderQueue(scope, scored) {
+  const p = palette();
+  const rank = ORDERS[workOrder].rank;
+
+  // Work order fixes the rank; a column sort is only a view on top of it.
+  const ranked = scope.slice().sort((a, b) => rank(b) - rank(a));
+  const rankOf = new Map(ranked.map((r, i) => [r.customer_id, i + 1]));
+
+  let view = ranked;
+  if (tableSort.key) {
+    view = ranked.slice().sort((a, b) => {
+      const av = a[tableSort.key], bv = b[tableSort.key];
+      const cmp = (typeof av === 'number' || typeof bv === 'number')
+        ? Number(av || 0) - Number(bv || 0)
+        : String(av ?? '').localeCompare(String(bv ?? ''));
+      return tableSort.dir === 'asc' ? cmp : -cmp;
+    });
+  }
+
+  document.querySelectorAll('#queueTable thead th[data-sort]').forEach(th => {
+    const on = th.getAttribute('data-sort') === tableSort.key;
+    if (on) th.setAttribute('aria-sort', tableSort.dir === 'asc' ? 'ascending' : 'descending');
+    else th.removeAttribute('aria-sort');
   });
 
-  document.getElementById('queueBody').innerHTML = top.map(r => `
-    <tr>
-      <td><span class="tier-chip ${esc(r.risk_tier)}">${esc(r.risk_tier)}</span></td>
-      <td><code>${esc(r.customer_id)}</code></td>
-      <td>${esc(r.segment)}</td>
-      <td class="num">${money2(Number(r.current_mrr || 0))}</td>
-      <td class="num">${num(Number(r.churn_risk_score || 0), 1)}</td>
-      <td class="num">${num(Number(r.customer_value_score || 0), 1)}</td>
-      <td class="num">${num(Number(r.retention_priority_score || 0), 1)}</td>
-      <td>${esc(r.main_risk_driver)}</td>
-      <td>${esc(r.recommended_action)}</td>
-    </tr>
-  `).join('');
+  const top = view.slice(0, RENDER_CAP);
+  $('queueBody').innerHTML = top.length
+    ? top.map(r => `
+      <tr>
+        <td class="rank">${intf(rankOf.get(r.customer_id))}</td>
+        <td><span class="chip ${esc(r.risk_tier)}"><i style="background:${p.tier[r.risk_tier] || p.ink4}"></i>${esc(r.risk_tier)}</span></td>
+        <td class="id">${esc(r.customer_id)}</td>
+        <td>${esc(r.segment)}</td>
+        <td class="n mrr">${money(Number(r.current_mrr || 0))}</td>
+        <td class="n">${num(Number(r.churn_risk_score || 0), 1)}</td>
+        <td class="n">${num(Number(r.customer_value_score || 0), 1)}</td>
+        <td class="n">${num(Number(r.retention_priority_score || 0), 1)}</td>
+        <td>${esc(r.main_risk_driver)}</td>
+        <td>${esc(r.recommended_action)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="10" class="void">No accounts in save scope under the current filters.</td></tr>`;
 
-  const tierOrder = ['critical', 'high', 'medium', 'low'];
-  const p = getPalette();
+  setText('queueSub',
+    `Ranked by ${ORDERS[workOrder].label.toLowerCase()}. The # column holds that rank, so it stays readable when you re-sort a column.`);
+  setText('queueCount', scope.length > RENDER_CAP
+    ? `Showing ${intf(RENDER_CAP)} of ${plural(scope.length, 'account', 'accounts')} in save scope`
+    : `${plural(scope.length, 'account', 'accounts')} in save scope`);
+
+  // Tier mix across the whole scored slice, not just the save scope.
   const counts = new Map();
-  scoredRows.forEach(r => counts.set(r.risk_tier, (counts.get(r.risk_tier) || 0) + 1));
-  const total = scoredRows.length || 1;
+  scored.forEach(r => counts.set(r.risk_tier, (counts.get(r.risk_tier) || 0) + 1));
+  const present = TIERS.filter(t => (counts.get(t) || 0) > 0);
+  const total = scored.length || 1;
+  $('tierBar').innerHTML = present
+    .map(t => `<i style="background:${p.tier[t]};flex:${counts.get(t) / total}" title="${t}: ${intf(counts.get(t))}"></i>`)
+    .join('');
+  paintLegend('tierLegend', present.map(t => ({
+    label: t, color: p.tier[t], note: `${intf(counts.get(t))} · ${pct0(counts.get(t) / total)}`,
+  })));
 
-  document.getElementById('tierBar').innerHTML = tierOrder
-    .filter(t => (counts.get(t) || 0) > 0)
-    .map(t => `<span title="${t}: ${counts.get(t)}" style="background:${p.tierColors[t]};flex:${(counts.get(t) || 0) / total}"></span>`)
-    .join('');
-  document.getElementById('tierLegend').innerHTML = tierOrder
-    .filter(t => (counts.get(t) || 0) > 0)
-    .map(t => `<span><span class="dot" style="background:${p.tierColors[t]}"></span>${t} · ${intf(counts.get(t) || 0)}</span>`)
-    .join('');
+  // The masthead meridian is the same tier mix, read at a glance.
+  $('meridian').innerHTML = TIERS.map(t => {
+    const share = (counts.get(t) || 0) / total;
+    const h = Math.max(3, Math.round(4 + share * 10));
+    return `<i style="height:${h}px;background:${p.tier[t]};opacity:${counts.get(t) ? 1 : 0.25}"></i>`;
+  }).join('');
+  $('meridian').setAttribute('aria-label',
+    `Tier mix in scope: ${present.map(t => `${intf(counts.get(t))} ${t}`).join(', ') || 'no accounts'}`);
 }
 
+/* ── KPI tiles ──────────────────────────────────────────────────────── */
+function setDelta(id, pp) {
+  const el = $(id);
+  if (!el) return;
+  if (!Number.isFinite(pp) || Math.abs(pp) < 1e-9) {
+    el.textContent = 'flat MoM'; el.className = 'delta'; return;
+  }
+  el.textContent = `${pp > 0 ? '+' : '−'}${Math.abs(pp * 100).toFixed(1)} pp MoM`;
+  el.className = `delta ${pp > 0 ? 'up' : 'down'}`;
+}
+
+function renderTiles(rows, kpi) {
+  const period = aggregateTrend(rows);
+  const last = rows[rows.length - 1];
+  const prev = rows.length > 1 ? rows[rows.length - 2] : null;
+
+  setText('kpiCustChurn', pct(period.cust_rate));
+  setText('kpiCustChurnNote', `${intf(period.cust_lost)} lost from a ${intf(period.cust_start)} account-month base`);
+  setDelta('kpiCustChurnDelta', last && prev ? last.cust_rate - prev.cust_rate : NaN);
+
+  setText('kpiRevChurn', pct(period.rev_rate));
+  setText('kpiRevChurnNote', `${money(period.mrr_lost)} lost from ${money(period.mrr_start)}`);
+  setDelta('kpiRevChurnDelta', last && prev ? last.rev_rate - prev.rev_rate : NaN);
+
+  const exposed = Number(kpi.priority_mrr_exposure || 0);
+  const totalMrr = Number(kpi.total_current_mrr || 0);
+  const exposedShare = totalMrr > 0 ? exposed / totalMrr : 0;
+  setText('kpiRevRisk', money(exposed));
+  setText('kpiRevRiskNote', `${pct(exposedShare)} of ${money(totalMrr)} scoped MRR`);
+  $('kpiRevRiskMeter').style.width = `${(exposedShare * 100).toFixed(1)}%`;
+  $('kpiRevRiskMeterWrap').setAttribute('aria-label', `${pct(exposedShare)} of scoped MRR is in save scope`);
+  const el = $('kpiRevRiskDelta');
+  el.className = 'delta'; el.textContent = `${intf(Number(kpi.priority_accounts || 0))} in scope`;
+
+  const scored = Number(kpi.scored_customers || 0);
+  const priorityAccounts = Number(kpi.priority_accounts || 0);
+  const accShare = scored > 0 ? priorityAccounts / scored : 0;
+  setText('kpiActive', intf(scored));
+  setText('kpiActiveNote', `${pct(accShare)} in save scope · avg priority ${num(Number(kpi.avg_priority_score || 0), 1)}`);
+  $('kpiActiveMeter').style.width = `${(accShare * 100).toFixed(1)}%`;
+  $('kpiActiveMeterWrap').setAttribute('aria-label', `${pct(accShare)} of scored accounts are in save scope`);
+  const el2 = $('kpiActiveDelta');
+  el2.className = 'delta'; el2.textContent = `${intf(Number(kpi.critical_customers || 0))} critical`;
+}
+
+/* ── Table twins ────────────────────────────────────────────────────── */
+const TABLES = {};
+
+function buildTable(cols, rows) {
+  if (!rows.length) return `<p class="void">Nothing in scope.</p>`;
+  return `<table class="data">
+    <thead><tr>${cols.map(c => `<th${c.n ? ' class="n"' : ''} scope="col">${esc(c.label)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${r.map((v, i) => `<td${cols[i].n ? ' class="n"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function paintTable(key) {
+  const el = $(`tbl-${key}`);
+  const spec = TABLES[key];
+  if (!el || !spec) return;
+  el.innerHTML = buildTable(spec.cols, spec.rows);
+}
+
+function repaintOpenTables() {
+  document.querySelectorAll('.swap[aria-pressed="true"]').forEach(b => paintTable(b.getAttribute('data-swap')));
+}
+
+/* ── Scope digest ───────────────────────────────────────────────────── */
+function renderScopeBar(f, kpi) {
+  const active = DIM_FILTERS.filter(id => $(id).value !== 'all');
+  DIM_FILTERS.forEach(id => {
+    const el = $(id);
+    el.dataset.active = el.value !== 'all' ? '1' : '0';
+  });
+  const custom = $('filterPeriodPreset').value !== 'all';
+  $('filterPeriodPreset').dataset.active = custom ? '1' : '0';
+  $('resetBtn').hidden = !active.length && !custom;
+  setText('scopeDigest',
+    `${plural(Number(kpi.scored_customers || 0), 'scored account', 'scored accounts')} · ${MONTHS.indexOf(f.endMonth) - MONTHS.indexOf(f.startMonth) + 1} months`);
+}
+
+/* ── Provenance ─────────────────────────────────────────────────────── */
 function renderFooter() {
-  const v     = DATA.validation_summary || {};
+  const v = DATA.validation_summary || {};
   const fails = Number(v.fail_checks || 0);
   const warns = Number(v.warn_checks || 0);
-  const badge = document.getElementById('validationBadge');
-  badge.className = `badge ${fails > 0 ? 'fail' : warns > 0 ? 'warn' : ''}`;
-  setText('validationText', `${Number(v.pass_checks || 0)} / ${Number(v.total_checks || 0)} checks passing`);
-  setText('versionTag',     DATA.meta.dashboard_version);
-  setText('snapshotMonth',  DATA.meta.data_snapshot_month);
+  const cls = `pill ${fails > 0 ? 'fail' : warns > 0 ? 'warn' : ''}`;
+  const label = `${intf(Number(v.pass_checks || 0))}/${intf(Number(v.total_checks || 0))} checks pass`;
+  ['validationBadge', 'validationBadgeFoot'].forEach(id => { $(id).className = cls; });
+  setText('validationText', label);
+  setText('validationTextFoot', label);
+  setText('validationIssue', v.top_issue || '—');
+  setText('versionTag', `build ${DATA.meta.dashboard_version}`);
+  setText('snapshotMonth', `data through ${DATA.meta.data_snapshot_month}`);
 }
 
-/* ── Main render ──────────────────────────────────────── */
+/* ── Render ─────────────────────────────────────────────────────────── */
+function render() {
+  chartDefaults();
+  const f = getFilters();
+  const trendRows = getTrendRows(f);
+  const kpi = getRiskKpi(f);
+  const snapshot = getSnapshot(f);
+  const scored = getScored(f);
+  const cohort = getCohort(f);
+  const scope = scored.filter(inSaveScope);
 
-function renderDashboard() {
-  applyChartDefaults();
-  const f           = getFilters();
-  const trendRows   = getTrendRows(f);
-  const riskKpi     = getRiskKpi(f);
-  const snapshotRows = getSnapshot(f);
-  const scoredRows  = getScored(f);
-  const cohortRows  = getCohort(f);
-
-  renderHero(f, trendRows, riskKpi);
-  renderKpis(trendRows, riskKpi);
+  renderScopeBar(f, kpi);
+  renderBrief(f, trendRows, kpi, scope);
+  renderTiles(trendRows, kpi);
   renderTrend(trendRows);
-  renderConcentration(snapshotRows);
-  renderCohort(cohortRows);
-  renderQueue(scoredRows);
+  renderStructure(snapshot);
+  renderCohort(cohort);
+  renderSurface(scored);
+  renderFrontier(scope);
+  renderPlaybook(scope);
+  renderQueue(scope, scored);
   renderFooter();
+
+  // Table twins are built from the same slices the charts just drew.
+  TABLES.trend = {
+    cols: [{ label: 'Month' }, { label: 'Customer churn', n: 1 }, { label: 'Revenue churn', n: 1 }, { label: 'Accounts lost', n: 1 }, { label: 'MRR lost', n: 1 }],
+    rows: trendRows.map(r => [r.month, pct(r.cust_rate), pct(r.rev_rate), intf(r.cust_lost), money(r.mrr_lost)]),
+  };
+  const segRows = groupByDim(snapshot, 'segment').slice(0, 8);
+  TABLES.seg = {
+    cols: [{ label: 'Segment' }, { label: 'Churn share', n: 1 }, { label: 'Churned', n: 1 }, { label: 'Accounts', n: 1 }],
+    rows: segRows.map(r => [r.label, pct(r.share), intf(r.churned), intf(r.count)]),
+  };
+  const chnRows = groupByDim(snapshot, 'acquisition_channel').slice(0, 8);
+  TABLES.chn = {
+    cols: [{ label: 'Channel' }, { label: 'Churn share', n: 1 }, { label: 'Churned', n: 1 }, { label: 'Accounts', n: 1 }],
+    rows: chnRows.map(r => [r.label, pct(r.share), intf(r.churned), intf(r.count)]),
+  };
+  const cohortMap = cohortSeries(cohort);
+  const cohortMonths = spreadPick(Array.from(cohortMap.keys()).sort(), 6);
+  TABLES.cohort = {
+    cols: [{ label: 'Cohort' }, { label: 'Age (months)', n: 1 }, { label: 'Retention', n: 1 }],
+    rows: cohortMonths.flatMap(m => (cohortMap.get(m) || []).slice().sort((a, b) => a.age - b.age)
+      .map(r => [m, intf(r.age), pct(r.retention)])),
+  };
+  const openRows = scored.filter(r => r.risk_tier !== 'churned')
+    .slice().sort((a, b) => Number(b.retention_priority_score || 0) - Number(a.retention_priority_score || 0))
+    .slice(0, RENDER_CAP);
+  TABLES.surface = {
+    cols: [{ label: 'Account' }, { label: 'Tier' }, { label: 'Churn risk', n: 1 }, { label: 'Value', n: 1 }, { label: 'Priority', n: 1 }, { label: 'MRR', n: 1 }],
+    rows: openRows.map(r => [r.customer_id, r.risk_tier, num(Number(r.churn_risk_score), 1), num(Number(r.customer_value_score), 1), num(Number(r.retention_priority_score), 1), money(Number(r.current_mrr))]),
+  };
+  const marks = [10, 25, 50, 100, 150, 200, 300, 450, 600].filter(n => n <= scope.length);
+  const curveByKey = Object.fromEntries(Object.keys(ORDERS).map(k => [k, frontierCurve(scope, k)]));
+  TABLES.frontier = {
+    cols: [{ label: 'Accounts contacted', n: 1 }, ...Object.keys(ORDERS).map(k => ({ label: ORDERS[k].label, n: 1 }))],
+    rows: marks.map(n => [intf(n), ...Object.keys(ORDERS).map(k => pct0(coverageAt(curveByKey[k], n)))]),
+  };
+  repaintOpenTables();
 }
 
-initTheme();
+syncThemeLabel(document.documentElement.getAttribute('data-theme') || 'light');
 populateFilters();
-renderDashboard();
+render();
   </script>
 </body>
 </html>

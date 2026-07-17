@@ -28,60 +28,66 @@ PROC = ROOT / "data" / "processed"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # ── Design system ──────────────────────────────────────────
-LOSS = "#B83530"
-LOSS_LT = "#E8A09A"
-GAIN = "#1B6640"
-SLATE = "#1E293B"
-ACCENT = "#1B3A6B"
-MUTED = "#94A3B8"
-NEUTRAL = "#475569"
-FIG_BG = "#FAFAFA"
-AX_BG = "#FFFFFF"
+LOSS = "#A82D73"
+LOSS_LT = "#D9A0C0"
+GAIN = "#00A88F"
+SLATE = "#152431"
+ACCENT = "#0785C1"
+CYAN = "#13A8D3"
+LIME = "#A8D400"
+VIOLET = "#5A2A83"
+MUTED = "#A6B2BA"
+NEUTRAL = "#60727F"
+FIG_BG = "#F2F4F6"
+AX_BG = "#F2F4F6"
 
 SEG_COLORS = {
-    "Enterprise": "#1B3A6B",
-    "Mid-Market": "#2E6B9E",
-    "SMB": "#B83530",
-    "Startup": "#C9860A",
+    "Enterprise": "#075985",
+    "Mid-Market": "#0785C1",
+    "SMB": "#00A88F",
+    "Startup": "#A8D400",
 }
 
 TIER_COLORS = {
-    "critical": "#B83530",
-    "high": "#D4715A",
-    "medium": "#C9860A",
-    "low": "#94A3B8",
+    "critical": "#A82D73",
+    "high": "#5A2A83",
+    "medium": "#13A8D3",
+    "low": "#A6B2BA",
 }
 
 matplotlib.rcParams.update(
     {
         "font.family": "sans-serif",
-        "font.sans-serif": ["Helvetica Neue", "Helvetica", "Arial", "DejaVu Sans"],
+        "font.sans-serif": ["DejaVu Sans"],
         "axes.facecolor": AX_BG,
         "figure.facecolor": FIG_BG,
-        "axes.edgecolor": "#CBD5E1",
-        "axes.linewidth": 0.7,
+        "axes.edgecolor": "#CED6DC",
+        "axes.linewidth": 0.6,
         "axes.spines.top": False,
         "axes.spines.right": False,
+        "axes.spines.left": False,
+        "axes.spines.bottom": False,
         "axes.grid": True,
         "axes.grid.axis": "y",
-        "grid.color": "#E2E8F0",
-        "grid.linewidth": 0.55,
+        "grid.color": "#D7DEE3",
+        "grid.linewidth": 0.6,
         "xtick.color": NEUTRAL,
         "ytick.color": NEUTRAL,
-        "xtick.labelsize": 9.5,
-        "ytick.labelsize": 9.5,
-        "axes.labelsize": 10.5,
+        "xtick.labelsize": 8.5,
+        "ytick.labelsize": 8.5,
+        "axes.labelsize": 9.3,
         "axes.labelcolor": SLATE,
-        "axes.titlesize": 12.5,
+        "axes.titlesize": 11.5,
         "axes.titleweight": "bold",
         "axes.titlecolor": SLATE,
-        "axes.titlepad": 13,
-        "figure.titlesize": 13.5,
+        "axes.titlepad": 12,
+        "axes.titlelocation": "left",
+        "figure.titlesize": 12.5,
         "figure.titleweight": "bold",
-        "legend.fontsize": 9.5,
+        "legend.fontsize": 8.5,
         "legend.framealpha": 0.0,
-        "lines.linewidth": 2.0,
-        "savefig.dpi": 180,
+        "lines.linewidth": 2.2,
+        "savefig.dpi": 200,
         "savefig.bbox": "tight",
         "savefig.facecolor": FIG_BG,
         "figure.constrained_layout.use": False,
@@ -471,7 +477,7 @@ def chart_cohort_heatmap() -> None:
     nrows = len(pivot)
     fig, ax = plt.subplots(figsize=(14, max(5.5, nrows * 0.32 + 2.5)))
     im = ax.imshow(
-        pivot.values, aspect="auto", cmap="RdYlGn", vmin=0, vmax=1, interpolation="nearest"
+        pivot.values, aspect="auto", cmap="YlGnBu", vmin=0, vmax=1, interpolation="nearest"
     )
 
     ax.set_xticks(range(len(pivot.columns)))

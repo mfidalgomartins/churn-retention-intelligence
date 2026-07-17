@@ -12,13 +12,30 @@ operational risk monitoring in one reproducible pipeline.
 &nbsp;&nbsp;·&nbsp;&nbsp;
 **[PDF report](https://github.com/mfidalgomartins/churn-retention-intelligence/blob/main/outputs/reports/churn-retention-intelligence-report.pdf)**
 
-![Retention plays ranked by weighted MRR exposure](outputs/graphs/intervention_priorities.png)
-
 The reference release covers 3,500 deterministic synthetic B2B SaaS accounts
 through 2026-03-01. It is explicit about the boundary between demonstrated
 engineering and real-world evidence: commercial values are proxies, model
 performance is synthetic out-of-time evidence, and intervention outcomes are
 identified as simulations.
+
+## Flagship deliverables
+
+**[Executive dashboard](https://mfidalgomartins.github.io/churn-retention-intelligence/)**
+— a single self-contained HTML file with the governed data and chart runtime
+embedded, no server required. Filterable by period, segment, region, channel,
+plan, and risk tier; every number on the page ties back to a validation check
+that runs at build time (57/57 shown in the header).
+
+[![Executive dashboard preview](assets/screenshots/dashboard-preview.png)](https://mfidalgomartins.github.io/churn-retention-intelligence/)
+
+**[Narrative report](https://github.com/mfidalgomartins/churn-retention-intelligence/blob/main/outputs/reports/churn-retention-intelligence-report.pdf)**
+— the companion decision-support document: where the book is losing customers
+and revenue, why the losses cluster where they do, and which accounts to
+defend first, generated from the same canonical outputs as the dashboard.
+
+<a href="https://github.com/mfidalgomartins/churn-retention-intelligence/blob/main/outputs/reports/churn-retention-intelligence-report.pdf"><img src="assets/screenshots/report-cover-preview.png" alt="Narrative report cover" width="360"></a>
+
+![Retention plays ranked by weighted MRR exposure](outputs/graphs/intervention_priorities.png)
 
 ## What ships
 

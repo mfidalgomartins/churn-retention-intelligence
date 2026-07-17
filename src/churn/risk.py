@@ -41,6 +41,16 @@ TIER_CUTOFFS: dict[str, float] = {
     "medium": 15.0,
 }
 
+# retention_priority = churn_risk * (PRIORITY_BASE + PRIORITY_VALUE_WEIGHT * value / 100).
+# Value can only modulate the index; it cannot create priority where churn risk is zero.
+PRIORITY_BASE: float = 0.65
+PRIORITY_VALUE_WEIGHT: float = 0.35
+
+# Override: very high behavioural risk on a high-revenue account is critical
+# regardless of where the blended index lands.
+CRITICAL_OVERRIDE_CHURN: float = 45.0
+CRITICAL_OVERRIDE_VALUE: float = 70.0
+
 REQUIRED_FEATURE_COLUMNS: tuple[str, ...] = (
     "customer_id",
     "segment",
@@ -155,7 +165,9 @@ def assign_tiers(priority: pd.Series, churn: pd.Series, value: pd.Series) -> pd.
     revenue stake) catches accounts that don't quite cross the priority bar
     but are individually high-impact saves.
     """
-    critical = (priority >= TIER_CUTOFFS["critical"]) | ((churn >= 45.0) & (value >= 70.0))
+    critical = (priority >= TIER_CUTOFFS["critical"]) | (
+        (churn >= CRITICAL_OVERRIDE_CHURN) & (value >= CRITICAL_OVERRIDE_VALUE)
+    )
     high = priority >= TIER_CUTOFFS["high"]
     medium = priority >= TIER_CUTOFFS["medium"]
     return pd.Series(
@@ -226,7 +238,8 @@ def compute_scores(features: pd.DataFrame) -> pd.DataFrame:
     scored["churn_risk_score"] = churn_risk_score(scored, signals).values
     scored["customer_value_score"] = customer_value_score(scored).values
     scored["retention_priority_score"] = (
-        scored["churn_risk_score"] * (0.65 + 0.35 * scored["customer_value_score"] / 100.0)
+        scored["churn_risk_score"]
+        * (PRIORITY_BASE + PRIORITY_VALUE_WEIGHT * scored["customer_value_score"] / 100.0)
     ).round(2)
 
     scored["risk_tier"] = assign_tiers(

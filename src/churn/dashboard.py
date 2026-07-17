@@ -9,6 +9,14 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from churn.risk import (
+    CRITICAL_OVERRIDE_CHURN,
+    CRITICAL_OVERRIDE_VALUE,
+    PRIORITY_BASE,
+    PRIORITY_VALUE_WEIGHT,
+    TIER_CUTOFFS,
+)
+
 ALL_FILTER_VALUE = "__all__"
 RISK_ORDER = ["critical", "high", "medium", "low", "churned"]
 OFFICIAL_DASHBOARD_FILENAME = "executive-retention-command-center.html"
@@ -360,6 +368,21 @@ def load_data(project_root: Path) -> dict:
         },
         "domains": domains,
         "months": months,
+        # The dashboard draws the tiering policy as curves over churn risk ×
+        # customer value, so it needs the same constants risk.py scores with.
+        # Emitting them keeps risk.py the single source of truth.
+        "policy": {
+            "base": PRIORITY_BASE,
+            "value_weight": PRIORITY_VALUE_WEIGHT,
+            "tiers": [
+                {"key": key, "min": cutoff}
+                for key, cutoff in sorted(TIER_CUTOFFS.items(), key=lambda kv: kv[1], reverse=True)
+            ],
+            "override": {
+                "risk": CRITICAL_OVERRIDE_CHURN,
+                "value": CRITICAL_OVERRIDE_VALUE,
+            },
+        },
         "validation_summary": validation_summary,
         "monthly_fact_rows": monthly_fact_rows,
         "risk_kpi_cube": _json_records(risk_kpi_cube),

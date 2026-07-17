@@ -241,11 +241,14 @@ class TestIntegration(unittest.TestCase):
             'id="filterRiskTier"',
             'type="date"',
             '<div class="sr-only">',
-            '<h3 id="trendTitle">',
-            '<h3 id="cohortTitle">',
-            '<h3 id="queueTitle">',
         ):
             self.assertIn(marker, html_text)
+
+        # Core views carry a heading with a stable id. Matched by regex rather
+        # than an exact tag string so restyling cannot break the assertion
+        # while the view itself is still labelled.
+        for view in ("trendTitle", "cohortTitle", "queueTitle"):
+            self.assertRegex(html_text, rf'<h3[^>]*\bid="{view}"[^>]*>')
 
         # Core charts and tables present.
         for marker in (
@@ -253,6 +256,8 @@ class TestIntegration(unittest.TestCase):
             'id="chartChurnSegment"',
             'id="chartChurnChannel"',
             'id="chartCohort"',
+            'id="chartSurface"',
+            'id="chartFrontier"',
             'id="queueTable"',
         ):
             self.assertIn(marker, html_text)

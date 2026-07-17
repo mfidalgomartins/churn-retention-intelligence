@@ -19,12 +19,15 @@ import re
 from pathlib import Path
 
 import pandas as pd
+from matplotlib import font_manager
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
     BaseDocTemplate,
@@ -53,24 +56,50 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 REPORT_PATH = OUT / "churn-retention-intelligence-report.pdf"
 
-# ── Palette (matches the chart pack and dashboard) ─────────
-INK = colors.HexColor("#1E293B")  # body text
-SLATE = colors.HexColor("#334155")
-MUTED = colors.HexColor("#64748B")
-HAIR = colors.HexColor("#CBD5E1")
-PALE = colors.HexColor("#E2E8F0")
+# ── Editorial design system ───────────────────────────────
+MIDNIGHT = colors.HexColor("#071824")
+INK = colors.HexColor("#152431")
+SLATE = colors.HexColor("#394955")
+MUTED = colors.HexColor("#60727F")
+HAIR = colors.HexColor("#CED6DC")
+PALE = colors.HexColor("#E7ECEF")
+MIST = colors.HexColor("#F2F4F6")
 PAPER = colors.HexColor("#FFFFFF")
-NAVY = colors.HexColor("#1B3A6B")  # accent
-LOSS = colors.HexColor("#B83530")  # emphasis / risk
-GAIN = colors.HexColor("#1B6640")
-CREAM = colors.HexColor("#FAF8F4")
+CYAN = colors.HexColor("#13A8D3")
+TEAL = colors.HexColor("#00A88F")
+LIME = colors.HexColor("#A8D400")
+VIOLET = colors.HexColor("#5A2A83")
+NAVY = MIDNIGHT
+LOSS = colors.HexColor("#A82D73")
+GAIN = TEAL
 
 PAGE_W, PAGE_H = A4
-LMARGIN = 2.4 * cm
-RMARGIN = 2.4 * cm
-TMARGIN = 2.3 * cm
-BMARGIN = 2.2 * cm
+LMARGIN = 1.45 * cm
+RMARGIN = 1.45 * cm
+TMARGIN = 1.55 * cm
+BMARGIN = 1.65 * cm
 CONTENT_W = PAGE_W - LMARGIN - RMARGIN
+
+
+def _register_report_fonts() -> None:
+    """Embed a stable serif/sans pair so the PDF renders consistently everywhere."""
+    font_specs = {
+        "ReportSans": font_manager.findfont("DejaVu Sans"),
+        "ReportSans-Bold": font_manager.findfont(
+            font_manager.FontProperties(family="DejaVu Sans", weight="bold")
+        ),
+        "ReportSerif": font_manager.findfont("DejaVu Serif"),
+        "ReportSerif-Italic": font_manager.findfont(
+            font_manager.FontProperties(family="DejaVu Serif", style="italic")
+        ),
+        "ReportMono": font_manager.findfont("DejaVu Sans Mono"),
+    }
+    for alias, path in font_specs.items():
+        if alias not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(alias, path))
+
+
+_register_report_fonts()
 
 REFERENCE_DATE = f"{SNAPSHOT_DATE.day} {SNAPSHOT_DATE.strftime('%B %Y')}"
 BUILD_DATE = os.getenv("CHURN_REPORT_DATE", REFERENCE_DATE)
@@ -360,7 +389,7 @@ def floor_multiple(x: float) -> str:
 def code(text: str) -> str:
     """Mark a literal field, file, or path name so it reads as a system
     identifier rather than prose, wherever it appears inline or in a table."""
-    return f'<font face="Courier" size="8">{text}</font>'
+    return f'<font face="ReportMono" size="7.2">{text}</font>'
 
 
 # ════════════════════════════════════════════════════════════
@@ -369,12 +398,12 @@ def code(text: str) -> str:
 def build_styles() -> dict:
     body = ParagraphStyle(
         "Body",
-        fontName="Times-Roman",
-        fontSize=10.5,
-        leading=15.5,
+        fontName="ReportSans",
+        fontSize=8.7,
+        leading=12.7,
         textColor=INK,
-        alignment=TA_JUSTIFY,
-        spaceAfter=8,
+        alignment=TA_LEFT,
+        spaceAfter=7,
         firstLineIndent=0,
     )
     styles = {
@@ -382,149 +411,154 @@ def build_styles() -> dict:
         "lead": ParagraphStyle(
             "Lead",
             parent=body,
-            fontSize=11.5,
-            leading=17,
-            spaceAfter=10,
+            fontName="ReportSerif",
+            fontSize=13.4,
+            leading=17.8,
+            spaceAfter=12,
             textColor=SLATE,
         ),
         "h1": ParagraphStyle(
             "H1",
-            fontName="Helvetica-Bold",
-            fontSize=19,
-            leading=22,
-            textColor=NAVY,
-            spaceBefore=4,
-            spaceAfter=4,
+            fontName="ReportSans-Bold",
+            fontSize=22.5,
+            leading=26,
+            textColor=PAPER,
+            backColor=MIDNIGHT,
+            borderPadding=(13, 14, 13, 14),
+            spaceBefore=2,
+            spaceAfter=0,
         ),
         "h1num": ParagraphStyle(
             "H1num",
-            fontName="Helvetica-Bold",
-            fontSize=10,
-            leading=12,
-            textColor=LOSS,
-            spaceAfter=2,
+            fontName="ReportSans-Bold",
+            fontSize=7.8,
+            leading=10,
+            textColor=CYAN,
+            backColor=MIDNIGHT,
+            borderPadding=(6, 14, 1, 14),
+            spaceAfter=0,
         ),
         "h2": ParagraphStyle(
             "H2",
-            fontName="Helvetica-Bold",
-            fontSize=13,
-            leading=16,
+            fontName="ReportSerif",
+            fontSize=15.3,
+            leading=19,
             textColor=INK,
-            spaceBefore=14,
-            spaceAfter=5,
+            spaceBefore=15,
+            spaceAfter=6,
         ),
         "h3": ParagraphStyle(
             "H3",
-            fontName="Helvetica-Bold",
-            fontSize=11,
-            leading=14,
+            fontName="ReportSans-Bold",
+            fontSize=9.8,
+            leading=13,
             textColor=SLATE,
             spaceBefore=10,
-            spaceAfter=3,
+            spaceAfter=4,
         ),
         "caption": ParagraphStyle(
             "Caption",
-            fontName="Helvetica",
-            fontSize=8.5,
-            leading=11.5,
+            fontName="ReportSans",
+            fontSize=7.2,
+            leading=10,
             textColor=MUTED,
             alignment=TA_LEFT,
-            spaceBefore=4,
-            spaceAfter=16,
+            spaceBefore=5,
+            spaceAfter=15,
         ),
         "pull": ParagraphStyle(
             "Pull",
-            fontName="Times-Italic",
-            fontSize=13.5,
-            leading=19,
-            textColor=NAVY,
+            fontName="ReportSerif",
+            fontSize=13.2,
+            leading=18,
+            textColor=INK,
             alignment=TA_LEFT,
         ),
         "kicker": ParagraphStyle(
             "Kicker",
-            fontName="Helvetica-Bold",
-            fontSize=9,
-            leading=12,
-            textColor=LOSS,
+            fontName="ReportSans-Bold",
+            fontSize=7.8,
+            leading=10,
+            textColor=CYAN,
             spaceAfter=3,
         ),
         "toc1": ParagraphStyle(
             "TOC1",
-            fontName="Helvetica-Bold",
-            fontSize=10.5,
-            leading=20,
+            fontName="ReportSans-Bold",
+            fontSize=7.4,
+            leading=10.5,
             textColor=INK,
         ),
         "toc2": ParagraphStyle(
             "TOC2",
-            fontName="Helvetica",
-            fontSize=9.5,
-            leading=16,
+            fontName="ReportSans",
+            fontSize=6.5,
+            leading=8,
             textColor=SLATE,
             leftIndent=16,
         ),
         # cover
         "cover_kick": ParagraphStyle(
             "CK",
-            fontName="Helvetica-Bold",
-            fontSize=11,
-            leading=15,
-            textColor=LOSS,
+            fontName="ReportSans-Bold",
+            fontSize=8.2,
+            leading=12,
+            textColor=CYAN,
             alignment=TA_LEFT,
         ),
         "cover_title": ParagraphStyle(
             "CT",
-            fontName="Helvetica-Bold",
+            fontName="ReportSans-Bold",
             fontSize=33,
-            leading=37,
-            textColor=NAVY,
+            leading=36,
+            textColor=PAPER,
             alignment=TA_LEFT,
             spaceBefore=10,
             spaceAfter=8,
         ),
         "cover_sub": ParagraphStyle(
             "CS",
-            fontName="Times-Italic",
-            fontSize=15,
-            leading=21,
-            textColor=SLATE,
+            fontName="ReportSerif",
+            fontSize=14.5,
+            leading=20,
+            textColor=colors.HexColor("#E7EEF2"),
             alignment=TA_LEFT,
         ),
         "cover_meta": ParagraphStyle(
             "CM",
-            fontName="Helvetica",
-            fontSize=9.5,
-            leading=15,
-            textColor=MUTED,
+            fontName="ReportSans",
+            fontSize=7.8,
+            leading=12,
+            textColor=colors.HexColor("#B9C7CF"),
             alignment=TA_LEFT,
         ),
         "tbl": ParagraphStyle(
             "Tbl",
-            fontName="Times-Roman",
-            fontSize=9,
-            leading=12,
+            fontName="ReportSans",
+            fontSize=7.4,
+            leading=10.2,
             textColor=INK,
         ),
         "tbl_r": ParagraphStyle(
             "TblR",
-            fontName="Times-Roman",
-            fontSize=9,
-            leading=12,
+            fontName="ReportSans",
+            fontSize=7.4,
+            leading=10.2,
             textColor=INK,
             alignment=TA_RIGHT,
         ),
         "tblh": ParagraphStyle(
             "Tblh",
-            fontName="Helvetica-Bold",
-            fontSize=8.5,
-            leading=11,
+            fontName="ReportSans-Bold",
+            fontSize=7.2,
+            leading=9.5,
             textColor=PAPER,
         ),
         "tblh_r": ParagraphStyle(
             "TblhR",
-            fontName="Helvetica-Bold",
-            fontSize=8.5,
-            leading=11,
+            fontName="ReportSans-Bold",
+            fontSize=7.2,
+            leading=9.5,
             textColor=PAPER,
             alignment=TA_RIGHT,
         ),
@@ -549,15 +583,28 @@ def fig(name: str, caption: str, styles: dict, width_frac: float = 1.0, max_h: f
     """Inline figure scaled to the content width, with a numbered caption."""
     path = GRAPHS / name
     iw, ih = ImageReader(str(path)).getSize()
-    w = CONTENT_W * width_frac
+    w = CONTENT_W * width_frac - 10
     h = w * ih / iw
     if h > max_h:
         h = max_h
         w = h * iw / ih
     img = Image(str(path), width=w, height=h)
     img.hAlign = "CENTER"
+    panel = Table([[img]], colWidths=[w + 10])
+    panel.hAlign = "CENTER"
+    panel.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), MIST),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     cap = Paragraph(caption, styles["caption"])
-    return KeepTogether([Spacer(1, 4), img, cap])
+    return KeepTogether([Spacer(1, 5), panel, cap])
 
 
 def rule(color=HAIR, thickness=0.6, space_before=2, space_after=8, width=None):
@@ -577,17 +624,31 @@ def rule(color=HAIR, thickness=0.6, space_before=2, space_after=8, width=None):
 def pull_quote(text: str, styles: dict) -> KeepTogether:
     """A callout box for a single load-bearing sentence, used sparingly to
     break up dense text pages and signal which line matters most."""
+    mark = Paragraph(
+        "“",
+        ParagraphStyle(
+            "QuoteMark",
+            fontName="ReportSerif",
+            fontSize=27,
+            leading=25,
+            textColor=CYAN,
+        ),
+    )
     p = Paragraph(text, styles["pull"])
-    t = Table([[p]], colWidths=[CONTENT_W])
+    t = Table([[mark, p]], colWidths=[1.05 * cm, CONTENT_W - 1.05 * cm])
     t.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, -1), CREAM),
-                ("LINEBEFORE", (0, 0), (0, -1), 3, LOSS),
-                ("TOPPADDING", (0, 0), (-1, -1), 12),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
-                ("LEFTPADDING", (0, 0), (-1, -1), 18),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 16),
+                ("BACKGROUND", (0, 0), (-1, -1), MIST),
+                ("LINEABOVE", (0, 0), (-1, 0), 1.4, CYAN),
+                ("LINEBELOW", (0, -1), (-1, -1), 0.5, HAIR),
+                ("TOPPADDING", (0, 0), (-1, -1), 11),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 11),
+                ("LEFTPADDING", (0, 0), (0, -1), 12),
+                ("RIGHTPADDING", (0, 0), (0, -1), 0),
+                ("LEFTPADDING", (1, 0), (1, -1), 2),
+                ("RIGHTPADDING", (1, 0), (1, -1), 14),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]
         )
     )
@@ -602,10 +663,10 @@ def stat_band(items, styles):
             value,
             ParagraphStyle(
                 "sv",
-                fontName="Helvetica-Bold",
-                fontSize=17,
-                leading=19,
-                textColor=NAVY,
+                fontName="ReportSans-Bold",
+                fontSize=18,
+                leading=20,
+                textColor=PAPER,
                 alignment=TA_CENTER,
             ),
         )
@@ -613,10 +674,10 @@ def stat_band(items, styles):
             label,
             ParagraphStyle(
                 "sl",
-                fontName="Helvetica",
-                fontSize=7.8,
-                leading=10,
-                textColor=MUTED,
+                fontName="ReportSans-Bold",
+                fontSize=6.7,
+                leading=9,
+                textColor=colors.HexColor("#A9DCE9"),
                 alignment=TA_CENTER,
             ),
         )
@@ -635,9 +696,9 @@ def stat_band(items, styles):
     t.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, -1), CREAM),
-                ("BOX", (0, 0), (-1, -1), 0.6, HAIR),
-                ("LINEBEFORE", (1, 0), (-1, -1), 0.5, HAIR),
+                ("BACKGROUND", (0, 0), (-1, -1), MIDNIGHT),
+                ("LINEABOVE", (0, 0), (-1, 0), 2.2, CYAN),
+                ("LINEBEFORE", (1, 0), (-1, -1), 0.35, colors.HexColor("#49606D")),
                 ("TOPPADDING", (0, 0), (-1, -1), 12),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -678,15 +739,15 @@ def data_table(header, rows, styles, col_widths):
     ]
     t = Table([head, *body], colWidths=col_widths, repeatRows=1)
     style = [
-        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("LEFTPADDING", (0, 0), (-1, -1), 7),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("BACKGROUND", (0, 0), (-1, 0), MIDNIGHT),
+        ("LINEABOVE", (0, 0), (-1, 0), 1.8, CYAN),
+        ("TOPPADDING", (0, 0), (-1, -1), 5.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5.5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LINEBELOW", (0, 0), (-1, -1), 0.4, PALE),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.6, NAVY),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [PAPER, CREAM]),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.35, HAIR),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [PAPER, MIST]),
     ]
     t.setStyle(TableStyle(style))
     return KeepTogether([Spacer(1, 4), t, Spacer(1, 14)])
@@ -750,26 +811,81 @@ class ReportDoc(BaseDocTemplate):
 
     def _cover_bg(self, canvas, doc):
         canvas.saveState()
-        canvas.setFillColor(NAVY)
-        canvas.rect(0, PAGE_H - 1.0 * cm, PAGE_W, 1.0 * cm, fill=1, stroke=0)
-        canvas.setFillColor(LOSS)
-        canvas.rect(0, PAGE_H - 1.0 * cm, 0.35 * cm, 1.0 * cm, fill=1, stroke=0)
-        canvas.setFillColor(NAVY)
-        canvas.rect(0, 0, PAGE_W, 0.55 * cm, fill=1, stroke=0)
+        canvas.setFillColor(MIDNIGHT)
+        canvas.rect(0, 0, PAGE_W, PAGE_H, fill=1, stroke=0)
+
+        # Layered vector fields echo the reference's photographic light without
+        # importing third-party imagery into the analytical deliverable.
+        canvas.setFillAlpha(0.72)
+        canvas.setFillColor(colors.HexColor("#004A75"))
+        canvas.circle(2.2 * cm, 1.1 * cm, 8.5 * cm, fill=1, stroke=0)
+        canvas.setFillAlpha(0.48)
+        canvas.setFillColor(CYAN)
+        canvas.circle(0.5 * cm, 3.0 * cm, 5.7 * cm, fill=1, stroke=0)
+        canvas.setFillAlpha(0.38)
+        canvas.setFillColor(VIOLET)
+        canvas.circle(8.3 * cm, 0.8 * cm, 6.6 * cm, fill=1, stroke=0)
+        canvas.setFillAlpha(0.22)
+        canvas.setFillColor(TEAL)
+        canvas.circle(17.7 * cm, 13.3 * cm, 8.0 * cm, fill=1, stroke=0)
+        canvas.setFillAlpha(1)
+
+        # Asymmetric editorial frame with the report's four accent roots.
+        x0, y0 = 1.05 * cm, 18.15 * cm
+        canvas.setLineWidth(5.5)
+        canvas.setStrokeColor(CYAN)
+        canvas.line(x0, y0, x0, 23.2 * cm)
+        canvas.line(x0, 23.2 * cm, 5.3 * cm, 24.0 * cm)
+        canvas.setStrokeColor(TEAL)
+        canvas.line(5.3 * cm, 24.0 * cm, 9.3 * cm, 24.7 * cm)
+        canvas.setStrokeColor(LIME)
+        canvas.line(9.3 * cm, 24.7 * cm, 19.45 * cm, 25.35 * cm)
+        canvas.line(19.45 * cm, 25.35 * cm, 19.45 * cm, 18.2 * cm)
+        canvas.setFillColor(CYAN)
+        for idx in range(4):
+            canvas.rect(x0 + idx * 0.52 * cm, 17.45 * cm, 0.24 * cm, 0.24 * cm, fill=1, stroke=0)
+
+        canvas.setFont("ReportSans-Bold", 6.8)
+        canvas.setFillColor(colors.HexColor("#B9C7CF"))
+        canvas.drawString(1.05 * cm, 1.0 * cm, "RETENTION ANALYTICS  /  EXECUTIVE DECISION SUPPORT")
         canvas.restoreState()
 
     def _footer(self, canvas, doc):
         canvas.saveState()
-        y = BMARGIN - 0.85 * cm
-        canvas.setStrokeColor(PALE)
-        canvas.setLineWidth(0.5)
-        canvas.line(LMARGIN, y + 0.35 * cm, PAGE_W - RMARGIN, y + 0.35 * cm)
-        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillAlpha(1)
+        canvas.setFillColor(PAPER)
+        canvas.rect(0, 0, PAGE_W, PAGE_H, fill=1, stroke=0)
+        # Consulting-style chapter rail: quiet identity at left, four evidence
+        # phases at right, and a stable full-width footer band.
+        header_y = PAGE_H - 0.68 * cm
+        canvas.setFont("ReportSans-Bold", 6.4)
         canvas.setFillColor(MUTED)
-        canvas.drawString(LMARGIN, y, "Churn & Retention Intelligence")
-        canvas.drawRightString(PAGE_W - RMARGIN, y, f"Retention Review  ·  Page {doc.page}")
-        canvas.setFont("Helvetica", 7)
-        canvas.drawCentredString(PAGE_W / 2, y, "")
+        canvas.drawString(LMARGIN, header_y, "RETENTION INTELLIGENCE")
+        rail_x = PAGE_W - RMARGIN - 7.3 * cm
+        rail_w = 7.3 * cm / 4
+        rail_colors = [CYAN, colors.HexColor("#168FC3"), TEAL, LIME]
+        for idx, rail_color in enumerate(rail_colors):
+            x = rail_x + idx * rail_w
+            canvas.setStrokeColor(rail_color)
+            canvas.setLineWidth(1.2)
+            canvas.line(x, header_y + 1, x + rail_w, header_y + 1)
+            canvas.setFillColor(PAPER)
+            canvas.circle(x + rail_w, header_y + 1, 3.2, fill=1, stroke=1)
+
+        band_h = 0.72 * cm
+        canvas.setFillColor(MIDNIGHT)
+        canvas.rect(0, 0, PAGE_W, band_h, fill=1, stroke=0)
+        segment_w = PAGE_W / 4
+        for idx, rail_color in enumerate(rail_colors):
+            canvas.setFillColor(rail_color)
+            canvas.rect(idx * segment_w, band_h, segment_w, 1.6, fill=1, stroke=0)
+        canvas.setFont("ReportSans", 6.7)
+        canvas.setFillColor(colors.HexColor("#D7E1E6"))
+        canvas.drawString(LMARGIN, 0.27 * cm, "Churn & Retention Intelligence")
+        canvas.setFillColor(CYAN)
+        canvas.drawRightString(
+            PAGE_W - RMARGIN, 0.27 * cm, f"Retention Review  /  {doc.page:02d}"
+        )
         canvas.restoreState()
 
 
@@ -787,7 +903,7 @@ def P(text, styles, key="body"):
 def H1(text, num, key, styles, story):
     story.append(Paragraph(num, styles["h1num"]))
     story.append(SectionHeading(text, styles["h1"], 0, key))
-    story.append(rule(NAVY, 1.1, 2, 12))
+    story.append(rule(CYAN, 2.2, 0, 13))
 
 
 def H2(text, key, styles, story):
@@ -800,7 +916,7 @@ def build_story(styles: dict, M: dict) -> list:
     beh, drv, itv, segr = M["beh"], M["drv"], M["itv"], M["segr"]
 
     # ── COVER ──────────────────────────────────────────────
-    story.append(Spacer(1, 3.2 * cm))
+    story.append(Spacer(1, 4.4 * cm))
     story.append(P("RETENTION INTELLIGENCE REVIEW", styles, "cover_kick"))
     story.append(P("Churn &amp; Retention<br/>Intelligence", styles, "cover_title"))
     story.append(
@@ -813,7 +929,7 @@ def build_story(styles: dict, M: dict) -> list:
         )
     )
     story.append(Spacer(1, 1.0 * cm))
-    story.append(rule(HAIR, 0.6, 0, 12))
+    story.append(rule(colors.HexColor("#6D8490"), 0.6, 0, 12))
     story.append(
         P(
             f"Analytical period {M['window_start']} to {M['window_end']}  ·  "
@@ -825,8 +941,8 @@ def build_story(styles: dict, M: dict) -> list:
             "cover_meta",
         )
     )
-    story.append(Spacer(1, 9.4 * cm))
-    story.append(rule(HAIR, 0.6, 0, 8))
+    story.append(Spacer(1, 7.85 * cm))
+    story.append(rule(colors.HexColor("#6D8490"), 0.6, 0, 8))
     story.append(
         P(
             "Retention Analytics  ·  "
@@ -842,7 +958,7 @@ def build_story(styles: dict, M: dict) -> list:
 
     # ── TABLE OF CONTENTS ──────────────────────────────────
     story.append(P("Contents", styles, "h1"))
-    story.append(rule(NAVY, 1.1, 2, 14))
+    story.append(rule(CYAN, 2.2, 0, 14))
     toc = TableOfContents()
     toc.levelStyles = [styles["toc1"], styles["toc2"]]
     toc.dotsMinLevel = 0
@@ -1501,6 +1617,7 @@ def build_story(styles: dict, M: dict) -> list:
             "months. The final three months (highlighted) sit well above the "
             "prior nine-month average shown by the dotted line.",
             styles,
+            width_frac=0.82,
         )
     )
 
@@ -1524,6 +1641,7 @@ def build_story(styles: dict, M: dict) -> list:
             "has compounded steadily; the retention task is to protect the "
             "base, not to rescue a business in decline.",
             styles,
+            width_frac=0.82,
         )
     )
 
@@ -2352,6 +2470,7 @@ def build_story(styles: dict, M: dict) -> list:
         )
     )
 
+    story.append(PageBreak())
     H2("What would change the conclusion", "s10g", styles, story)
     story.append(
         P(
