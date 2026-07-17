@@ -3,6 +3,8 @@
 [![CI](https://github.com/mfidalgomartins/churn-retention-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/mfidalgomartins/churn-retention-intelligence/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+[![Tests: 159 passing](https://img.shields.io/badge/tests-159%20passing-brightgreen.svg)](tests/)
+[![Branch coverage: 82%25](https://img.shields.io/badge/branch%20coverage-82%25-brightgreen.svg)](pyproject.toml)
 
 A production-shaped SaaS retention system that joins governed ingestion,
 revenue economics, calibrated churn probabilities, randomized holdouts, and
@@ -53,12 +55,33 @@ that runs at build time (57/57 shown in the header).
 
 [![Executive dashboard preview](assets/screenshots/dashboard-preview.png)](https://mfidalgomartins.github.io/churn-retention-intelligence/)
 
+- **Scoring policy, drawn** — every open account plotted as churn risk ×
+  customer value, with each tier threshold drawn as the curve the score is
+  computed from, so the policy can be argued with rather than taken on faith.
+- **Work-order capacity view** — the governed contact order compared against
+  risk-only and value-weighted orderings on cumulative MRR reached per
+  account, so the priority/coverage trade-off is visible before it's adopted.
+- **Chart/table twin on every figure** — each visualization carries a toggle
+  to the same slice as a plain, screen-reader-friendly table.
+- **Single-hue, single-meaning color** — red encodes retention risk and
+  nothing else; every ramp is validated for monotone lightness and contrast
+  in both light and dark surfaces.
+
 **[Narrative report](https://github.com/mfidalgomartins/churn-retention-intelligence/blob/main/outputs/reports/churn-retention-intelligence-report.pdf)**
 — the companion decision-support document: where the book is losing customers
 and revenue, why the losses cluster where they do, and which accounts to
 defend first, generated from the same canonical outputs as the dashboard.
 
 <a href="https://github.com/mfidalgomartins/churn-retention-intelligence/blob/main/outputs/reports/churn-retention-intelligence-report.pdf"><img src="assets/screenshots/report-cover-preview.png" alt="Narrative report cover" width="360"></a>
+
+- Thirteen sections moving from executive summary through retention findings,
+  behavioral drivers, revenue concentration, the model, the experiment, a
+  governed intervention queue, and an appendix.
+- Every figure and claim in the PDF traces back to the same `outputs/tables/`
+  artifacts the dashboard reads, generated in the same `make release` run.
+- States its own limits: synthetic dataset, proxy commercial values, and a
+  null-result experiment reported as measured rather than adjusted to look
+  favorable.
 
 ![Retention plays ranked by weighted MRR exposure](outputs/graphs/intervention_priorities.png)
 
