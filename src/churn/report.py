@@ -883,9 +883,7 @@ class ReportDoc(BaseDocTemplate):
         canvas.setFillColor(colors.HexColor("#D7E1E6"))
         canvas.drawString(LMARGIN, 0.27 * cm, "Churn & Retention Intelligence")
         canvas.setFillColor(CYAN)
-        canvas.drawRightString(
-            PAGE_W - RMARGIN, 0.27 * cm, f"Retention Review  /  {doc.page:02d}"
-        )
+        canvas.drawRightString(PAGE_W - RMARGIN, 0.27 * cm, f"Retention Review  /  {doc.page:02d}")
         canvas.restoreState()
 
 
