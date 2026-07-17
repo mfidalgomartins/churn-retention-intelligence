@@ -24,6 +24,25 @@ engineering and real-world evidence: commercial values are proxies, model
 performance is synthetic out-of-time evidence, and intervention outcomes are
 identified as simulations.
 
+## Executive summary
+
+On the reference book, $209,578 of monthly recurring revenue sits in 600
+accounts carrying an at-risk flag or a high-to-critical tier — 19% of total
+MRR concentrated in a fifth of the customer base. The governed priority order
+is risk-led by design: the first 100 accounts worked top-down reach 23% of
+that exposure, against 63% if the same 100 calls were picked by revenue alone.
+That gap is the product's central decision — trading save-rate efficiency for
+size of save — and it is the number a retention team would negotiate before
+adopting the queue.
+
+The system exists to make that trade-off inspectable, not just computable: the
+calibrated model (out-of-time ROC AUC 0.823) estimates who is likely to leave,
+the transparent policy score turns that into a ranked, auditable action list,
+and the randomized-holdout design measures whether interventions actually move
+the outcome instead of assuming they do. Every number that reaches the
+dashboard or report passes a build-time contract and validation gate first —
+57 checks on the current release, 0 failed.
+
 ## Flagship deliverables
 
 **[Executive dashboard](https://mfidalgomartins.github.io/churn-retention-intelligence/)**
