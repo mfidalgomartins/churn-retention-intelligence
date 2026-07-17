@@ -11,6 +11,12 @@ operational risk monitoring in one reproducible pipeline.
 **[Live dashboard](https://mfidalgomartins.github.io/churn-retention-intelligence/)**
 &nbsp;&nbsp;·&nbsp;&nbsp;
 **[PDF report](https://github.com/mfidalgomartins/churn-retention-intelligence/blob/main/outputs/reports/churn-retention-intelligence-report.pdf)**
+&nbsp;&nbsp;·&nbsp;&nbsp;
+**[Architecture](docs/architecture/pipeline_architecture.md)**
+&nbsp;&nbsp;·&nbsp;&nbsp;
+**[Quickstart](#quickstart)**
+&nbsp;&nbsp;·&nbsp;&nbsp;
+**[Docs](docs/README.md)**
 
 The reference release covers 3,500 deterministic synthetic B2B SaaS accounts
 through 2026-03-01. It is explicit about the boundary between demonstrated
@@ -39,10 +45,17 @@ defend first, generated from the same canonical outputs as the dashboard.
 
 ## What ships
 
-```text
-source adapter → contracts → economics → point-in-time features → analysis
-               → policy score + calibrated model → randomized holdout
-               → transition monitoring → dashboard/report → release gates
+```mermaid
+flowchart LR
+    A[Source adapter\nCSV / PostgreSQL] --> B[Contracts\nschema + FK checks]
+    B --> C[Economics\nMRR bridge, CAC, LTV]
+    C --> D[Point-in-time features]
+    D --> E[Analysis\ndrivers, cohorts]
+    D --> F[Policy score\n+ calibrated model]
+    F --> G[Randomized holdout\ntreatment vs. control]
+    G --> H[Transition monitoring\nalerts, drift]
+    H --> I[Dashboard / report]
+    I --> J[Release gates]
 ```
 
 - CSV and PostgreSQL source adapters validate a complete batch before publishing
@@ -159,6 +172,20 @@ tests/            business logic, failure paths, and end-to-end release assertio
   out-of-time results, not independent-sample confidence intervals.
 - A live deployment must replace simulated outcomes, confirm source semantics,
   recalibrate probabilities, and set alert thresholds against operating history.
+
+## Roadmap
+
+Ordered by what would need to change first to run this against a live book:
+
+- Replace the synthetic generator's outcome file with observed 90-day results
+  from a real intervention program, so `intervention_incrementality.csv`
+  reports a measured effect instead of a simulated one.
+- Add a second source adapter validated against a live warehouse schema
+  (current PostgreSQL coverage is reference SQL, not a tested connector).
+- Extend `monitor.py` alert thresholds with a burn-in period against real
+  operating history before they gate a release.
+- Swap the analytical margin proxy in `economics.py` for a cost allocation
+  reconciled to finance's chart of accounts.
 
 ## Stack
 

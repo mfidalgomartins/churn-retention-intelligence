@@ -1,5 +1,7 @@
 # Documentation
 
+Part of the [Churn & Retention Intelligence](../README.md) pipeline.
+
 ## Architecture
 
 - `architecture/pipeline_architecture.md` — source-to-decision topology,

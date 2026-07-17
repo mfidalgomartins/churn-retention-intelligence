@@ -1,7 +1,7 @@
 # Outputs
 
-Everything in this directory is generated. Change the producing module, not an
-artifact.
+Part of the [Churn & Retention Intelligence](../README.md) pipeline. Everything
+in this directory is generated. Change the producing module, not an artifact.
 
 - `dashboard/executive-retention-command-center.html` — self-contained
   dashboard with embedded governed data and chart runtime.

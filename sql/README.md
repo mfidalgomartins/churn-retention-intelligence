@@ -1,7 +1,8 @@
 # PostgreSQL Reference Models
 
-These PostgreSQL 15+ queries implement the pipeline's core temporal definitions
-for warehouse use:
+Part of the [Churn & Retention Intelligence](../README.md) pipeline. These
+PostgreSQL 15+ queries implement the pipeline's core temporal definitions for
+warehouse use:
 
 - `staging/subscriptions_clean.sql` — typed subscription staging model.
 - `marts/customer_retention_features.sql` — customer features measured at churn
