@@ -10,10 +10,11 @@ A production-shaped SaaS retention system that joins governed ingestion,
 revenue economics, calibrated churn probabilities, randomized holdouts, and
 operational risk monitoring in one reproducible pipeline.
 
-**[Live dashboard](https://mfidalgomartins.github.io/churn-retention-intelligence/)**
-&nbsp;&nbsp;·&nbsp;&nbsp;
-**[PDF report](https://github.com/mfidalgomartins/churn-retention-intelligence/blob/main/outputs/reports/churn-retention-intelligence-report.pdf)**
-&nbsp;&nbsp;·&nbsp;&nbsp;
+<p>
+  <a href="https://mfidalgomartins.github.io/churn-retention-intelligence/"><img alt="Open the Live Dashboard" src="https://img.shields.io/badge/Open%20the-Live%20Dashboard-0b5fcc?style=for-the-badge&logo=googlechrome&logoColor=white"></a>
+  <a href="https://github.com/mfidalgomartins/churn-retention-intelligence/blob/main/outputs/reports/churn-retention-intelligence-report.pdf"><img alt="Read the Analytical Report" src="https://img.shields.io/badge/Read%20the-Analytical%20Report-b3261e?style=for-the-badge&logo=adobeacrobatreader&logoColor=white"></a>
+</p>
+
 **[Architecture](docs/architecture/pipeline_architecture.md)**
 &nbsp;&nbsp;·&nbsp;&nbsp;
 **[Quickstart](#quickstart)**
